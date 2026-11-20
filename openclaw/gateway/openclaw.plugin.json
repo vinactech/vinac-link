@@ -1,0 +1,50 @@
+{
+  "id": "vinac-link-gateway",
+  "name": "VINAC Link",
+  "description": "VINAC Link tools for OpenClaw agents: messages and intent-checked requests between paired computers, through the node that runs VINAC Link. No pairing confirmation, secret values, firewall changes or unpairing.",
+  "version": "0.7.0",
+  "enabledByDefault": false,
+  "activation": { "onStartup": true },
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "nodeId": { "type": "string", "minLength": 1, "description": "Exact id of the node that runs VINAC Link. Optional; by default the one connected node that offers vinac.status is used." },
+      "nodeName": { "type": "string", "minLength": 1, "description": "Display name of that node, used when nodeId is not set." },
+      "frontDesk": {
+        "type": "object",
+        "additionalProperties": false,
+        "description": "Opt-in: put a short note (never message text) into an agent session and wake it when VINAC Link items arrive or wait for the person. Approvals stay on the VINAC Link page.",
+        "properties": {
+          "enabled": { "type": "boolean", "description": "Default false." },
+          "sessionKey": { "type": "string", "minLength": 1, "description": "Session that gets the notes. Default agent:main:main." },
+          "agentId": { "type": "string", "minLength": 1, "description": "Agent to wake (default: the session's agent)." },
+          "waitSeconds": { "type": "number", "minimum": 0, "maximum": 30, "description": "Long-poll wait per node call. Default 25." },
+          "retrySeconds": { "type": "number", "minimum": 1, "maximum": 3600, "description": "Wait after an error (node offline). Default 30." },
+          "minWakeSeconds": { "type": "number", "minimum": 0, "maximum": 3600, "description": "At most one wake per this many seconds. Default 60." },
+          "notifyWaiting": { "type": "boolean", "description": "Note items waiting for approval (count only). Default true." },
+          "wakeOnMessages": { "type": "boolean", "description": "Note new visible messages. Default true." },
+          "notify": {
+            "type": "object", "additionalProperties": false,
+            "description": "Where the woken agent's reply goes, like heartbeat delivery (target, to, accountId). Default: the configured heartbeat destination.",
+            "properties": { "target": { "type": "string" }, "to": { "type": "string" }, "accountId": { "type": "string" } }
+          }
+        }
+      }
+    }
+  },
+  "contracts": {
+    "tools": ["vinac_status", "vinac_peers", "vinac_intents", "vinac_secrets", "vinac_pair_status", "vinac_pair_request", "vinac_send", "vinac_file", "vinac_inbox"]
+  },
+  "toolMetadata": {
+    "vinac_status": { "optional": true },
+    "vinac_peers": { "optional": true },
+    "vinac_intents": { "optional": true },
+    "vinac_secrets": { "optional": true },
+    "vinac_pair_status": { "optional": true },
+    "vinac_pair_request": { "optional": true },
+    "vinac_send": { "optional": true },
+    "vinac_file": { "optional": true },
+    "vinac_inbox": { "optional": true }
+  }
+}

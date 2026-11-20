@@ -1,0 +1,10 @@
+{
+  "name": "openclaw-vinac-link-gateway",
+  "version": "0.7.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "VINAC Link agent tools for the OpenClaw gateway. Self-contained: copy this folder to the gateway machine.",
+  "engines": { "node": ">=22" },
+  "openclaw": { "extensions": ["./index.js"] }
+}

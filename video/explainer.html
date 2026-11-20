@@ -1,0 +1,413 @@
+<!doctype html>
+<!-- VINAC Link 90-second explainer. Script: explainer-script.md. renderAt(seconds) draws any
+     moment exactly, so connector/tools/render-video.mjs can turn it into a video frame by frame.
+     Open with ?play to watch it in a browser. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VINAC Link explainer</title>
+<style>
+  html, body { margin: 0; background: #09090b; overflow: hidden; }
+  canvas { display: block; width: 100vw; height: 56.25vw; max-height: 100vh; max-width: 177.78vh; margin: auto; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1920" height="1080"></canvas>
+<script>
+const W = 1920, H = 1080, DURATION = 90;
+const c = document.getElementById('c'), g = c.getContext('2d');
+const FONT = '"Segoe UI Variable Display", "Segoe UI", "SF Pro Display", system-ui, sans-serif';
+const MONO = '"Cascadia Mono", Consolas, "SF Mono", monospace';
+const C = { bg: '#09090b', panel: '#141418', panel2: '#1b1b22', line: '#2a2a33', ink: '#f4f4f6', muted: '#a3a3ad', faint: '#6f6f7a',
+  a: '#5b74ff', b: '#a16bf2', ok: '#3ddc84', warn: '#ffb547', bad: '#ff6b6b' };
+
+// ---- images (icon and app logos), loaded before rendering -------------------------
+const img = {};
+const load = (k, src) => new Promise(res => { const i = new Image(); i.onload = () => { img[k] = i; res(); }; i.onerror = () => res(); i.src = src; });
+window.ready = Promise.all([
+  load('icon', '../site/brand/icon-512.png'),
+  ...['claude', 'codex', 'cursor', 'lmstudio', 'ollama', 'goose', 'openwebui', 'openclaw'].map(k => load(k, `../site/logos/${k}.svg`)),
+  document.fonts?.ready,
+]);
+
+// ---- timing helpers ----------------------------------------------------------------
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const ease = x => { x = clamp(x); return x * x * (3 - 2 * x); };
+const easeOut = x => 1 - Math.pow(1 - clamp(x), 3);
+const prog = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, k) => a + (b - a) * k;
+/** visible inside [a, b], fading in and out over f seconds */
+const vis = (t, a, b, f = 0.6) => Math.min(ease((t - a) / f), ease((b - t) / f));
+
+// ---- drawing helpers -----------------------------------------------------------------
+function rr(x, y, w, h, r) { g.beginPath(); g.roundRect(x, y, w, h, r); }
+function grad(x0, y0, x1, y1) { const q = g.createLinearGradient(x0, y0, x1, y1); q.addColorStop(0, C.a); q.addColorStop(1, C.b); return q; }
+function text(s, x, y, { size = 32, weight = 600, color = C.ink, align = 'center', font = FONT, alpha = 1 } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = `${weight} ${size}px ${font}`; g.fillStyle = color; g.textAlign = align; g.textBaseline = 'middle'; g.fillText(s, x, y); g.restore();
+}
+function pill(s, x, y, color, { size = 22, alpha = 1, fill } = {}) {
+  g.save(); g.globalAlpha *= alpha; g.font = `700 ${size}px ${FONT}`;
+  const w = g.measureText(s).width + size * 1.3, h = size * 1.7;
+  rr(x - w / 2, y - h / 2, w, h, h / 2); g.fillStyle = fill || color + '26'; g.fill();
+  g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText(s, x, y + 1); g.restore();
+  return w;
+}
+function laptop(x, y, label, { alpha = 1, offline = false, glow = 0, screen } = {}) {
+  g.save(); g.globalAlpha *= alpha;
+  if (glow > 0) { g.shadowColor = `rgba(110,120,255,${0.6 * glow})`; g.shadowBlur = 60 * glow; }
+  rr(x - 150, y - 105, 300, 190, 16); g.fillStyle = C.panel; g.fill();
+  g.shadowBlur = 0;
+  g.lineWidth = 3; g.strokeStyle = offline ? C.faint : '#3a3a48'; if (offline) g.setLineDash([12, 9]); g.stroke(); g.setLineDash([]);
+  rr(x - 190, y + 92, 380, 18, 9); g.fillStyle = '#2a2a33'; g.fill();
+  if (screen) screen(x, y - 10);
+  text(label, x, y + 150, { size: 30, weight: 650, color: offline ? C.muted : C.ink });
+  g.restore();
+}
+function agentChip(x, y, alpha = 1) {
+  g.save(); g.globalAlpha *= alpha;
+  rr(x - 52, y - 26, 104, 52, 26); g.fillStyle = grad(x - 52, y, x + 52, y); g.fill();
+  text('AI', x, y + 1, { size: 26, weight: 800 }); g.restore();
+}
+function key(x, y, s = 1, color = C.warn, rot = 0) {
+  g.save(); g.translate(x, y); g.rotate(rot); g.scale(s, s);
+  g.strokeStyle = color; g.lineWidth = 7; g.lineCap = 'round';
+  g.beginPath(); g.arc(-22, 0, 16, 0, Math.PI * 2); g.stroke();
+  g.beginPath(); g.moveTo(-6, 0); g.lineTo(34, 0); g.moveTo(22, 0); g.lineTo(22, 12); g.moveTo(32, 0); g.lineTo(32, 10); g.stroke();
+  g.restore();
+}
+function person(x, y, s = 1, color = C.ink, alpha = 1) {
+  g.save(); g.globalAlpha *= alpha; g.translate(x, y); g.scale(s, s); g.fillStyle = color;
+  g.beginPath(); g.arc(0, -26, 18, 0, Math.PI * 2); g.fill();
+  g.beginPath(); g.ellipse(0, 22, 30, 24, 0, Math.PI, 0); g.fill(); g.restore();
+}
+function check(x, y, s = 1, color = C.ok, k = 1) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.strokeStyle = color; g.lineWidth = 7; g.lineCap = 'round'; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(-16, 0); const p1 = ease(k * 2); g.lineTo(-16 + 12 * p1, 12 * p1);
+  if (k > 0.5) { const p2 = ease((k - 0.5) * 2); g.lineTo(-4 + 22 * p2, 12 - 26 * p2); }
+  g.stroke(); g.restore();
+}
+function cross(x, y, s = 1, color = C.bad) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.strokeStyle = color; g.lineWidth = 7; g.lineCap = 'round';
+  g.beginPath(); g.moveTo(-14, -14); g.lineTo(14, 14); g.moveTo(14, -14); g.lineTo(-14, 14); g.stroke(); g.restore();
+}
+function waves(x0, x1, y, t, alpha = 1) {
+  for (let i = 0; i < 6; i++) {
+    const p = ((t * 0.9 + i / 6) % 1);
+    const x = lerp(x0, x1, p);
+    g.save(); g.globalAlpha = alpha * Math.sin(p * Math.PI) * 0.9;
+    g.strokeStyle = grad(x0, y, x1, y); g.lineWidth = 5; g.lineCap = 'round';
+    g.beginPath(); g.arc(x - 30, y, 40, -0.6, 0.6); g.stroke(); g.restore();
+  }
+}
+function cloud(x, y, s = 1, color = C.muted) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.strokeStyle = color; g.lineWidth = 6; g.lineJoin = 'round';
+  g.beginPath(); g.moveTo(-50, 30); g.arc(-34, 8, 24, Math.PI * 0.6, Math.PI * 1.5); g.arc(4, -10, 34, Math.PI * 1.1, Math.PI * 1.95);
+  g.arc(40, 10, 22, Math.PI * 1.5, Math.PI * 0.45); g.closePath(); g.stroke(); g.restore();
+}
+function plug(x, y, s, gap, color) {
+  g.save(); g.translate(x, y); g.scale(s, s); g.strokeStyle = color; g.fillStyle = color; g.lineWidth = 6; g.lineCap = 'round';
+  rr(-70 - gap, -18, 50, 36, 8); g.fill(); g.beginPath(); g.moveTo(-20 - gap, -8); g.lineTo(-4 - gap, -8); g.moveTo(-20 - gap, 8); g.lineTo(-4 - gap, 8); g.stroke();
+  rr(20 + gap, -22, 50, 44, 8); g.fill(); g.beginPath(); g.moveTo(-110 - gap, 0); g.lineTo(-70 - gap, 0); g.moveTo(70 + gap, 0); g.lineTo(110 + gap, 0); g.stroke(); g.restore();
+}
+function logo(k, x, y, s = 56, { invert = false, alpha = 1 } = {}) {
+  const i = img[k]; if (!i) return;
+  g.save(); g.globalAlpha *= alpha; if (invert) g.filter = 'invert(1)'; g.drawImage(i, x - s / 2, y - s / 2, s, s); g.restore();
+}
+function caption(t, a, b, title, sub, step) {
+  const v = vis(t, a, b, 0.7); if (v <= 0) return;
+  const rise = (1 - easeOut((t - a) / 0.8)) * 24;
+  g.save(); g.globalAlpha = v;
+  if (step) {
+    g.font = `800 54px ${FONT}`; const tw = g.measureText(title).width; const x0 = W / 2 - (tw + 92) / 2;
+    rr(x0, 880 + rise, 68, 68, 20); g.fillStyle = grad(x0, 880, x0 + 68, 948); g.fill();
+    text(String(step), x0 + 34, 915 + rise, { size: 36, weight: 800 });
+    text(title, x0 + 92, 915 + rise, { size: 54, weight: 800, align: 'left' });
+  } else text(title, W / 2, 915 + rise, { size: 54, weight: 800 });
+  if (sub) text(sub, W / 2, 990 + rise, { size: 32, weight: 500, color: C.muted });
+  g.restore();
+}
+
+// ---- background: a quiet field of dots, a slow wave from both sides -------------------
+function background(t) {
+  g.fillStyle = C.bg; g.fillRect(0, 0, W, H);
+  const glow = g.createRadialGradient(W / 2, 0, 0, W / 2, 0, 900); glow.addColorStop(0, 'rgba(91,116,255,0.16)'); glow.addColorStop(1, 'rgba(91,116,255,0)');
+  g.fillStyle = glow; g.fillRect(0, 0, W, H);
+  for (let y = 20; y < H; y += 40) for (let x = 20; x < W; x += 40) {
+    const d1 = Math.hypot(x - 80, y - 380), d2 = Math.hypot(x - W + 80, y - 380);
+    const w = Math.sin(d1 * 0.03 - t * 2.2) * Math.max(0, 1 - d1 / 1300) + Math.sin(d2 * 0.03 - t * 2.2) * Math.max(0, 1 - d2 / 1300);
+    const a = 0.05 + 0.13 * clamp((w + 0.3) / 1.6);
+    g.fillStyle = `rgba(140,155,255,${a.toFixed(3)})`; g.fillRect(x - 1.2, y - 1.2, 2.4, 2.4);
+  }
+}
+
+// ---- scenes ---------------------------------------------------------------------------
+function scene1(t) { // 0-8: several computers, each with an agent
+  const v = vis(t, 0, 20.4, 0.8);
+  if (v <= 0) return;
+  const spots = [[480, 'PC'], [960, 'Mac'], [1440, 'Lab · offline']];
+  spots.forEach(([x, label], i) => {
+    const a = ease((t - 0.3 - i * 0.45) / 0.8) * v;
+    const lift = (1 - easeOut((t - 0.3 - i * 0.45) / 0.9)) * 40;
+    const fadeLab = i === 2 ? 1 : 1;
+    laptop(x, 430 + lift, label, { alpha: a * fadeLab, offline: i === 2, screen: (cx, cy) => agentChip(cx, cy, a) });
+  });
+  caption(t, 0.8, 7.8, 'Your AI agents work on more than one computer');
+}
+
+function scene2(t) { // 8-20: keys end up in chats; the offline machine is cut off
+  if (t < 8 || t > 20.4) return;
+  const v = vis(t, 8, 20.4, 0.6);
+  // a chat bubble above the PC/Mac
+  const bA = ease((t - 8.4) / 0.6) * v;
+  g.save(); g.globalAlpha = bA;
+  const red = ease((t - 10.8) / 0.6);
+  rr(500, 130, 680, 120, 26); g.fillStyle = '#17171d'; g.fill(); g.lineWidth = 4; g.strokeStyle = red > 0 ? `rgba(255,107,107,${0.3 + 0.7 * red})` : C.line; g.stroke();
+  g.beginPath(); g.moveTo(600, 250); g.lineTo(572, 290); g.lineTo(650, 250); g.fillStyle = '#17171d'; g.fill();
+  text('Chat', 545, 168, { size: 22, weight: 700, color: C.faint, align: 'left' });
+  text('OPENAI_API_KEY = sk-live-9f3a…', 545, 208, { size: 30, weight: 600, color: red > 0.5 ? C.bad : C.ink, align: 'left', font: MONO });
+  if (red > 0) pill('Exposed', 1100, 168, C.bad, { alpha: red, size: 20 });
+  g.restore();
+  // a key flying from the PC into the chat
+  const k = prog(t, 9.0, 10.6);
+  if (k > 0 && k < 1) key(lerp(480, 820, ease(k)), lerp(410, 210, ease(k)) - Math.sin(k * Math.PI) * 60, 1.1, C.warn, k * 0.6);
+  // the offline lab: dashed line to a cloud, crossed
+  const o = ease((t - 12.5) / 0.7) * v;
+  if (o > 0) {
+    g.save(); g.globalAlpha = o;
+    cloud(1440, 170, 1.1, C.faint);
+    g.setLineDash([10, 10]); g.strokeStyle = C.faint; g.lineWidth = 4; g.beginPath(); g.moveTo(1440, 225); g.lineTo(1440, 310); g.stroke(); g.setLineDash([]);
+    cross(1440, 268, 1.2);
+    pill('No internet', 1440, 650, C.warn, { size: 22 });
+    g.restore();
+  }
+  caption(t, 8.6, 19.8, "But they can't safely share keys, tokens or requests", 'Keys end up pasted into chats. Offline machines are cut off.');
+}
+
+// PC and Mac move to the sides for the main story
+const pcX = t => lerp(480, 560, ease(prog(t, 20.2, 21.2)));
+const macX = t => lerp(960, 1360, ease(prog(t, 20.2, 21.2)));
+function duo(t, { glow = 0, macScreen, pcScreen } = {}) {
+  laptop(pcX(t), 430, 'PC', { glow, screen: pcScreen || ((x, y) => agentChip(x, y)) });
+  laptop(macX(t), 430, 'Mac', { glow, screen: macScreen || ((x, y) => agentChip(x, y)) });
+}
+
+function scene3(t) { // 20-34: pair once
+  if (t < 20.2 || t > 34.4) return;
+  const v = vis(t, 20.2, 34.4, 0.5);
+  g.save(); g.globalAlpha = v;
+  const paired = ease(prog(t, 30.2, 30.9));
+  duo(t, { glow: paired });
+  if (t > 21.2 && t < 26) waves(pcX(t) + 160, macX(t) - 160, 400, t - 21.2, vis(t, 21.4, 26, 0.5));
+  // codes: each screen shows its own code; the person types the other one
+  const codesA = vis(t, 25.6, 34.4, 0.5);
+  if (codesA > 0) {
+    g.save(); g.globalAlpha *= codesA;
+    const typedPc = Math.floor(clamp((t - 26.6) / 1.5) * 6), typedMac = Math.floor(clamp((t - 28.2) / 1.5) * 6);
+    [[560, '482 913', '705 268', typedPc], [1360, '705 268', '482 913', typedMac]].forEach(([x, own, other, typed]) => {
+      text('This computer’s code', x, 640, { size: 22, weight: 600, color: C.faint });
+      text(own, x, 684, { size: 46, weight: 700, font: MONO, color: '#b9a8ff' });
+      const digits = other.replace(' ', '');
+      for (let i = 0; i < 6; i++) {
+        const bx = x - 150 + i * 52 + (i > 2 ? 12 : 0);
+        rr(bx, 730, 44, 56, 10); g.fillStyle = '#18181f'; g.fill(); g.lineWidth = 2; g.strokeStyle = i === typed ? C.a : C.line; g.stroke();
+        if (i < typed) text(digits[i], bx + 22, 759, { size: 28, weight: 700, font: MONO });
+      }
+    });
+    g.restore();
+  }
+  person(960, 700, 1.4, paired > 0 ? C.ok : C.ink, codesA * 0.95);
+  if (paired > 0) {
+    g.save(); g.globalAlpha = paired;
+    g.strokeStyle = grad(720, 400, 1200, 400); g.lineWidth = 6; g.beginPath(); g.moveTo(720, 400); g.lineTo(1200, 400); g.stroke();
+    pill('Paired', 960, 400, C.ok, { fill: '#10261a', size: 24 });
+    g.restore();
+  }
+  g.restore();
+  caption(t, 21, 34, 'Pair once, by sound or a short code', 'Only a person can finish pairing.', 1);
+}
+
+function scene4(t) { // 34-48: share keys and tokens
+  if (t < 34 || t > 48.4) return;
+  const v = vis(t, 34, 48.4, 0.5);
+  g.save(); g.globalAlpha = v;
+  const arrived = ease(prog(t, 39.2, 39.8));
+  duo(t, {
+    macScreen: (x, y) => {
+      if (arrived <= 0) return agentChip(x, y);
+      g.save(); g.globalAlpha *= arrived;
+      text('OPENAI_API_KEY', x, y - 22, { size: 22, weight: 700, font: MONO });
+      text('••••••••••', x, y + 18, { size: 30, weight: 700, color: C.faint });
+      g.restore();
+    },
+  });
+  g.strokeStyle = 'rgba(140,155,255,0.35)'; g.lineWidth = 4; g.beginPath(); g.moveTo(720, 400); g.lineTo(1200, 400); g.stroke();
+  // the key travels along the link into the vault
+  const k = prog(t, 35.6, 39.2);
+  if (k > 0 && k < 1) key(lerp(700, 1500, ease(k)), 400 - Math.sin(k * Math.PI) * 40, 1.2, C.warn);
+  // the key store
+  const vA = ease((t - 35) / 0.6);
+  g.save(); g.globalAlpha *= vA;
+  rr(1590, 340, 160, 170, 24); g.fillStyle = C.panel2; g.fill(); g.lineWidth = 3; g.strokeStyle = arrived > 0 ? C.ok : C.line; g.stroke();
+  g.strokeStyle = C.ink; g.lineWidth = 6; g.beginPath(); g.arc(1670, 405, 26, Math.PI, 0); g.stroke();
+  rr(1630, 405, 80, 62, 12); g.fillStyle = C.ink; g.fill();
+  text('Key store', 1670, 545, { size: 24, weight: 650, color: C.muted });
+  if (arrived > 0) check(1736, 352, 0.9, C.ok, prog(t, 39.4, 40.2));
+  g.restore();
+  // the agent sees the name, never the value
+  const note = ease((t - 41) / 0.7);
+  if (note > 0) {
+    g.save(); g.globalAlpha *= note;
+    rr(1040, 640, 640, 120, 22); g.fillStyle = '#121218'; g.fill(); g.lineWidth = 2; g.strokeStyle = C.line; g.stroke();
+    text('The agent sees:', 1070, 675, { size: 22, weight: 600, color: C.faint, align: 'left' });
+    text('OPENAI_API_KEY · value hidden', 1070, 718, { size: 26, weight: 650, align: 'left', font: MONO });
+    g.restore();
+    g.save(); g.globalAlpha *= note;
+    rr(340, 660, 440, 80, 20); g.fillStyle = '#2c1214'; g.fill();
+    cross(390, 700, 0.8); text('Never pasted into a chat', 420, 700, { size: 26, weight: 650, color: C.bad, align: 'left' });
+    g.restore();
+  }
+  g.restore();
+  caption(t, 34.4, 47.8, 'Share keys and tokens', 'Straight into the key store, never into a chat.', 2);
+}
+
+function scene5(t) { // 48-64: requests your rules check, human in the loop
+  if (t < 48 || t > 64.4) return;
+  const v = vis(t, 48, 64.4, 0.5);
+  g.save(); g.globalAlpha = v;
+  laptop(300, 420, 'PC', { screen: (x, y) => agentChip(x, y) });
+  laptop(1620, 420, 'Mac', { screen: (x, y) => agentChip(x, y) });
+  // the gate with three lanes
+  const lanes = [[290, 'Allow', C.ok], [430, 'Ask me', C.warn], [570, 'Block', C.bad]];
+  text('Your rules', 960, 160, { size: 26, weight: 700, color: C.muted });
+  rr(810, 200, 300, 470, 30); g.fillStyle = C.panel; g.fill(); g.lineWidth = 3; g.strokeStyle = C.line; g.stroke();
+  lanes.forEach(([y, label, col]) => { rr(840, y - 55, 240, 110, 20); g.fillStyle = col + '1f'; g.fill(); text(label, 960, y - 28, { size: 24, weight: 750, color: col }); });
+  // request cards
+  const card = (label, y0, path, col) => {
+    const [ta, tb, laneY, end] = path;
+    const p = prog(t, ta, tb);
+    if (p <= 0 || t > end + 0.5) return;
+    const fade = 1 - prog(t, end, end + 0.5);
+    let x, y;
+    if (p < 0.45) { const q = ease(p / 0.45); x = lerp(470, 760, q); y = lerp(y0, laneY, q); }
+    else { const q = ease((p - 0.45) / 0.55); x = lerp(760, col === C.bad ? 900 : 1460, q); y = laneY; }
+    g.save(); g.globalAlpha *= fade;
+    g.font = `650 24px ${MONO}`; const w = g.measureText(label).width + 40;
+    rr(x - w / 2, y - 30, w, 60, 16); g.fillStyle = '#1f1f28'; g.fill(); g.lineWidth = 3; g.strokeStyle = col; g.stroke();
+    text(label, x, y, { size: 24, weight: 650, font: MONO });
+    g.restore();
+  };
+  card('question.ask', 380, [49.2, 52.4, 308, 52.6], C.ok);
+  card('command.execute', 420, [53, 55.4, 588, 55.6], C.bad);
+  if (t > 55.4 && t < 56.6) cross(960, 588, 1.4);
+  // the review request waits for a person
+  const r = prog(t, 56.4, 58.2);
+  const approved = ease(prog(t, 60.2, 60.7));
+  if (r > 0) {
+    const toGate = ease(clamp(r));
+    const out = ease(prog(t, 60.8, 62.6));
+    const x = out > 0 ? lerp(960, 1290, out) : lerp(470, 960, toGate);
+    const y = out > 0 ? 448 : lerp(460, 448, toGate);
+    const fade = 1 - prog(t, 63, 63.6);
+    g.save(); g.globalAlpha *= fade;
+    g.font = `650 24px ${MONO}`; const w = g.measureText('review.request').width + 40;
+    const pulse = t > 58.2 && approved === 0 ? 0.5 + 0.5 * Math.sin(t * 6) : 1;
+    rr(x - w / 2, y - 30, w, 60, 16); g.fillStyle = '#1f1f28'; g.fill(); g.lineWidth = 3; g.strokeStyle = approved > 0 ? C.ok : `rgba(255,181,71,${pulse})`; g.stroke();
+    text('review.request', x, y, { size: 24, weight: 650, font: MONO });
+    g.restore();
+  }
+  // the person approves
+  const ask = vis(t, 58.2, 63.4, 0.4);
+  if (ask > 0) {
+    g.save(); g.globalAlpha *= ask;
+    person(960, 760, 1.2, approved > 0 ? C.ok : C.ink);
+    const press = t > 59.9 && t < 60.3 ? 0.94 : 1;
+    g.save(); g.translate(1110, 770); g.scale(press, press);
+    rr(-90, -32, 180, 64, 32); g.fillStyle = approved > 0 ? '#1f7a36' : grad(-90, 0, 90, 0); g.fill();
+    text(approved > 0 ? 'Approved' : 'Approve', 0, 1, { size: 26, weight: 750 });
+    g.restore(); g.restore();
+  }
+  if (t > 62.2) check(1620, 300, 1.3, C.ok, prog(t, 62.2, 62.9));
+  g.restore();
+  caption(t, 48.4, 63.8, 'Send requests your rules check', 'Each request says what it wants. You stay in the loop.', 3);
+}
+
+function scene6(t) { // 64-74: online or offline
+  if (t < 64 || t > 74.4) return;
+  const v = vis(t, 64, 74.4, 0.5);
+  g.save(); g.globalAlpha = v;
+  const L = ease((t - 64.3) / 0.7), R = ease((t - 65.3) / 0.7);
+  const panel = (x, a, title, items, drawIcon) => {
+    g.save(); g.globalAlpha *= a;
+    rr(x - 400, 170, 800, 560, 32); g.fillStyle = C.panel; g.fill(); g.lineWidth = 2; g.strokeStyle = C.line; g.stroke();
+    drawIcon(x, 300);
+    text(title, x, 430, { size: 44, weight: 800 });
+    items.forEach(([k, name, inv], i) => {
+      const yy = 520 + Math.floor(i / 2) * 90, xx = x - 180 + (i % 2) * 360;
+      logo(k, xx - 110, yy, 48, { invert: inv });
+      text(name, xx - 70, yy, { size: 28, weight: 650, align: 'left' });
+    });
+    g.restore();
+  };
+  panel(520, L, 'Online', [['claude', 'Claude Code'], ['codex', 'Codex'], ['cursor', 'Cursor'], ['openclaw', 'OpenClaw']], (x, y) => cloud(x, y, 1.6, '#9aa8ff'));
+  panel(1400, R, 'Offline', [['lmstudio', 'LM Studio'], ['ollama', 'Ollama'], ['goose', 'Goose'], ['openwebui', 'Open WebUI']], (x, y) => plug(x, y, 1.1, 18 + 22 * ease(prog(t, 66, 67.2)), '#9aa8ff'));
+  g.restore();
+  caption(t, 64.6, 73.8, 'Online or offline', 'Cloud agents and local models. The link itself never needs the internet.');
+}
+
+function scene7(t) { // 74-84: security
+  if (t < 74 || t > 84.4) return;
+  const v = vis(t, 74, 84.4, 0.5);
+  g.save(); g.globalAlpha = v;
+  // shield
+  const s = easeOut((t - 74.2) / 0.9);
+  g.save(); g.translate(560, 450); g.scale(0.6 + 0.4 * s, 0.6 + 0.4 * s); g.globalAlpha *= s;
+  g.beginPath(); g.moveTo(0, -170); g.lineTo(150, -110); g.lineTo(140, 40); g.quadraticCurveTo(110, 150, 0, 200); g.quadraticCurveTo(-110, 150, -140, 40); g.lineTo(-150, -110); g.closePath();
+  g.fillStyle = grad(-150, -170, 150, 200); g.fill();
+  check(0, 10, 2.6, '#ffffff', prog(t, 75, 76));
+  g.restore();
+  const items = ['Built on proven, published cryptography', 'No servers in between', 'Human in the loop for everything that matters'];
+  items.forEach((s2, i) => {
+    const a = ease((t - 75.6 - i * 0.9) / 0.6);
+    const dx = (1 - easeOut((t - 75.6 - i * 0.9) / 0.7)) * 40;
+    g.save(); g.globalAlpha *= a;
+    rr(820 + dx, 290 + i * 120, 860, 92, 22); g.fillStyle = C.panel; g.fill();
+    check(870 + dx, 336 + i * 120, 1, C.ok, prog(t, 75.8 + i * 0.9, 76.4 + i * 0.9));
+    text(s2, 920 + dx, 336 + i * 120, { size: 34, weight: 650, align: 'left' });
+    g.restore();
+  });
+  g.restore();
+  caption(t, 74.6, 83.8, 'Security first', 'Our own design, on proven foundations.');
+}
+
+function scene8(t) { // 84-90: logo and address
+  if (t < 84) return;
+  const a = ease((t - 84.2) / 0.8);
+  const sc = 0.85 + 0.15 * easeOut((t - 84.2) / 1);
+  g.save(); g.globalAlpha = a;
+  if (img.icon) {
+    g.save(); g.translate(W / 2, 360); g.scale(sc, sc);
+    g.shadowColor = 'rgba(110,120,255,0.55)'; g.shadowBlur = 80;
+    rr(-120, -120, 240, 240, 54); g.save(); g.clip(); g.drawImage(img.icon, -120, -120, 240, 240); g.restore();
+    g.restore();
+  }
+  text('VINAC Link', W / 2, 580, { size: 96, weight: 800 });
+  text('A secure link between your AI agents', W / 2, 670, { size: 40, weight: 500, color: C.muted, alpha: ease((t - 85) / 0.8) });
+  g.save(); g.globalAlpha *= ease((t - 85.8) / 0.8);
+  g.font = `800 52px ${FONT}`; g.fillStyle = grad(W / 2 - 160, 0, W / 2 + 160, 0); g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillText('vinac.tech', W / 2, 790);
+  g.restore();
+  g.restore();
+}
+
+function renderAt(t) {
+  background(t);
+  scene1(t); scene2(t); scene3(t); scene4(t); scene5(t); scene6(t); scene7(t); scene8(t);
+}
+window.renderAt = renderAt;
+window.DURATION = DURATION;
+
+if (new URLSearchParams(location.search).has('play')) {
+  window.ready.then(() => { const start = performance.now(); const loop = now => { const t = ((now - start) / 1000) % DURATION; renderAt(t); requestAnimationFrame(loop); }; requestAnimationFrame(loop); });
+} else window.ready.then(() => renderAt(Number(new URLSearchParams(location.search).get('t') || 0)));
+</script>
+</body>
+</html>

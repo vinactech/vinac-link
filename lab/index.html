@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="color-scheme" content="light dark">
+  <title>VINAC Lab</title>
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" aria-hidden="true"><rect x="2" y="9" width="3" height="6" rx="1.5"/><rect x="8" y="5" width="3" height="14" rx="1.5"/><rect x="14" y="7" width="3" height="10" rx="1.5"/><rect x="20" y="10" width="2.5" height="4" rx="1.25"/></svg>
+      <div>
+        <h1>VINAC Lab</h1>
+        <p>Signed messages over near-ultrasound</p>
+      </div>
+    </div>
+    <div class="pills">
+      <span class="pill" id="micPill" data-state="off">Mic off</span>
+      <span class="pill quiet" id="sessionPill">Session —</span>
+    </div>
+  </header>
+
+  <nav class="roles" role="tablist" aria-label="Role of this device">
+    <button role="tab" id="roleSend" data-role="send" aria-selected="true">Send</button>
+    <button role="tab" id="roleReceive" data-role="receive" aria-selected="false">Receive</button>
+    <button role="tab" id="roleSelf" data-role="self" aria-selected="false">Test this device</button>
+  </nav>
+
+  <main class="layout">
+    <section class="col">
+      <!-- Pairing: the sender hands its link to the receiver -->
+      <div class="card" id="pairCard">
+        <div data-show="send">
+          <h2>1 · Pair the receiver</h2>
+          <p class="hint">Open this link on the other device. It carries the session key, speed and tones, so nothing needs to be matched by hand.</p>
+          <div class="copyrow">
+            <input id="pairLink" readonly aria-label="Receiver link">
+            <button class="ghost" id="copyLink">Copy</button>
+          </div>
+          <p class="hint small" id="linkNote">Treat it like a temporary password. Copy it again after changing speed or tones.</p>
+        </div>
+        <div data-show="receive">
+          <h2>1 · Pairing</h2>
+          <div id="pairedInfo" class="paired" hidden></div>
+          <div id="pastePair">
+            <p class="hint">Open the link from the sending device, or paste it here.</p>
+            <div class="copyrow">
+              <input id="pasteLink" placeholder="Paste the receiver link" aria-label="Receiver link">
+              <button class="ghost" id="usePasted">Use</button>
+            </div>
+          </div>
+        </div>
+        <div data-show="self">
+          <h2>1 · Same-device check</h2>
+          <p class="hint">This device sends and listens at once. Use it to check the speaker and microphone before a two-device test.</p>
+        </div>
+      </div>
+
+      <!-- The main action -->
+      <div class="card" id="actionCard">
+        <h2 id="actionTitle">2 · Send</h2>
+        <div data-show="receive self">
+          <button class="primary big" id="listenBtn">Start listening</button>
+        </div>
+        <div data-show="send self" class="sendbox">
+          <label for="message">Message</label>
+          <input id="message" maxlength="120" value="Hello from VINAC">
+          <button class="primary big" id="sendBtn"><span id="sendLabel">Send message</span><i class="progress" id="sendProgress"></i></button>
+          <button class="ghost" id="replayBtn" disabled title="Plays the last message again, unchanged. A receiver must refuse it.">Replay last message (security test)</button>
+        </div>
+      </div>
+
+      <!-- Setup -->
+      <div class="card" id="setupCard">
+        <h2>Setup</h2>
+        <div class="field" data-show="send self">
+          <label for="speaker">Speaker</label>
+          <select id="speaker"><option value="">System default</option></select>
+          <p class="hint small" id="speakerHint">Speaker names appear after the microphone is on.</p>
+        </div>
+        <div class="field">
+          <span class="label">Speed</span>
+          <div class="seg" id="speedSeg" role="radiogroup" aria-label="Speed">
+            <button role="radio" data-speed="fast">Fast<small>100 bps</small></button>
+            <button role="radio" data-speed="steady">Steady<small>50 bps</small></button>
+            <button role="radio" data-speed="slow">Slow<small>25 bps</small></button>
+          </div>
+          <p class="hint small" id="airtimeHint"></p>
+        </div>
+        <div class="field">
+          <span class="label">Tones</span>
+          <div class="tones" id="toneChips"></div>
+          <div data-show="send self" class="tunerow">
+            <button class="ghost" id="tuneBtn">Tune to this speaker</button>
+            <span class="hint small" id="tuneStatus">Plays a 10-second sweep and avoids weak spots.</span>
+          </div>
+        </div>
+      </div>
+
+      <details class="card" id="advanced">
+        <summary>Advanced</summary>
+        <div class="field">
+          <label for="fec">Error correction</label>
+          <select id="fec">
+            <option value="64">Strong · 64 repair bytes</option>
+            <option value="32">Normal · 32 repair bytes</option>
+            <option value="0">Off · v1 frames</option>
+          </select>
+        </div>
+        <div class="field">
+          <label for="intent">Request type (Logos intent)</label>
+          <select id="intent"></select>
+        </div>
+        <div class="buttons">
+          <button class="ghost" id="newSession">New session</button>
+          <button class="ghost" id="securityBtn">Run security self-test</button>
+          <button class="ghost" id="exportBtn">Export report</button>
+        </div>
+        <ul class="checks" id="securityResults" hidden></ul>
+      </details>
+    </section>
+
+    <section class="col">
+      <div class="card meter" id="meterCard">
+        <div class="meterhead">
+          <h2>Signal</h2>
+          <span class="hint small" id="meterStatus">Microphone off</span>
+        </div>
+        <div class="bars" id="bars"></div>
+      </div>
+
+      <div class="summary" aria-live="polite">
+        <div><b id="countSent">0</b><span>sent</span></div>
+        <div class="ok"><b id="countOk">0</b><span>verified</span></div>
+        <div class="bad"><b id="countBad">0</b><span>rejected</span></div>
+      </div>
+
+      <div class="card feedcard">
+        <h2>Messages</h2>
+        <ol class="feed" id="feed" aria-live="polite">
+          <li class="empty" id="feedEmpty">Nothing yet. Sent and received messages appear here with their result.</li>
+        </ol>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot">Research build. Messages are signed and replay-protected, but not encrypted, and sound does not prove distance.</footer>
+
+  <script type="module" src="./js/app.js"></script>
+</body>
+</html>

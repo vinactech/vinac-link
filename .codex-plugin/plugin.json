@@ -1,0 +1,18 @@
+{
+  "name": "vinac-link",
+  "version": "0.7.0",
+  "description": "A secure link between AI agents on your computers, no cloud or internet needed. Pair by sound or code; send encrypted messages, requests, files and git branches through a firewall you control. Secrets are never returned to agents.",
+  "author": { "name": "Mexley Marketing Inc.", "url": "https://vinac.tech" },
+  "homepage": "https://vinac.tech",
+  "license": "Apache-2.0",
+  "keywords": ["agents", "pairing", "messaging", "secrets", "ultrasound", "mcp", "claude-code"],
+  "skills": "./skills/",
+  "mcpServers": "./codex.mcp.json",
+  "interface": {
+    "displayName": "VINAC Link",
+    "shortDescription": "Encrypted messages between agents on your paired computers",
+    "longDescription": "Pair this computer with another one by sound (or a typed code) and a two-way 6-digit code check. Agents can then send each other encrypted messages, intent-checked requests, files up to 64 MB and git branches, directly over Wi-Fi, a hotspot or a cable, with no server and no internet. Each person's firewall decides what reaches their agent. People can send API keys between the devices; agent tools only ever see their names.",
+    "developerName": "Mexley Marketing Inc.",
+    "category": "Productivity"
+  }
+}

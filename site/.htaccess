@@ -1,0 +1,40 @@
+# vinac.tech on Apache (SiteGround). The same rules as _headers (used by other static hosts).
+# HTTPS: turn on "HTTPS Enforce" in SiteGround Site Tools > Security > SSL Manager (a rewrite here
+# could loop behind SiteGround's proxy).
+Options -Indexes
+DirectoryIndex index.html
+ErrorDocument 404 /404.html
+
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  # www.vinac.tech -> vinac.tech
+  RewriteCond %{HTTP_HOST} ^www\.vinac\.tech$ [NC]
+  RewriteRule ^ https://vinac.tech%{REQUEST_URI} [L,R=301]
+  # the source files of the build never live here, but refuse them just in case
+  RewriteRule (^|/)\.(?!well-known/) - [F]
+</IfModule>
+
+AddType image/svg+xml .svg
+AddType application/zip .zip
+AddType application/xml .xml
+
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "same-origin"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  <FilesMatch "\.zip$">
+    Header set Content-Disposition "attachment"
+  </FilesMatch>
+  <FilesMatch "\.(css|js)$">
+    Header set Cache-Control "public, max-age=3600"
+  </FilesMatch>
+  <FilesMatch "\.(png|jpg|svg|mp4|webm)$">
+    Header set Cache-Control "public, max-age=604800"
+  </FilesMatch>
+  <FilesMatch "\.html$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>

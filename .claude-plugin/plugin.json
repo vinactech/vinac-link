@@ -1,0 +1,16 @@
+{
+  "name": "vinac-link",
+  "displayName": "VINAC Link",
+  "version": "0.7.0",
+  "description": "A secure link between AI agents on your computers, no cloud or internet needed. Pair by sound or code; send encrypted messages, requests, files and git branches through a firewall you control. Secrets are never returned to agents.",
+  "author": { "name": "Mexley Marketing Inc.", "url": "https://vinac.tech" },
+  "homepage": "https://vinac.tech",
+  "license": "Apache-2.0",
+  "keywords": ["agents", "pairing", "messaging", "secrets", "ultrasound", "mcp", "codex"],
+  "mcpServers": {
+    "vinac": {
+      "command": "node",
+      "args": ["${CLAUDE_PLUGIN_ROOT}/connector/bin/vinac.mjs", "mcp"]
+    }
+  }
+}

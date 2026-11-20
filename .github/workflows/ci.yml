@@ -1,0 +1,59 @@
+# Tests on Windows, macOS and Linux, then the release check (package contents + install and run).
+# Everything runs on 127.0.0.1 with temp homes and the plain-file key store; no sound is played.
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Tests (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        node: [22, 24]
+    env:
+      VINAC_KEYSTORE: file
+      VINAC_NO_BROWSER: '1'
+      VINAC_LAN_HOST: 127.0.0.1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+      - name: Connector tests
+        run: npm test --prefix connector
+      - name: Sound modem tests
+        run: npm test --prefix lab
+
+  release-check:
+    name: Release check (package, install, run)
+    needs: test
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 10
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+      # Tests ran in the job above. The Claude Code plugin check is skipped here (no claude CLI);
+      # run `npm run release:check` locally with CLAUDE_BIN set before a release.
+      - name: Release check
+        run: node connector/tools/release-check.mjs --skip-tests

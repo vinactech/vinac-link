@@ -1,0 +1,375 @@
+{{head}}
+<body class="home">
+<a class="skip" href="#content">Skip to content</a>
+{{header}}
+<main id="content">
+
+<section class="hero">
+  <canvas class="field" aria-hidden="true"></canvas>
+  <div class="wrap hero-center">
+    <p class="chip"><span class="dot" aria-hidden="true"></span>Open source · Online or offline · v{{version}}</p>
+    <h1>A secure link between<br>your <span class="grad-text">AI agents</span></h1>
+    <p class="lede">Pair your computers once, by sound or a short code. Then their AI agents can pass each other API keys, tokens and requests, your rules decide what each agent receives, and you stay in the loop for anything that matters.</p>
+    <div class="cta">
+      <a class="btn primary" href="#download">Download for free</a>
+      <a class="btn ghost" href="/docs/getting-started.html">Read the quick start</a>
+    </div>
+    <ul class="os-row" aria-label="Runs on">
+      <li><img src="/logos/windows.svg" alt="" width="18" height="18">Windows</li>
+      <li><img class="ink-black" src="/logos/apple.svg" alt="" width="18" height="18">macOS</li>
+      <li><img class="ink-black" src="/logos/linux.svg" alt="" width="18" height="18">Linux</li>
+    </ul>
+    <p class="micro">Free <span aria-hidden="true">·</span> No account <span aria-hidden="true">·</span> Cloud agents and local models</p>
+  </div>
+  <div class="wrap shot-wrap">
+    <figure class="shot">
+      <img class="for-dark" src="/media/app-firewall-dark.jpg" width="1440" height="900" fetchpriority="high" alt="The VINAC Link page on a PC: two requests from the Mac, a task hand-off and a code review, wait for approval. A status update was allowed by a rule.">
+      <img class="for-light" src="/media/app-firewall-light.jpg" width="1440" height="900" loading="lazy" alt="The VINAC Link page on a PC: two requests from the Mac, a task hand-off and a code review, wait for approval. A status update was allowed by a rule.">
+      <figcaption>The real VINAC Link page: a request from another computer's agent waits until you approve it.</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="works" aria-label="Works with">
+  <p class="works-label">Works with the agents you already use, in the cloud or on your own machine</p>
+  <div class="marquee">
+    {{works}}
+  </div>
+</section>
+
+<section class="section" id="how">
+  <div class="wrap">
+    <p class="kicker center">How it works</p>
+    <h2 class="center">Pair once. Then share safely.</h2>
+    <figure class="schematic">
+      <svg viewBox="0 0 1200 560" role="img" aria-labelledby="schem-title schem-desc">
+        <title id="schem-title">How VINAC Link works</title>
+        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once by sound or a short code. Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline.</desc>
+        <defs>
+          <linearGradient id="sg-link" gradientUnits="userSpaceOnUse" x1="420" x2="780" y1="250" y2="250"><stop offset="0" class="sg-a"/><stop offset="1" class="sg-b"/></linearGradient>
+          <linearGradient id="sg-chip" x1="0" x2="1" y1="0" y2="1"><stop offset="0" class="sg-a"/><stop offset="1" class="sg-b"/></linearGradient>
+          <filter id="sg-glow" x="-20%" y="-200%" width="140%" height="500%"><feGaussianBlur stdDeviation="8"/></filter>
+          <path id="sg-path" d="M420 250 H780"/>
+          <path id="sg-path-back" d="M780 250 H420"/>
+        </defs>
+
+        <!-- online: cloud AI, optional -->
+        <g class="sg-cloud">
+          <path class="sg-dash" d="M560 92 C470 110 330 120 290 168 M640 92 C730 110 870 120 910 168"/>
+          <path class="sg-cloud-shape" d="M562 96h78a26 26 0 0 0 2-52 38 38 0 0 0-72-6 24 24 0 0 0-8 58Z"/>
+          <text class="sg-small" x="600" y="128" text-anchor="middle">Cloud AI · online, optional</text>
+        </g>
+
+        <!-- the two computers -->
+        <g class="sg-pc">
+          <rect class="sg-screen" x="130" y="170" width="290" height="166" rx="16"/>
+          <rect class="sg-base" x="100" y="342" width="350" height="14" rx="7"/>
+          <rect x="235" y="200" width="80" height="40" rx="20" fill="url(#sg-chip)"/>
+          <text class="sg-chip-text" x="275" y="226" text-anchor="middle">AI</text>
+          <rect class="sg-vault" x="200" y="266" width="150" height="40" rx="12"/>
+          <path class="sg-lock" d="M222 284v-5a7 7 0 0 1 14 0v5M218 284h22v14h-22z"/>
+          <text class="sg-tiny" x="250" y="292">Key store</text>
+          <text class="sg-label" x="275" y="390" text-anchor="middle">PC</text>
+        </g>
+        <g class="sg-mac">
+          <rect class="sg-screen" x="780" y="170" width="290" height="166" rx="16"/>
+          <rect class="sg-base" x="750" y="342" width="350" height="14" rx="7"/>
+          <rect x="885" y="200" width="80" height="40" rx="20" fill="url(#sg-chip)"/>
+          <text class="sg-chip-text" x="925" y="226" text-anchor="middle">AI</text>
+          <rect class="sg-vault" x="850" y="266" width="150" height="40" rx="12"/>
+          <path class="sg-lock" d="M872 284v-5a7 7 0 0 1 14 0v5M868 284h22v14h-22z"/>
+          <text class="sg-tiny" x="900" y="292">Key store</text>
+          <text class="sg-label" x="925" y="390" text-anchor="middle">Mac</text>
+        </g>
+
+        <!-- the link -->
+        <path class="sg-link-glow" d="M420 250 H780" stroke="url(#sg-link)" filter="url(#sg-glow)"/>
+        <path class="sg-link" d="M420 250 H780" stroke="url(#sg-link)"/>
+        <circle class="sg-packet" r="5"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#sg-path"/></animateMotion></circle>
+        <circle class="sg-packet" r="5"><animateMotion dur="3.2s" begin="-1.6s" repeatCount="indefinite"><mpath href="#sg-path-back"/></animateMotion></circle>
+
+        <!-- 1: pair once (sound) -->
+        <path class="sg-wave" d="M432 232a26 26 0 0 1 0 36M446 222a40 40 0 0 1 0 56M460 212a54 54 0 0 1 0 76"/>
+        <circle class="sg-num" cx="452" cy="178" r="16"/><text class="sg-num-text" x="452" y="184" text-anchor="middle">1</text>
+        <text class="sg-step" x="452" y="318" text-anchor="middle">Pair once</text>
+
+        <!-- 2: keys and tokens -->
+        <g class="sg-key" transform="translate(560 226)">
+          <circle cx="-14" cy="0" r="10"/><path d="M-4 0h30M16 0v8M24 0v6"/>
+        </g>
+        <circle class="sg-num" cx="566" cy="178" r="16"/><text class="sg-num-text" x="566" y="184" text-anchor="middle">2</text>
+        <text class="sg-step" x="566" y="318" text-anchor="middle">Keys &amp; tokens</text>
+
+        <!-- 3: your rules, a person approves -->
+        <rect class="sg-gate" x="652" y="204" width="76" height="92" rx="18"/>
+        <path class="sg-shield" d="M690 220l20 8v14c0 14-9 22-20 27-11-5-20-13-20-27v-14z"/>
+        <circle class="sg-dot-ok" cx="674" cy="283" r="4"/><circle class="sg-dot-ask" cx="690" cy="283" r="4"/><circle class="sg-dot-block" cx="706" cy="283" r="4"/>
+        <circle class="sg-num" cx="740" cy="190" r="16"/><text class="sg-num-text" x="740" y="196" text-anchor="middle">3</text>
+        <text class="sg-step" x="690" y="318" text-anchor="middle">Your rules</text>
+        <path class="sg-dash" d="M690 328 V368"/>
+        <g class="sg-person"><circle cx="690" cy="384" r="12"/><path d="M670 422a20 18 0 0 1 40 0z"/></g>
+        <text class="sg-small" x="690" y="446" text-anchor="middle">You approve</text>
+
+        <!-- offline -->
+        <g class="sg-offline">
+          <rect class="sg-pill" x="370" y="488" width="460" height="48" rx="24"/>
+          <path class="sg-plug" d="M404 512h12m0-8h12v16h-12zm24 0h12v16h-12zm12 8h12M434 506v12"/>
+          <text class="sg-small sg-strong" x="482" y="518">Local models: everything works offline</text>
+        </g>
+      </svg>
+    </figure>
+    <ol class="legend">
+      <li><span class="num">1</span><div><h3>Pair once</h3><p>By sound or a short code. You confirm a 6-digit code on each screen; only a person can finish pairing.</p></div></li>
+      <li><span class="num">2</span><div><h3>Share keys and tokens</h3><p>They go straight into the other computer's key store. Agents can use them, never see them.</p></div></li>
+      <li><span class="num">3</span><div><h3>Send requests your rules check</h3><p>Each request says what it wants. Your rules let it through, ask you first, or block it.</p></div></li>
+    </ol>
+    <p class="fine center legend-note">Online with cloud agents like Claude Code and Codex, or fully offline with local models in LM Studio, Ollama, Goose or Open WebUI. The link between your computers never needs the internet.</p>
+  </div>
+</section>
+
+<section class="section alt" id="features">
+  <div class="wrap">
+    <p class="kicker center">What it does</p>
+    <h2 class="center">Trust between your computers, in your hands</h2>
+    <div class="tabs">
+      <div class="tablist" role="tablist" aria-label="Features">
+        <button role="tab" id="tab-pair" aria-controls="panel-pair" aria-selected="true">Pairing</button>
+        <button role="tab" id="tab-secrets" aria-controls="panel-secrets" aria-selected="false">Secrets</button>
+        <button role="tab" id="tab-firewall" aria-controls="panel-firewall" aria-selected="false">Requests</button>
+        <button role="tab" id="tab-files" aria-controls="panel-files" aria-selected="false">Files</button>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-pair" aria-labelledby="tab-pair">
+        <div class="panel-copy">
+          <h3>Trust that only people can create</h3>
+          <p>Each screen shows its own six digits, and you type them into the other computer. Nobody nearby or on the network can slip in, and an agent can start pairing but can't finish it.</p>
+          <ul class="ticks"><li>By sound, or a typed code when there's no microphone</li><li>Built on the Noise protocol, a published standard</li><li>Works on your own network, or across networks with Tailscale</li></ul>
+          <a class="link" href="/docs/guide/pairing.html">How pairing works →</a>
+        </div>
+        <div class="panel-visual">
+          <div class="dark-card pair-card" aria-hidden="true">
+            <div class="pair-devs">
+              <div class="pd"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 18h20"/></svg>PC</div>
+              <div class="pd-waves"><span></span><span></span><span></span></div>
+              <div class="pd"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 18h20"/></svg>Mac</div>
+            </div>
+            <p class="dc-label">Type this on the Mac</p>
+            <p class="code-big">482 913</p>
+            <p class="dc-label">Code shown on the Mac</p>
+            <div class="code-input"><span>7</span><span>0</span><span>5</span><span>2</span><span>6</span><span class="caret"></span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-firewall" aria-labelledby="tab-firewall">
+        <div class="panel-copy">
+          <h3>Every request says what it wants. Your rules decide.</h3>
+          <p>Agents don't send each other free-form commands. Each request names its purpose from a fixed list, so your computer can check it before your agent ever sees it. Anything that matters waits for a human: you approve or reject it.</p>
+          <ul class="lanes-mini">
+            <li><span class="pill allow">Allow</span>The agent sees it right away: questions, status updates.</li>
+            <li><span class="pill ask">Ask me</span>Waits for your OK: code reviews, task hand-offs, files.</li>
+            <li><span class="pill block">Block</span>Never reaches the agent: running commands, writing files.</li>
+          </ul>
+          <a class="link" href="/docs/guide/firewall.html">Set your own rules →</a>
+        </div>
+        <div class="panel-visual">
+          <img class="dark-shot" src="/media/app-overview-dark.jpg" width="1440" height="900" loading="lazy" alt="The VINAC Link overview: one paired device online, two requests waiting for approval, four messages received today, nothing blocked.">
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-secrets" aria-labelledby="tab-secrets">
+        <div class="panel-copy">
+          <h3>Keys and tokens move between computers, never through the chat</h3>
+          <p>Send an API key or token from one computer to the other. It goes straight into that computer's secure key store. Your agent can use it in a program you approve, but only ever sees its name.</p>
+          <ul class="ticks"><li>Stored by Windows, macOS or Linux's own key store</li><li>Only accepted while you choose to receive one</li><li>Each use needs your OK on the VINAC Link page</li></ul>
+          <a class="link" href="/docs/guide/secrets.html">Moving secrets →</a>
+        </div>
+        <div class="panel-visual">
+          <div class="dark-card term" aria-hidden="true">
+            <div class="term-bar"><i></i><i></i><i></i><span>Agent on the Mac</span></div>
+<pre><span class="mut">› what secrets do I have?</span>
+<span class="acc">vinac_secrets</span>
+  DEMO_API_KEY   <span class="mut">from the PC · by sound · in Keychain</span>
+  <span class="mut">value: never shown to agents</span>
+
+<span class="mut">› start the app with it</span>
+<span class="acc">vinac run</span> --secret DEMO_API_KEY -- npm start
+  <span class="warn">waiting for your OK on the VINAC Link page…</span>
+  <span class="ok">approved · started</span></pre>
+          </div>
+        </div>
+      </div>
+
+      <div class="panel" role="tabpanel" id="panel-files" aria-labelledby="tab-files">
+        <div class="panel-copy">
+          <h3>Files and code, checked on arrival</h3>
+          <p>When agents need to share a file or a git branch, it travels encrypted and is checked on arrival. Your rules decide whether it reaches the agent, and nothing is merged for you.</p>
+          <ul class="ticks"><li>Files up to 64 MB</li><li>A tamper-evident record of what was shared, never the contents</li><li>Works with no internet at all</li></ul>
+          <a class="link" href="/docs/guide/messages-and-requests.html">Messages, files and git →</a>
+        </div>
+        <div class="panel-visual">
+          <div class="dark-card term" aria-hidden="true">
+            <div class="term-bar"><i></i><i></i><i></i><span>Terminal on the PC</span></div>
+<pre><span class="mut">$</span> vinac git send --branch feature/login --to Mac
+  bundle 84 KB · 6 commits · <span class="ok">delivered, receipt checked</span>
+
+<span class="mut">$</span> vinac send-file build.log --to all
+  2 devices · 3.1 MB in 7 sealed parts · <span class="ok">delivered</span>
+
+<span class="mut">$</span> vinac audit --verify
+  1,284 entries · <span class="ok">chain intact</span></pre>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="demo">
+  <div class="wrap narrow center">
+    <p class="kicker">Demo</p>
+    <h2>See it in 90 seconds</h2>
+    <p class="sub">The whole idea, start to finish: pair once, share keys and tokens, and send requests your rules check, with you in the loop.</p>
+    {{demo}}
+  </div>
+</section>
+
+<section class="section alt" id="security">
+  <div class="wrap narrow">
+    <div class="honest">
+      <span class="pill allow">Security first</span>
+      <h2>Our technology, on proven foundations</h2>
+      <p class="sub">The pairing, the intent firewall and the way secrets move are our own design. Underneath, every connection uses the Noise protocol, the published cryptography also used by WireGuard and WhatsApp.</p>
+      <div class="two">
+        <div>
+          <h3>Built in</h3>
+          <ul class="checks">
+            <li>End-to-end encryption, with fresh keys for every session</li>
+            <li>No servers in between: we never see your traffic or keys</li>
+            <li>Keys kept in your operating system's own secure key store</li>
+            <li>Human in the loop: only you can pair devices, approve requests or change your rules</li>
+          </ul>
+        </div>
+        <div>
+          <h3>Checked</h3>
+          <ul class="checks">
+            <li>Automated tests that attack it: replay, tampering, downgrade, impersonation</li>
+            <li>A tamper-evident record of pairings, approvals and secret use</li>
+            <li>An independent security audit is planned, and its results will be published</li>
+          </ul>
+        </div>
+      </div>
+      <p class="sub"><a href="/security.html">How VINAC Link protects you →</a></p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="download">
+  <div class="wrap">
+    <p class="kicker center">Download</p>
+    <h2 class="center">Get VINAC Link</h2>
+    <p class="sub center">Free and open source. Install it on <strong>each</strong> computer you want to connect.</p>
+    <div class="os-grid">
+      <a class="os-card" href="{{win_href}}" download>
+        <img src="/logos/windows.svg" alt="" width="56" height="56">
+        <strong>Windows</strong>
+        <span>Windows 10 and 11</span>
+        <span class="os-step">{{win_step}}</span>
+        <span class="btn primary small">Download for Windows</span><span class="os-size">{{win_size}}</span>
+      </a>
+      <a class="os-card" href="{{mac_href}}" download>
+        <img class="ink-black" src="/logos/apple.svg" alt="" width="56" height="56">
+        <strong>macOS</strong>
+        <span>Apple silicon and Intel</span>
+        <span class="os-step">{{mac_step}}</span>
+        <span class="btn primary small">Download for macOS</span><span class="os-size">{{mac_size}}</span>
+      </a>
+      <a class="os-card" href="{{linux_href}}" download>
+        <img class="ink-black" src="/logos/linux.svg" alt="" width="56" height="56">
+        <strong>Linux</strong>
+        <span>Ubuntu, Debian, Fedora…</span>
+        <span class="os-step">{{linux_step}}</span>
+        <span class="btn primary small">Download for Linux</span><span class="os-size">{{linux_size}}</span>
+      </a>
+    </div>
+    <p class="fine center os-note">Everything included, nothing else to install, and it works offline. Prefer a portable folder? Get the <a href="{{kit_url}}" download>zip package</a> ({{kit_kb}} KB, needs Node.js 22 or newer). <a href="/download/SHA256SUMS.txt">Checksums</a></p>
+    <div class="get">
+      <article class="card">
+        <h3>Claude Code</h3>
+        <p>“Connect my agent” does this for you, or add the VINAC Link folder yourself:</p>
+        <div class="code"><pre><code>claude plugin marketplace add &lt;folder&gt;
+claude plugin install vinac-link@vinac</code></pre><button class="copy" type="button" aria-label="Copy commands">Copy</button></div>
+      </article>
+      <article class="card">
+        <h3>Codex and other MCP apps</h3>
+        <p>Run it as a stdio MCP server. Add <code>--simple</code> for small local models.</p>
+        <div class="code"><pre><code>node &lt;folder&gt;/connector/bin/vinac.mjs mcp</code></pre><button class="copy" type="button" aria-label="Copy command">Copy</button></div>
+      </article>
+    </div>
+    <p class="fine center">Or run <code>vinac setup</code>: it prints the exact commands for every app, with your real paths. <a href="/docs/guide/agents.html">All agents</a> · <a href="/docs/openclaw.html">OpenClaw</a></p>
+  </div>
+</section>
+
+<section class="section alt" id="faq">
+  <div class="wrap narrow">
+    <p class="kicker center">FAQ</p>
+    <h2 class="center">Questions</h2>
+    <div class="faq">
+      <details><summary>Do I need an account or a server?</summary><p>No. The two computers talk directly over whatever network connects them: Wi-Fi, a hotspot, a cable, or Tailscale. There is no server in between and no sign-up.</p></details>
+      <details><summary>Does it work online and offline?</summary><p>Both. The link between your computers never needs the internet: Wi-Fi without internet, a hotspot or a cable is enough. Cloud agents such as Claude Code, Codex or Cursor need the internet for their own AI model; local models in LM Studio, Ollama, Goose or Open WebUI can run with no internet at all. You only need a connection once, to download VINAC Link, and you can copy the package over on a USB stick instead.</p></details>
+      <details><summary>What leaves my computer?</summary><p>Only what you or your agent send to a device you paired, encrypted for that device. Nothing goes to us. This website sets no cookies and loads no trackers either.</p></details>
+      <details><summary>Can an agent approve its own requests?</summary><p>No. Agents get tools to send and read. Confirming a pairing, approving a request, changing a rule or revealing a secret value only happens on the VINAC Link page, by a person.</p></details>
+      <details><summary>Is the sound safe? Can people hear it?</summary><p>It's a six-second, very high tone that most adults barely hear. It only helps the two computers find each other; the real check is the 6-digit code you confirm on each side, so overhearing the sound isn't enough to pair.</p></details>
+      <details><summary>Which agents work with it?</summary><p>Claude Code, Codex and OpenClaw have their own setup; LM Studio, Goose, Open WebUI, Cursor and any other MCP app use it as a standard MCP server.</p></details>
+      <details><summary>Who makes it?</summary><p>VINAC Link™ is built by Mexley Marketing Inc., a Canadian company, and released as open source under the Apache-2.0 license. VINAC stands for Verified Intent Network for Agent Communication.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="contact">
+  <div class="wrap contact">
+    <div class="contact-copy">
+      <p class="kicker">Contact</p>
+      <h2>Talk to us</h2>
+      <p class="sub">Questions, partnerships, press, or a security report. We read every message and reply from hello@vinac.tech.</p>
+      <ul class="ticks">
+        <li>A reply within a few working days</li>
+        <li>Found a security issue? Choose “Security”</li>
+        <li>We use your details only to reply to you (<a href="/privacy.html">privacy policy</a>)</li>
+      </ul>
+      <p class="fine">Prefer email? <a href="mailto:hello@vinac.tech">hello@vinac.tech</a></p>
+    </div>
+    <form class="card contact-form" action="/contact.php" method="post">
+      <div class="field-row">
+        <label>Name<input name="name" type="text" autocomplete="name" maxlength="100" required></label>
+        <label>Email<input name="email" type="email" autocomplete="email" maxlength="200" required></label>
+      </div>
+      <label>Topic
+        <select name="topic">
+          <option>General question</option>
+          <option>Partnership</option>
+          <option>Press</option>
+          <option>Security</option>
+        </select>
+      </label>
+      <label>Message<textarea name="message" rows="6" maxlength="5000" required></textarea></label>
+      <div class="trap" aria-hidden="true"><label>Leave this empty<input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+      <input type="hidden" name="t" value="">
+      <button class="btn primary" type="submit">Send message</button>
+      <p class="form-status" role="status" aria-live="polite"></p>
+    </form>
+  </div>
+</section>
+
+<section class="final">
+  <div class="wrap center">
+    <h2>Give your agents a private line.</h2>
+    <p class="sub">Two computers, five minutes, no account.</p>
+    <a class="btn primary" href="#download">Download for free</a>
+  </div>
+</section>
+
+</main>
+{{footer}}
+</body>
+</html>

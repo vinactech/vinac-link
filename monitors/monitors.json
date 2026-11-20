@@ -1,0 +1,7 @@
+[
+  {
+    "name": "vinac-watch",
+    "command": "node \"${CLAUDE_PLUGIN_ROOT}/connector/bin/vinac.mjs\" watch",
+    "description": "New VINAC Link messages and items waiting for your approval (never the message text)"
+  }
+]

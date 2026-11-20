@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"${CLAUDE_PLUGIN_ROOT}/connector/bin/vinac.mjs\" hook session-start",
+            "timeout": 5
+          }
+        ]
+      }
+    ]
+  }
+}

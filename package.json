@@ -1,0 +1,32 @@
+{
+  "name": "vinac-link",
+  "version": "0.7.0",
+  "description": "A secure link between AI agents on your computers, no cloud or internet needed. Pairing by sound or code, encrypted messages, requests, files and git branches, a firewall you control.",
+  "license": "Apache-2.0",
+  "author": "Mexley Marketing Inc. (https://vinac.tech)",
+  "homepage": "https://vinac.tech",
+  "type": "module",
+  "bin": { "vinac": "connector/bin/vinac.mjs" },
+  "files": [
+    "connector/bin", "connector/src", "connector/web", "connector/package.json",
+    "lab/js/audio.js", "lab/js/bytes.js", "lab/js/crypto.js", "lab/js/fec.js", "lab/js/frame.js",
+    "lab/js/logos.js", "lab/js/modem.js", "lab/worklets",
+    "skills", "hooks", "monitors",".claude-plugin", ".codex-plugin", "codex.mcp.json",
+    "openclaw/node", "openclaw/gateway", "openclaw/README.md",
+    "README.md", "SECURITY.md", "LICENSE", "NOTICE", "docs", "!docs/LAUNCH.md", "!docs/ROADMAP.md"
+  ],
+  "engines": { "node": ">=22" },
+  "keywords": ["ai-agents", "mcp", "claude-code", "codex", "openclaw", "pairing", "firewall", "local-first", "offline", "air-gapped", "ultrasound"],
+  "scripts": {
+    "test": "npm test --prefix connector",
+    "start": "node connector/bin/vinac.mjs start",
+    "release:check": "node connector/tools/release-check.mjs",
+    "kit": "node connector/tools/make-kit.mjs",
+    "site": "node connector/tools/build-site.mjs",
+    "site:serve": "node connector/tools/serve-site.mjs",
+    "site:pack": "node connector/tools/build-site.mjs --zip",
+    "video": "node connector/tools/render-video.mjs",
+    "installers": "node connector/tools/installers/build-installers.mjs",
+    "site:screens": "node connector/tools/capture-screens.mjs"
+  }
+}

@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VINAC Link: start here</title>
+<style>
+  :root {
+    --bg: #ffffff; --panel: #f5f5f7; --ink: #1d1d1f; --muted: #6e6e73; --line: #e5e5ea;
+    --accent: #0071e3; --ok: #1f8a4c; --warn: #b25000; --code: #f2f2f7;
+    --grad: linear-gradient(135deg, #5b5bf7 0%, #0071e3 55%, #00a2c7 100%);
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #000; --panel: #1c1c1e; --ink: #f5f5f7; --muted: #a1a1a6; --line: #2c2c2e; --accent: #2997ff; --ok: #32d74b; --warn: #ff9f0a; --code: #1c1c1e; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 48px 20px 80px; }
+  .brand { display: flex; align-items: center; gap: 12px; margin-bottom: 8px; }
+  .mark { width: 40px; height: 40px; border-radius: 11px; background: var(--grad); display: grid; place-items: center; color: #fff; font-weight: 700; letter-spacing: .5px; }
+  h1 { font-size: 34px; line-height: 1.15; margin: 18px 0 10px; letter-spacing: -.02em; }
+  h2 { font-size: 22px; margin: 44px 0 10px; letter-spacing: -.01em; }
+  h3 { font-size: 17px; margin: 22px 0 6px; }
+  p, li { color: var(--ink); }
+  .lede { font-size: 19px; color: var(--muted); margin: 0 0 18px; }
+  .note { background: var(--panel); border-radius: 14px; padding: 14px 16px; margin: 18px 0; }
+  .note b { color: var(--warn); }
+  .steps { counter-reset: s; list-style: none; padding: 0; margin: 0; }
+  .steps > li { counter-increment: s; position: relative; padding: 18px 18px 18px 60px; border: 1px solid var(--line); border-radius: 16px; margin: 12px 0; }
+  .steps > li::before { content: counter(s); position: absolute; left: 18px; top: 18px; width: 28px; height: 28px; border-radius: 50%; background: var(--grad); color: #fff; font-weight: 600; display: grid; place-items: center; font-size: 14px; }
+  .steps h3 { margin-top: 2px; }
+  code { font: 13.5px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; background: var(--code); padding: 2px 6px; border-radius: 6px; word-break: break-word; }
+  pre { background: var(--code); padding: 12px 14px; border-radius: 12px; overflow-x: auto; }
+  pre code { padding: 0; background: none; }
+  .os { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; margin: 10px 0; }
+  .os div { background: var(--panel); border-radius: 12px; padding: 12px 14px; font-size: 15px; }
+  .os b { display: block; margin-bottom: 4px; }
+  table { width: 100%; border-collapse: collapse; font-size: 15px; }
+  td, th { text-align: left; padding: 9px 8px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  th { color: var(--muted); font-weight: 500; }
+  .try li { margin: 6px 0; }
+  a { color: var(--accent); }
+  small { color: var(--muted); }
+  footer { margin-top: 56px; color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <div class="brand"><div class="mark">V</div><b>VINAC Link</b> <small>&nbsp;preview __VERSION__</small></div>
+  <h1>A private link between AI agents on your computers</h1>
+  <p class="lede">Pair two computers by sound or a typed code. Their agents can then send each other messages, files and requests. Everything is encrypted, nothing goes through a server, and it works without the internet. You decide what reaches your agent.</p>
+
+  <div class="note"><b>Private preview.</b> Please don't share this package or post about it yet. It is experimental and has not had a human security review, so don't send production passwords or keys through it.</div>
+
+  <h2>What you need</h2>
+  <ul>
+    <li><b>Two computers</b> (Windows, Mac or Linux), on the same Wi-Fi. No internet is needed: a phone hotspot, a travel router or a network cable between the two also works.</li>
+    <li><b>Node.js 22 or newer</b> on each: <a href="https://nodejs.org">nodejs.org</a> (the LTS button). On Windows you can also run <code>winget install OpenJS.NodeJS.LTS</code>; on a Mac, <code>brew install node</code>.</li>
+    <li><b>Optional: an AI agent app</b>: Claude Code, Codex, LM Studio, Goose, Open WebUI or any app that supports MCP tools. You can try everything on the page first.</li>
+  </ul>
+
+  <h2>Get started (10 minutes)</h2>
+  <ol class="steps">
+    <li>
+      <h3>Unzip and start, on both computers</h3>
+      <div class="os">
+        <div><b>Windows</b>Double-click <code>Start VINAC Link.cmd</code>. If Windows asks whether Node.js may use the network, choose <i>Private networks</i> and <i>Allow</i>.</div>
+        <div><b>Mac</b>Right-click <code>Start VINAC Link.command</code> → <i>Open</i> → <i>Open</i> (the first time only; macOS asks because the file isn't from the App Store). Allow incoming connections if asked.</div>
+        <div><b>Linux</b>In a terminal in this folder: <code>sh start-linux.sh</code></div>
+      </div>
+      <p>The VINAC Link page opens in your browser. It keeps running in the background after you close the window.</p>
+    </li>
+    <li>
+      <h3>Pair the two computers</h3>
+      <p>On one computer press <b>Pair a device → Announce this device</b>. On the other press <b>Pair a device → Listen for a device</b> (it hears a short sound; allow the microphone), or type the code shown on the first screen.</p>
+      <p>Each screen then shows a <b>6-digit code</b>. Type each computer's code into the other one. That swap is what makes the pairing safe: no agent can do it for you.</p>
+    </li>
+    <li>
+      <h3>Send something</h3>
+      <p>Open the other computer's conversation and send a message, or click the paperclip to send a file (up to 64 MB). It arrives on the other screen in a second.</p>
+    </li>
+    <li>
+      <h3>Connect your agent</h3>
+      <p>Double-click <code>Connect my agent</code> (<code>.cmd</code> on Windows, <code>.command</code> on Mac). It adds the Claude Code plugin if you have Claude Code, and prints exactly what to paste for LM Studio, Goose, Codex, Open WebUI and others.</p>
+      <p>Then ask your agent: <i>"Send a message to my other computer: hello from my agent."</i></p>
+    </li>
+  </ol>
+
+  <h2>Things to try</h2>
+  <ul class="try">
+    <li><b>Agents talking:</b> ask the agent on one computer to ask the other one a question, and wait for the answer.</li>
+    <li><b>The firewall:</b> on the page, open <i>Firewall</i>. Requests like "read a contact" wait for your OK; plain messages go through. Change a rule and watch what your agent can see.</li>
+    <li><b>Files:</b> the paperclip, or <code>vinac send-file report.pdf --to "Other PC"</code> from this folder (use <code>./vinac</code> on Mac/Linux).</li>
+    <li><b>Code without GitHub:</b> in a git project, <code>vinac git send --to "Other PC"</code>. On the other side, <code>vinac files</code>, then <code>vinac git fetch &lt;id&gt;</code> adds the branch as <code>vinac/&lt;device&gt;/&lt;branch&gt;</code>. Nothing is merged for you.</li>
+    <li><b>Secrets:</b> <i>Secrets → Receive a secret</i> on one computer, then send one from the other (by sound or Wi-Fi). Agents only ever see its name. To use it in a program: <code>vinac run --secret API_KEY -- npm start</code>, and approve that run on the page.</li>
+    <li><b>Offline agents:</b> run a local model in Ollama or LM Studio. On the page, <i>Firewall → Auto-reply → Answers by: Local model</i>, and switch a device to <i>Questions &amp; status</i>. Questions from that device are answered while you're away, with no internet.</li>
+    <li><b>No internet at all:</b> turn the router's internet off, or connect the two computers with a phone hotspot or a cable, and try again.</li>
+    <li><b>Groups:</b> with three or more computers, <code>vinac group set team "PC 1,PC 2"</code>, then send to <code>team</code> or <code>all</code>.</li>
+    <li><b>The record:</b> <code>vinac audit</code> lists what happened (never message text); <code>vinac audit --verify</code> checks nobody edited it.</li>
+  </ul>
+
+  <h2>If something doesn't work</h2>
+  <table>
+    <tr><th>What you see</th><th>Try</th></tr>
+    <tr><td>"Node.js is not installed"</td><td>Install it from <a href="https://nodejs.org">nodejs.org</a>, then start again.</td></tr>
+    <tr><td>The other computer shows as offline</td><td>Both need VINAC Link running and the same network. On Windows, allow Node.js on <i>private</i> networks (Windows Security → Firewall → Allow an app). Guest Wi-Fi often blocks devices from seeing each other: use a hotspot instead.</td></tr>
+    <tr><td>Listening hears nothing</td><td>Allow the microphone in the browser, turn the volume up, keep the computers close, or just type the code.</td></tr>
+    <tr><td>Mac: "can't be opened"</td><td>Right-click the file → Open → Open. Or in Terminal, in this folder: <code>node connector/bin/vinac.mjs start</code></td></tr>
+    <tr><td>Your agent doesn't see VINAC Link</td><td>Start a new session of the agent app after connecting. Run <code>Check VINAC Link</code> to see what's missing.</td></tr>
+  </table>
+
+  <h2>Send feedback</h2>
+  <p>Double-click <code>Check VINAC Link</code> and send its output with what you tried and what happened. It contains your device names and addresses but no messages or keys.</p>
+
+  <h2>Stop or remove</h2>
+  <p><code>Stop VINAC Link</code> stops it. To remove it, stop it, then delete this folder and the <code>.vinac</code> folder in your home folder (that also forgets your pairings). If you added the Claude Code plugin: <code>claude plugin uninstall vinac-link@vinac</code>.</p>
+
+  <footer>VINAC Link (Verified Intent Network for Agent Communication) __VERSION__ · Apache-2.0 · Details: <code>README.md</code>, <code>docs/</code> and <code>SECURITY.md</code> in this folder.</footer>
+</main>
+</body>
+</html>

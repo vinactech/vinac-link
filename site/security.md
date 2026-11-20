@@ -1,0 +1,56 @@
+# Security
+
+Security is the reason VINAC Link exists. It lets AI agents on your computers work together without
+giving any of them more trust than you decided to give.
+
+## Our technology, on proven foundations
+
+VINAC Link combines technology we designed ourselves with cryptography the security community has
+studied for years:
+
+- **Pairing that only people can complete.** Two computers meet by sound or a short code, and each
+  person confirms a 6-digit code shown on the other screen. Someone nearby, someone on the network,
+  or an agent on either computer can't complete a pairing on their own.
+- **An intent firewall.** Agents don't send each other free-form commands. Every request names its
+  purpose from a fixed, versioned list, and your rules decide (allow, ask you first, or block)
+  before your agent sees anything.
+- **Secrets that never touch the chat.** Keys and tokens travel straight into your operating
+  system's own secure key store. Agents can use them in programs you approve, but never see the
+  values.
+- **Published, well-studied cryptography.** Pairing and every connection are built on the Noise
+  protocol framework, the same family of protocols behind WireGuard and WhatsApp's transport
+  encryption, with fresh keys for every session.
+
+## How you're protected
+
+| Protection | What it means for you |
+|---|---|
+| **End-to-end encryption** | Everything between your computers is encrypted for the paired device only, with keys that change every session. |
+| **No servers in between** | Your computers talk directly. We run no relay, see none of your traffic and hold none of your keys. |
+| **Proof of delivery** | "Delivered" means the other computer proved it received exactly that message. Replays and altered messages are refused. |
+| **Your rules first** | Requests, files and plain messages are checked against your rules before an agent sees them. Only you can change the rules or approve a request, on the VINAC Link page. |
+| **Human in the loop** | Agents can use the devices you paired, but only a person can pair a device, approve a request, change a rule or reveal a secret. |
+| **Keys stay protected at rest** | Pairing keys and secrets are kept by Windows, macOS or Linux's own key store, and message history is encrypted on disk. |
+| **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents. |
+| **A private local page** | The VINAC Link page only answers on your own computer and refuses other websites. |
+
+## Tested, and reviewed next
+
+These protections are covered by automated tests that attack them: replaying messages, altering
+them, forcing older protocol versions, pretending to be another device. An independent security audit is
+planned, and we will publish its results.
+
+## Good to know
+
+- VINAC Link is in early access. For the most sensitive production keys, we suggest waiting for the
+  published audit.
+- Like any app, VINAC Link can't protect you from malware that is already running on your computer
+  under your account.
+- A message that your rules let through is still just text: an agent should treat it as information,
+  not as orders.
+
+## Report a problem
+
+If you find a security issue, please email **hello@vinac.tech** with "Security" in the subject, and
+don't post it publicly until we've fixed it. We reply within a few days and are glad to credit you.
+Security reviewers can ask us for the full technical design.

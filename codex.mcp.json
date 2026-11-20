@@ -1,0 +1,10 @@
+{
+  "mcpServers": {
+    "vinac": {
+      "type": "stdio",
+      "command": "node",
+      "args": ["${PLUGIN_ROOT}/connector/bin/vinac.mjs", "mcp"],
+      "cwd": "${PLUGIN_ROOT}"
+    }
+  }
+}

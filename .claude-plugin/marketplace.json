@@ -1,0 +1,14 @@
+{
+  "name": "vinac",
+  "owner": { "name": "Mexley Marketing Inc.", "url": "https://vinac.tech" },
+  "description": "VINAC Link: AI agents on your different computers work together, and nothing important happens without your OK.",
+  "plugins": [
+    {
+      "name": "vinac-link",
+      "source": "./",
+      "description": "Pair computers by sound or code; agents exchange encrypted messages, requests and small files through a firewall you control.",
+      "category": "productivity",
+      "tags": ["agents", "pairing", "messaging", "firewall", "mcp"]
+    }
+  ]
+}

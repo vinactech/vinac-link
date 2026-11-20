@@ -1,0 +1,10 @@
+{
+  "name": "openclaw-vinac-link-node",
+  "version": "0.7.0",
+  "private": true,
+  "license": "Apache-2.0",
+  "type": "module",
+  "description": "VINAC Link node-host commands for OpenClaw. Needs ../../connector next to it.",
+  "engines": { "node": ">=22" },
+  "openclaw": { "extensions": ["./index.js"] }
+}
