@@ -30,6 +30,10 @@ AddType "text/plain; charset=utf-8" .sh .ps1
   <FilesMatch "\.zip$">
     Header set Content-Disposition "attachment"
   </FilesMatch>
+  # The pitch deck is shared by link only: keep it out of search results.
+  <FilesMatch "pitch-deck\.pdf$">
+    Header set X-Robots-Tag "noindex, nofollow"
+  </FilesMatch>
   <FilesMatch "\.(css|js)$">
     Header set Cache-Control "public, max-age=3600"
   </FilesMatch>

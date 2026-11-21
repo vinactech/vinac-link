@@ -240,6 +240,8 @@ function buildMac(files) {
   <key>CFBundleVersion</key><string>${V}</string>
   <key>CFBundleShortVersionString</key><string>${V}</string>
   <key>CFBundleExecutable</key><string>VINAC Link</string>
+  <key>LSArchitecturePriority</key>
+  <array><string>arm64</string><string>x86_64</string></array>
   <key>CFBundleIconFile</key><string>vinac.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>13.5</string>
@@ -257,7 +259,9 @@ fi
 `) });
   out.push({ name: 'make-dmg.sh', mode: 0o755, data: Buffer.from(`#!/bin/bash
 # Run this on a Mac (in Terminal: sh make-dmg.sh) to make VINAC-Link-${V}.dmg next to it.
-# The app is signed ad hoc (not notarized), so on other Macs people must allow it once in
+# This signs the app ad hoc (not notarized), so on other Macs people must allow it once in
+# System Settings > Privacy & Security, unless it is then signed with a Developer ID and notarized
+# (as 0.8.0 was on the owner's Mac; see MAC-BUILD instructions). Ad hoc builds: allow it once in
 # System Settings > Privacy & Security > Open Anyway, until Apple Developer signing is added.
 set -e
 cd "$(dirname "$0")"

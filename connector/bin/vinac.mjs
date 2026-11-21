@@ -25,6 +25,7 @@ import { runMcpServer, AgentApi, VERSION } from '../src/mcp.js';
 import { openApp, openInBrowser } from '../src/net.js';
 import { doctor, formatChecks, stopDaemon, runHook, setupText } from '../src/setup.js';
 import { env } from '../src/env.js';
+import { isOlderVersion } from '../src/version.js';
 import { defaultHome } from '../src/store.js';
 
 const [command = 'start', ...rest] = process.argv.slice(2);
@@ -57,6 +58,17 @@ function printSent(r) {
 try {
   if (command === 'start') {
     const api = new AgentApi({ home, port, name: opt.name });
+    // After an update, an older service may still be running from before: replace it with this
+    // version. Pairings, keys and messages live in the home folder and are kept. A newer running
+    // service is left alone.
+    if (await api.attach()) {
+      const running = (await api.call('GET', '/api/status', null, 2000).catch(() => ({}))).version;
+      if (running && isOlderVersion(running, VERSION)) {
+        console.log(`Updating the running VINAC Link from ${running} to ${VERSION} ...`);
+        await stopDaemon({ home });
+        for (const until = Date.now() + 10_000; Date.now() < until && await api.attach();) await new Promise(r => setTimeout(r, 200));
+      }
+    }
     const how = await api.connect();
     const s = await api.tool('vinac_status');
     if (!opt['no-open']) (opt.tab ? openInBrowser : openApp)(s.approvalPage);

@@ -23,7 +23,7 @@ We didn't find one, so we built it.
 - **October 2026.** VINAC Link becomes a product, built around a firewall the person controls.
 - **November 2026.** Early access: installers, full offline use, and this website.
 
-Next come an independent security audit, signed installers and an optional relay.
+Next come an independent security audit, a signed Windows installer and an optional relay.
 [See the full roadmap and our vision →](/roadmap.html)
 
 ## What it does

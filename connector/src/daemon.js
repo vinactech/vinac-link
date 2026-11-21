@@ -43,7 +43,8 @@ import { AuditLog } from './audit.js';
 const here = path.dirname(fileURLToPath(import.meta.url));
 const WEB_DIR = path.resolve(here, '../web');
 const LAB_DIR = path.resolve(here, '../../lab');
-const APP_VERSION = JSON.parse(fs.readFileSync(path.resolve(here, '../package.json'), 'utf8')).version;
+// VINAC_TEST_VERSION lets a test run a service that reports an older version (see the update test).
+const APP_VERSION = env('TEST_VERSION') || JSON.parse(fs.readFileSync(path.resolve(here, '../package.json'), 'utf8')).version;
 export const DEFAULT_PORT = 47800;
 const PAIR_TTL_MS = 3 * 60_000;
 const POLL_MS = 1000;

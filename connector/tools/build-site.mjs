@@ -218,7 +218,7 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     } else dl[key] = { href: kit ? kit.url : '#download', step: fallbackStep, size: kit ? `${kit.kb} KB zip` : '' };
   };
   installer('win', `VINAC-Link-Setup-${version}.exe`, 'Run the installer. If Windows SmartScreen appears, choose <b>More info → Run anyway</b>.', 'Unzip, then double-click <b>Start VINAC Link.cmd</b> (needs Node.js 22+)');
-  installer('mac', `VINAC-Link-${version}.dmg`, 'Open the .dmg and drag VINAC Link to Applications. The first time, allow it in <b>System Settings → Privacy &amp; Security</b>.', 'Unzip, then right-click <b>Start VINAC Link.command</b> → Open (needs Node.js 22+)');
+  installer('mac', `VINAC-Link-${version}.dmg`, 'Open the .dmg and drag VINAC Link to Applications. Signed and notarized by Apple, so it opens without warnings.', 'Unzip, then right-click <b>Start VINAC Link.command</b> → Open (needs Node.js 22+)');
   installer('linux', `VINAC-Link-${version}-linux-x64.tar.gz`, 'Extract it, then run <b>sh install.sh</b>. It adds VINAC Link to your app menu.', 'Unzip, then run <b>sh start-linux.sh</b> (needs Node.js 22+)');
 
   // 2. Static assets

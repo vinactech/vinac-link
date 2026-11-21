@@ -5,6 +5,7 @@
 //   node connector/tools/render-video.mjs                    full video + poster
 //   node connector/tools/render-video.mjs --stills 5,15,30   only these moments, as PNGs in --out
 //   options: --fps 30  --out DIR  --crf 24
+//   another page: --page video/walkthrough.html --name walkthrough   -> site/media/walkthrough.mp4 + walkthrough-poster.jpg
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -18,7 +19,9 @@ const FPS = Number(opt('fps', 30));
 const CRF = String(opt('crf', 24));
 const OUT = path.resolve(opt('out', path.join(ROOT, 'site', 'media')));
 const stills = opt('stills', null)?.split(',').map(Number);
-const PAGE = pathToFileURL(path.join(ROOT, 'video', 'explainer.html')).href;
+const PAGE = pathToFileURL(path.resolve(ROOT, opt('page', 'video/explainer.html'))).href;
+const NAME = opt('name', 'demo'); // output: <NAME>.mp4 and, for the default, poster.jpg
+const POSTER_FILE = NAME === 'demo' ? 'poster.jpg' : `${NAME}-poster.jpg`;
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 const BROWSERS = [process.env.CHROME_BIN, 'C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe', 'C:/Program Files/Google/Chrome/Application/chrome.exe',
@@ -58,7 +61,7 @@ try {
     for (const t of stills) fs.writeFileSync(path.join(OUT, `still-${String(t).padStart(5, '0')}.png`), await shot(t, 'png'));
     console.log(`${stills.length} stills in ${OUT}`);
   } else {
-    const file = path.join(OUT, 'demo.mp4');
+    const file = path.join(OUT, `${NAME}.mp4`);
     const ff = spawn('ffmpeg', ['-y', '-loglevel', 'error', '-f', 'image2pipe', '-framerate', String(FPS), '-c:v', 'mjpeg', '-i', '-',
       '-c:v', 'libx264', '-preset', 'slow', '-crf', CRF, '-pix_fmt', 'yuv420p', '-movflags', '+faststart', file], { stdio: ['pipe', 'inherit', 'inherit'] });
     const done = new Promise((res, rej) => ff.on('close', code => (code === 0 ? res() : rej(new Error(`ffmpeg exited ${code}`)))));
@@ -71,8 +74,9 @@ try {
     }
     ff.stdin.end();
     await done;
-    fs.writeFileSync(path.join(OUT, 'poster.jpg'), await shot(86.5));
-    console.log(`video: ${file} (${(fs.statSync(file).size / 1048576).toFixed(1)} MB, ${frames} frames)\nposter: ${path.join(OUT, 'poster.jpg')}`);
+    const posterAt = (await cdp('Runtime.evaluate', { expression: 'window.POSTER', returnByValue: true })).result.value ?? 86.5;
+    fs.writeFileSync(path.join(OUT, POSTER_FILE), await shot(posterAt));
+    console.log(`video: ${file} (${(fs.statSync(file).size / 1048576).toFixed(1)} MB, ${frames} frames)\nposter: ${path.join(OUT, POSTER_FILE)}`);
   }
   ws.close();
 } finally {

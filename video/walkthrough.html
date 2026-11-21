@@ -1,0 +1,262 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>VINAC Link walkthrough</title>
+<!--
+  A product walkthrough built from real VINAC Link screens (site/media, taken by
+  connector/tools/capture-screens.mjs from a demo copy). Rendered frame by frame:
+    node connector/tools/render-video.mjs --page video/walkthrough.html --name walkthrough
+  renderAt(seconds) draws one exact frame; nothing depends on real time.
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; background: #08080C; }
+  body { font-family: "Segoe UI Variable Display", "Segoe UI", system-ui, sans-serif; color: #F2F2F6; }
+  #stage { position: absolute; inset: 0; overflow: hidden;
+    background: radial-gradient(1100px 600px at 50% -10%, rgba(110,120,255,.22), transparent 70%), radial-gradient(800px 500px at 100% 110%, rgba(154,92,240,.16), transparent 70%), #08080C; }
+  .scene { position: absolute; inset: 0; opacity: 0; }
+  /* app window */
+  .win { position: absolute; left: 256px; top: 40px; width: 1408px; height: 880px; border-radius: 18px; overflow: hidden;
+    border: 1px solid #2E2E3C; box-shadow: 0 50px 140px -30px rgba(80,96,255,.45), 0 20px 60px rgba(0,0,0,.6); background: #0B0B10; }
+  .cam { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
+  .cam > img { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; }
+  /* captions */
+  .cap { position: absolute; left: 0; right: 0; top: 946px; text-align: center; }
+  .cap .l1 { font-size: 46px; font-weight: 650; letter-spacing: -.5px; }
+  .cap .l2 { font-size: 28px; color: #A9A9B8; margin-top: 6px; }
+  .step { position: absolute; left: 64px; top: 52px; font-size: 22px; font-weight: 700; letter-spacing: 3px; color: #8C9BFF; writing-mode: vertical-rl; transform: rotate(180deg); }
+  /* pointer */
+  #ptr { position: absolute; width: 34px; height: 44px; left: 0; top: 0; opacity: 0; z-index: 30; }
+  #ptr svg { width: 34px; height: 44px; filter: drop-shadow(0 4px 10px rgba(0,0,0,.6)); }
+  #click { position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; border-radius: 50%; border: 4px solid #8C9BFF; opacity: 0; z-index: 29; }
+  /* terminal */
+  .term { position: absolute; left: 260px; top: 150px; width: 1400px; height: 680px; border-radius: 18px; background: #0E0E14; border: 1px solid #2E2E3C;
+    box-shadow: 0 50px 140px -30px rgba(80,96,255,.4); overflow: hidden; }
+  .term .bar { height: 52px; border-bottom: 1px solid #23232E; display: flex; align-items: center; gap: 10px; padding: 0 22px; }
+  .term .bar i { width: 14px; height: 14px; border-radius: 50%; background: #34343F; display: block; }
+  .term .bar span { margin-left: 16px; color: #75757F; font-size: 20px; font-family: "Segoe UI", sans-serif; }
+  .term pre { padding: 34px 40px; font: 34px/1.6 "Cascadia Mono", Consolas, monospace; color: #E6E6EA; white-space: pre-wrap; }
+  .mut { color: #8A8A96; } .ok { color: #3DDC84; } .acc { color: #A9B4FF; }
+  .caret { display: inline-block; width: 18px; height: 36px; background: #A9B4FF; vertical-align: -6px; }
+  /* overlays drawn in screen coordinates (inside .cam) */
+  .ov { position: absolute; }
+  .ring { position: absolute; border-radius: 50%; border: 3px solid #8C9BFF; }
+  .approved { position: absolute; left: 1122px; top: 379px; width: 76px; height: 33px; border-radius: 999px; background: #10261a; color: #3DDC84;
+    font: 600 13px "Segoe UI", sans-serif; display: grid; place-items: center; border: 1px solid #1F5A36; }
+  .toast { position: absolute; left: 50%; bottom: 24px; transform: translateX(-50%); background: #F2F2F6; color: #0B0B10; border-radius: 999px;
+    padding: 10px 20px; font: 15px "Segoe UI", sans-serif; white-space: nowrap; }
+  .hl { position: absolute; border: 3px solid #8C9BFF; border-radius: 14px; box-shadow: 0 0 0 9999px rgba(8,8,12,.45); }
+  /* title + end cards */
+  .card { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+  .card img { width: 150px; height: 150px; border-radius: 34px; margin-bottom: 40px; box-shadow: 0 20px 60px -10px rgba(90,100,255,.6); }
+  .card h1 { font-size: 110px; font-weight: 700; letter-spacing: -3px; line-height: 1; }
+  .card .t2 { font-size: 46px; margin-top: 26px; background: linear-gradient(100deg, #8EA0FF, #C08CFF); -webkit-background-clip: text; color: transparent; font-weight: 600; }
+  .card .t3 { font-size: 30px; margin-top: 24px; color: #A9A9B8; }
+  .cmd { margin-top: 44px; padding: 22px 34px; border-radius: 16px; background: #14141C; border: 1px solid #2E2E3C; font: 36px "Cascadia Mono", Consolas, monospace; color: #E6E6EA; }
+  .links { margin-top: 34px; font-size: 30px; color: #A9A9B8; }
+  .links b { color: #F2F2F6; }
+</style>
+</head>
+<body>
+<div id="stage">
+
+  <!-- 0 · title -->
+  <div class="scene" id="s-title"><div class="card">
+    <img src="../site/brand/icon-512.png" alt="">
+    <h1>VINAC Link</h1>
+    <p class="t2">The secure link between AI agents on your own computers.</p>
+    <p class="t3">Any vendor · Online or offline · Nothing important happens without your OK</p>
+  </div></div>
+
+  <!-- 1 · install -->
+  <div class="scene" id="s-install">
+    <div class="term"><div class="bar"><i></i><i></i><i></i><span>Terminal</span></div><pre id="install-text"></pre></div>
+  </div>
+
+  <!-- app screens -->
+  <div class="scene" id="s-welcome"><div class="win"><div class="cam"><img src="../site/media/tour-welcome.jpg" alt=""></div></div></div>
+  <div class="scene" id="s-pair"><div class="win"><div class="cam"><img src="../site/media/tour-pair.jpg" alt=""><div class="ov" id="rings"></div></div></div></div>
+  <div class="scene" id="s-compare"><div class="win"><div class="cam"><img src="../site/media/tour-compare.jpg" alt=""><div class="hl" id="hl-digits" style="left:740px;top:196px;width:250px;height:76px;opacity:0"></div></div></div></div>
+
+  <!-- 5 · an agent asks -->
+  <div class="scene" id="s-agent">
+    <div class="term"><div class="bar"><i></i><i></i><i></i><span>Your AI agent, on the PC</span></div><pre id="agent-text"></pre></div>
+  </div>
+
+  <div class="scene" id="s-thread"><div class="win"><div class="cam"><img src="../site/media/tour-thread.jpg" alt=""></div></div></div>
+  <div class="scene" id="s-firewall"><div class="win"><div class="cam"><img src="../site/media/app-firewall-dark.jpg" alt="">
+    <div class="approved" id="approved" style="opacity:0">Approved</div>
+    <div class="toast" id="toast" style="opacity:0">Approved. Your agent can now see agent.review.request from Mac.</div>
+  </div></div></div>
+  <div class="scene" id="s-secrets"><div class="win"><div class="cam"><img src="../site/media/tour-secrets.jpg" alt=""></div></div></div>
+  <div class="scene" id="s-overview"><div class="win"><div class="cam"><img src="../site/media/app-overview-dark.jpg" alt=""></div></div></div>
+
+  <!-- end -->
+  <div class="scene" id="s-end"><div class="card">
+    <img src="../site/brand/icon-512.png" alt="">
+    <h1>VINAC Link</h1>
+    <p class="t2">Free and open source. Install it in one line.</p>
+    <p class="cmd">curl -fsSL https://vinac.tech/install.sh | sh</p>
+    <p class="links"><b>vinac.tech</b> · github.com/vinactech/vinac-link</p>
+  </div></div>
+
+  <div class="step" id="step"></div>
+  <div class="cap"><p class="l1" id="cap1"></p><p class="l2" id="cap2"></p></div>
+  <div id="click"></div>
+  <div id="ptr"><svg viewBox="0 0 24 32"><path d="M2 2l19 13-8.5 1.6 5 9.6-3.6 1.9-5-9.7L2 24z" fill="#F2F2F6" stroke="#0B0B10" stroke-width="1.6" stroke-linejoin="round"/></svg></div>
+</div>
+
+<script src="walkthrough-timing.js"></script>
+<script>
+// ---------- helpers ----------
+const $ = id => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+const ease = x => (x < .5 ? 4 * x * x * x : 1 - Math.pow(-2 * x + 2, 3) / 2);
+const lerp = (a, b, k) => a + (b - a) * k;
+// value of keyframes [{t, ...}] at time t, eased between neighbours
+function track(keys, t, prop) {
+  if (t <= keys[0].t) return keys[0][prop];
+  for (let i = 1; i < keys.length; i++) if (t <= keys[i].t) {
+    const a = keys[i - 1], b = keys[i];
+    return lerp(a[prop], b[prop], ease(clamp((t - a.t) / (b.t - a.t))));
+  }
+  return keys[keys.length - 1][prop];
+}
+const W = 1408, H = 880, K = W / 1440;  // window size and screen-to-window scale
+function camera(el, keys, t) {
+  const z = track(keys, t, 'z'), fx = track(keys, t, 'x'), fy = track(keys, t, 'y');
+  const s = K * z;
+  const tx = clamp(W / 2 - fx * s, W - 1440 * s, 0), ty = clamp(H / 2 - fy * s, H - 900 * s, 0);
+  el.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+  return (x, y) => [256 + tx + x * s, 40 + ty + y * s]; // screen point -> video point
+}
+function typed(text, t, t0, cps = 26) { return text.slice(0, Math.max(0, Math.floor((t - t0) * cps))); }
+
+// ---------- scenes (seconds) ----------
+const X = 0.6; // cross-fade
+const S = [
+  { id: 's-title', a: 0, b: 5.2 },
+  { id: 's-install', a: 5, b: 13.6, step: '1 · INSTALL', c1: 'Install in one line.', c2: 'Everything included. Windows, macOS and Linux.' },
+  { id: 's-welcome', a: 13, b: 18.2, step: '1 · INSTALL', c1: 'It opens in its own window.', c2: 'No account, no cloud.' },
+  { id: 's-pair', a: 17.6, b: 27.2, step: '2 · PAIR', c1: 'Pair two computers by sound,', c2: 'or with a short code when there is no microphone.' },
+  { id: 's-compare', a: 26.6, b: 36.2, step: '2 · PAIR', c1: 'A person confirms a 6‑digit code on both screens.', c2: 'No agent can pair a device.' },
+  { id: 's-agent', a: 35.6, b: 44.2, step: '3 · ASK', c1: 'Now your agents can ask each other,', c2: 'across vendors: Claude Code, Codex, OpenClaw, local models.' },
+  { id: 's-thread', a: 43.6, b: 52.2, step: '3 · ASK', c1: 'Every request names its intent,', c2: 'and you can follow every conversation.' },
+  { id: 's-firewall', a: 51.6, b: 64.2, step: '4 · DECIDE', c1: 'Your firewall decides: allow, ask you first, or block.', c2: 'Only a person can approve.' },
+  { id: 's-secrets', a: 63.6, b: 73.2, step: '5 · SHARE KEYS', c1: 'API keys go from key store to key store.', c2: 'Agents use them by name. They never see the value.' },
+  { id: 's-overview', a: 72.6, b: 80.2, step: '6 · ANYWHERE', c1: 'Online or offline. Wi‑Fi, a hotspot or a cable.', c2: 'Your computers, your network, your rules.' },
+  { id: 's-end', a: 79.6, b: 88 },
+];
+// The scenes below are timed on an 88 s base timeline. walkthrough-timing.js (made from the
+// voice-over's line lengths) stretches each scene so its narration fits with breathing room.
+const SEGS = window.TIMING ? window.TIMING.segments : [[0, 88, 0, 88]];
+window.DURATION = window.TIMING ? window.TIMING.total : 88;
+function toBase(t) {
+  for (const [a, b, A, B] of SEGS) if (t <= B) return a + (b - a) * clamp((t - A) / (B - A));
+  return 88;
+}
+function fromBase(x) {
+  for (const [a, b, A, B] of SEGS) if (x <= b) return A + (B - A) * clamp((x - a) / (b - a));
+  return window.DURATION;
+}
+window.POSTER = fromBase(82.5);
+
+const INSTALL = [
+  ['<span class="mut">$</span> ', 'curl -fsSL https://vinac.tech/install.sh | sh', 5.6],
+];
+function renderInstall(t) {
+  const cmd = typed('curl -fsSL https://vinac.tech/install.sh | sh', t, 5.7, 24);
+  let out = `<span class="mut">$</span> ${cmd}`;
+  if (t < 8.0) out += '<span class="caret"></span>';
+  const lines = [
+    [8.4, '<span class="mut">Downloading VINAC-Link-0.8.0.dmg ...</span>'],
+    [9.6, '<span class="ok">Checksum OK.</span>'],
+    [10.6, 'Installed: /Applications/VINAC Link.app'],
+    [11.6, '<span class="mut">Next: pair a second computer in the VINAC Link window.</span>'],
+  ];
+  for (const [at, l] of lines) if (t >= at) out += '\n' + l;
+  $('install-text').innerHTML = out;
+}
+function renderAgent(t) {
+  const ask = typed('Ask the Mac which branch has the auth refactor.', t, 36.4, 28);
+  let out = `<span class="acc">&gt;</span> ${ask}`;
+  if (t < 38.3) out += '<span class="caret"></span>';
+  const lines = [
+    [38.8, '<span class="mut">vinac_send  to: Mac  ·  intent: agent.question.ask</span>'],
+    [40.0, '<span class="mut">vinac_inbox ...</span>'],
+    [41.2, '<span class="ok">Mac:</span> It is on feature/auth-v2. Tests pass on the Mac.'],
+  ];
+  for (const [at, l] of lines) if (t >= at) out += '\n' + l;
+  $('agent-text').innerHTML = out;
+}
+
+// camera keyframes, in screen pixels (1440x900)
+const CAM = {
+  's-welcome': [{ t: 13, x: 720, y: 450, z: 1 }, { t: 18, x: 720, y: 400, z: 1.12 }],
+  's-pair': [{ t: 17.6, x: 720, y: 450, z: 1 }, { t: 19.5, x: 860, y: 280, z: 1.45 }, { t: 27, x: 860, y: 280, z: 1.5 }],
+  's-compare': [{ t: 26.6, x: 860, y: 300, z: 1.25 }, { t: 29, x: 864, y: 250, z: 1.9 }, { t: 33, x: 864, y: 250, z: 1.9 }, { t: 36, x: 840, y: 330, z: 1.35 }],
+  's-thread': [{ t: 43.6, x: 720, y: 450, z: 1 }, { t: 46, x: 700, y: 400, z: 1.4 }, { t: 52, x: 700, y: 480, z: 1.45 }],
+  's-firewall': [{ t: 51.6, x: 720, y: 450, z: 1 }, { t: 54.5, x: 960, y: 420, z: 1.5 }, { t: 63, x: 960, y: 420, z: 1.5 }],
+  's-secrets': [{ t: 63.6, x: 720, y: 450, z: 1 }, { t: 66, x: 720, y: 400, z: 1.35 }, { t: 73, x: 720, y: 430, z: 1.38 }],
+  's-overview': [{ t: 72.6, x: 720, y: 450, z: 1.05 }, { t: 80, x: 760, y: 420, z: 1.15 }],
+};
+// pointer: [{t, x, y}] in screen pixels of the given scene; clicks: times
+const PTR = {
+  's-pair': { keys: [{ t: 18.2, x: 1150, y: 640 }, { t: 20.2, x: 740, y: 270 }], clicks: [20.6] },
+  's-compare': { keys: [{ t: 32.4, x: 980, y: 420 }, { t: 34.2, x: 800, y: 410 }], clicks: [34.6] },
+  's-firewall': { keys: [{ t: 55.6, x: 1250, y: 560 }, { t: 58.2, x: 1159, y: 395 }], clicks: [58.6] },
+  's-secrets': { keys: [{ t: 67.6, x: 980, y: 560 }, { t: 70.2, x: 720, y: 660 }], clicks: [70.6] },
+};
+
+function renderAt(t) { drawAt(toBase(t)); }
+function drawAt(t) {
+  let active = null;
+  for (const s of S) {
+    const o = clamp((t - s.a) / X) * clamp((s.b - t) / X);
+    const el = $(s.id);
+    el.style.opacity = o.toFixed(3);
+    if (o > 0 && (!active || t >= s.a + X / 2)) active = s;
+    const cam = el.querySelector('.cam');
+    if (cam && CAM[s.id]) s.map = camera(cam, CAM[s.id], t);
+  }
+  renderInstall(t); renderAgent(t);
+
+  // captions follow the active scene
+  const cs = S.find(s => t >= s.a + 0.2 && t < s.b - 0.2 && s.c1) || null;
+  const capO = cs ? clamp((t - cs.a - 0.3) / 0.5) * clamp((cs.b - 0.4 - t) / 0.4) : 0;
+  $('cap1').textContent = cs ? cs.c1 : ''; $('cap2').textContent = cs ? cs.c2 : '';
+  $('cap1').parentElement.style.opacity = capO.toFixed(3);
+  $('step').textContent = cs ? cs.step : ''; $('step').style.opacity = capO.toFixed(3);
+
+  // pointer and click ripple
+  let pO = 0, px = 0, py = 0, cO = 0, cx = 0, cy = 0, cScale = 1;
+  for (const [id, p] of Object.entries(PTR)) {
+    const s = S.find(x => x.id === id);
+    if (t < p.keys[0].t - 0.3 || t > s.b - 0.4 || !s.map) continue;
+    pO = clamp((t - p.keys[0].t + 0.3) / 0.3) * clamp((s.b - 0.4 - t) / 0.3);
+    [px, py] = s.map(track(p.keys, t, 'x'), track(p.keys, t, 'y'));
+    for (const c of p.clicks) if (t >= c && t < c + 0.7) { const k = (t - c) / 0.7; cO = 1 - k; cScale = 0.4 + k; [cx, cy] = [px, py]; }
+  }
+  const ptr = $('ptr'); ptr.style.opacity = pO.toFixed(3); ptr.style.transform = `translate(${px - 4}px, ${py - 3}px)`;
+  const ck = $('click'); ck.style.opacity = cO.toFixed(3); ck.style.left = cx + 'px'; ck.style.top = cy + 'px'; ck.style.transform = `scale(${cScale})`;
+
+  // pairing sound rings from the Announce button
+  const rings = $('rings'); rings.innerHTML = '';
+  if (t > 20.8 && t < 27.2) for (let i = 0; i < 4; i++) {
+    const k = ((t - 20.8) * 0.7 + i / 4) % 1;
+    const r = 30 + k * 260;
+    rings.innerHTML += `<div class="ring" style="left:${734 - r}px;top:${269 - r}px;width:${2 * r}px;height:${2 * r}px;opacity:${(1 - k) * 0.8}"></div>`;
+  }
+  // highlight the code
+  $('hl-digits').style.opacity = (clamp((t - 29.2) / 0.5) * clamp((32.6 - t) / 0.5)).toFixed(3);
+  // approval result
+  const ap = clamp((t - 58.8) / 0.3);
+  $('approved').style.opacity = ap.toFixed(3);
+  $('toast').style.opacity = (ap * clamp((63.6 - t) / 0.4)).toFixed(3);
+}
+
+window.ready = Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))).then(() => document.fonts.ready).then(() => renderAt(0));
+</script>
+</body>
+</html>

@@ -32,3 +32,6 @@ npm-debug.log*
 
 # Claude local overrides
 .claude/settings.local.json
+
+# Pitch deck: shared by link from the website only, never in the public repository
+site/media/vinac-link-pitch-deck.pdf
