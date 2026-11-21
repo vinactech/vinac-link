@@ -10,7 +10,7 @@ you agree to them. If you don't agree, please don't use the website.
 
 VINAC Link is open-source software. Your use, copying, modification and distribution of the
 software is governed by the **Apache License, Version 2.0**, included with the software and
-available [here](/LICENSE.txt). If anything in these terms conflicts with that license regarding
+available [here](/license.html). If anything in these terms conflicts with that license regarding
 the software itself, the license wins.
 
 ## 2. Trademarks and brand

@@ -64,7 +64,31 @@ const pc = await start('PC');
 const mac = await start('Mac');
 let browser;
 try {
-  await pair(pc, mac);
+  const { cdp, shoot, close } = await openBrowser();
+  const shots = [];
+  const snap = async (d, file, prep = '', wait = 900, scheme = 'dark') => {
+    await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
+    await cdp('Page.navigate', { url: d.uiUrl });
+    await sleep(1800);
+    if (prep) {
+      const r = await cdp('Runtime.evaluate', { expression: `(async () => { ${prep} })()`, awaitPromise: true });
+      if (r.exceptionDetails) throw new Error(`${file}: ${r.exceptionDetails.exception?.description || r.exceptionDetails.text}`);
+      await sleep(wait);
+    }
+    shots.push(await shoot(file));
+  };
+  // Guide: the first screen, before any pairing
+  await snap(pc, 'tour-welcome.jpg');
+  await snap(pc, 'tour-pair.jpg', `document.getElementById('newPairBtn').click()`);
+  // Pairing, stopped at the code swap for a picture
+  const p = (await ui(pc, 'POST', '/ui/announce')).pairing;
+  await ui(mac, 'POST', '/ui/heard', { code: p.beaconCode });
+  const both = async () => { const [a, b] = [await ui(pc, 'GET', '/ui/state'), await ui(mac, 'GET', '/ui/state')]; return a.pairing?.state === 'comparing' && b.pairing?.state === 'comparing' && [a, b]; };
+  const [a, b] = await until(both);
+  await snap(pc, 'tour-compare.jpg');
+  await ui(pc, 'POST', '/ui/confirm', { code: b.pairing.showCode });
+  await ui(mac, 'POST', '/ui/confirm', { code: a.pairing.showCode });
+  await until(async () => (await ui(pc, 'GET', '/ui/state')).pairing?.state === 'paired' && (await ui(mac, 'GET', '/ui/state')).pairing?.state === 'paired');
   const send = (from, msg) => ui(from, 'POST', '/api/send', msg, true);
   await send(pc, { text: 'Which branch has the auth refactor?', intent: 'agent.question.ask', args: { question: 'Which branch has the auth refactor?' } });
   await send(mac, { text: 'It is on feature/auth-v2. Tests pass on the Mac.' });
@@ -75,8 +99,26 @@ try {
   });
   await send(mac, { text: 'Update the README install steps for Linux.', intent: 'agent.task.handoff', args: { task: 'Update the README install steps for Linux.', branch: 'docs/linux' } });
   homeNetworkLook(pc, '192.168.1.24', '192.168.1.31:47800');
+  // The shown address is made up, so the reachability check would say "offline": keep the demo Mac online.
+  pc.setOnline = id => pc.online.set(id, { online: true, at: Date.now() });
+  for (const p of pc.store.peers()) pc.setOnline(p.id);
 
-  // ---- headless browser over the DevTools protocol ---------------------------------
+  // Product shots (home page) and the guide's steps
+  await snap(pc, 'app-firewall-dark.jpg', `document.getElementById('firewallNav').click()`);
+  await snap(pc, 'app-firewall-light.jpg', `document.getElementById('firewallNav').click()`, 900, 'light');
+  await snap(pc, 'app-overview-dark.jpg', `document.getElementById('overviewNav').click()`);
+  await snap(pc, 'tour-thread.jpg', `document.querySelector('.convo')?.click()`, 1200);
+  await snap(pc, 'tour-secrets.jpg', `document.getElementById('secretsNav').click(); await new Promise(r => setTimeout(r, 500)); document.querySelector('.convo')?.click(); await new Promise(r => setTimeout(r, 600)); document.getElementById('secretBtn').click(); document.getElementById('secretName').value = 'OPENAI_API_KEY'; document.getElementById('secretValue').value = 'sk-demo-not-a-real-key'; document.querySelector('input[name=how][value=wifi]').click();`, 900);
+  await snap(pc, 'tour-help.jpg', `document.getElementById('helpBtn').click()`);
+  close();
+  console.log(`screenshots in ${OUT}:\n  ${shots.join('\n  ')}`);
+} finally {
+  browser?.kill();
+  await pc.stop(); await mac.stop();
+}
+
+// ---- headless browser over the DevTools protocol ---------------------------------
+async function openBrowser() {
   const exe = BROWSERS.find(b => fs.existsSync(b));
   if (!exe) throw new Error('No Edge or Chrome found (set CHROME_BIN).');
   const profile = fs.mkdtempSync(path.join(os.tmpdir(), 'vinac-shot-browser-'));
@@ -93,20 +135,10 @@ try {
   await cdp('Page.enable');
   await cdp('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 2, mobile: false });
   fs.mkdirSync(OUT, { recursive: true });
-  const shots = [];
-  for (const [scheme, view, file] of [['dark', 'firewallNav', 'app-firewall-dark.jpg'], ['light', 'firewallNav', 'app-firewall-light.jpg'], ['dark', 'overviewNav', 'app-overview-dark.jpg']]) {
-    await cdp('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: scheme }, { name: 'prefers-reduced-motion', value: 'reduce' }] });
-    await cdp('Page.navigate', { url: pc.uiUrl });
-    await sleep(1800);
-    await cdp('Runtime.evaluate', { expression: `document.getElementById(${JSON.stringify(view)})?.click()` });
-    await sleep(900);
+  const shoot = async file => {
     const { data } = await cdp('Page.captureScreenshot', { format: 'jpeg', quality: 86 });
     fs.writeFileSync(path.join(OUT, file), Buffer.from(data, 'base64'));
-    shots.push(`${file} (${Math.round(Buffer.from(data, 'base64').length / 1024)} KB)`);
-  }
-  ws.close();
-  console.log(`screenshots in ${OUT}:\n  ${shots.join('\n  ')}`);
-} finally {
-  browser?.kill();
-  await pc.stop(); await mac.stop();
+    return `${file} (${Math.round(Buffer.from(data, 'base64').length / 1024)} KB)`;
+  };
+  return { cdp, shoot, close: () => ws.close() };
 }

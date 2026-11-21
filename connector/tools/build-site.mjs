@@ -42,7 +42,11 @@ export const PAGES = [
 ];
 // Pages with the plain layout: source in site/, URL, title, description, active nav item.
 export const PLAIN = [
+  ['tour.html', '/how-it-works.html', 'How it works', 'VINAC Link step by step, with real screens: install, pair by sound or code, connect your agent, set your firewall and move keys without the chat.', 'how'],
   ['about.md', '/about.html', 'About', 'Why we built VINAC Link: AI agents on several computers, some offline, and no safe way to share keys and requests between them.', 'about'],
+  // An .html source is a ready-made page body (the roadmap timeline), wrapped without Markdown.
+  ['roadmap.html', '/roadmap.html', 'Roadmap', 'How VINAC Link started in July 2026, what works today, what comes next, and where we are going.', 'roadmap'],
+  ['license.html', '/license.html', 'License', 'VINAC Link is free and open source under the Apache License 2.0: what you may do, what to include when you share it, and the full text.', ''],
   ['privacy.md', '/privacy.html', 'Privacy Policy', 'What Mexley Marketing Inc. collects through vinac.tech and VINAC Link (very little), and how we handle it.', ''],
   ['terms.md', '/terms.html', 'Terms of Use', 'The terms for using vinac.tech and downloading VINAC Link, including how our name and logo may be used.', ''],
 ];
@@ -51,10 +55,22 @@ export const PLAIN = [
 // Links to them show as plain text, and list items that only point at them are left out.
 const INTERNAL = ['docs/LAUNCH.md', 'docs/ROADMAP.md', 'CHANGELOG.md', 'docs/ARCHITECTURE.md', 'docs/NOISE.md'];
 const INTERNAL_LINE = /^\s*[-*]\s+\[[^\]]+\]\((?:\.\.\/)*(?:docs\/)?(?:LAUNCH|ROADMAP|CHANGELOG|ARCHITECTURE|NOISE)\.md[^)]*\)/;
-export const publicMarkdown = md => md.split('\n').filter(l => !INTERNAL_LINE.test(l) && !l.includes('LAUNCH.md')).join('\n');
+// Developer-only parts of public docs (they name internal files): left out of the website.
+const DEV_SECTIONS = ['## Adding intents'];
+const DEV_LINE = /logos\.js|logos-doc\.mjs|LOGOS_VERSION/;
+export function publicMarkdown(md) {
+  const out = [];
+  let skipping = false;
+  for (const l of md.split('\n')) {
+    if (/^## /.test(l)) skipping = DEV_SECTIONS.includes(l.trim());
+    if (skipping || INTERNAL_LINE.test(l) || l.includes('LAUNCH.md') || DEV_LINE.test(l)) continue;
+    out.push(l);
+  }
+  return out.join('\n');
+}
 const BY_SOURCE = new Map(PAGES.map(p => [p[0], p]));
 // Repository files that are not pages but still have a home on the site.
-const OTHER = { 'LICENSE': '/LICENSE.txt', 'NOTICE': '/NOTICE.txt', 'README.md': '/', 'docs/intents': '/docs/intents/', 'SECURITY.md': '/security.html' };
+const OTHER = { 'LICENSE': '/license.html', 'NOTICE': '/license.html#notices', 'README.md': '/', 'docs/intents': '/docs/intents/', 'SECURITY.md': '/security.html' };
 
 // Apps in the "works with" strip: name, logo file, and how the logo adapts to the theme
 // (ink-black: a black logo, shown white on dark; ink-white: a white logo, shown black on light).
@@ -83,17 +99,23 @@ export function resolveLink(source, href, missing = []) {
 const ICON = '<img class="mark" src="/brand/icon-128.png" alt="" width="30" height="30">';
 const ICON_BIG = '<img class="mark big" src="/brand/icon-128.png" alt="" width="56" height="56">';
 
+// Main menu: every page, in the header on wide screens and in a drop-down menu on phones.
+const NAV = [
+  ['/how-it-works.html', 'How it works', 'how'], ['/about.html', 'About', 'about'], ['/roadmap.html', 'Roadmap', 'roadmap'],
+  ['/docs/', 'Docs', 'docs'], ['/security.html', 'Security', 'security'], ['/#contact', 'Contact', 'contact'],
+];
 const header = active => `<header class="top">
   <div class="wrap top-in">
     <a class="brand" href="/" aria-label="VINAC Link home">${ICON}<span>VINAC Link</span></a>
-    <nav class="nav" aria-label="Main">
-      <a href="/#how"${active === 'how' ? ' aria-current="page"' : ''}>How it works</a>
-      <a href="/about.html"${active === 'about' ? ' aria-current="page"' : ''}>About</a>
-      <a href="/docs/"${active === 'docs' ? ' aria-current="page"' : ''}>Docs</a>
-      <a href="/security.html"${active === 'security' ? ' aria-current="page"' : ''}>Security</a>
-      <button class="theme-toggle" type="button" aria-label="Switch theme"><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg></button>
-      <a class="btn small primary" href="/#download">Download</a>
+    <nav class="nav" id="site-nav" aria-label="Main">
+      ${NAV.map(([href, label, key]) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('\n      ')}
+      <a class="btn small primary nav-download" href="/#download">Download</a>
     </nav>
+    <div class="top-actions">
+      <button class="theme-toggle" type="button" aria-label="Switch theme"><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg></button>
+      <a class="btn small primary top-download" href="/#download">Download</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg></button>
+    </div>
   </div>
 </header>`;
 
@@ -101,12 +123,14 @@ const footer = `<footer class="foot">
   <div class="wrap foot-in">
     <div class="foot-brand">${ICON}<div><strong>VINAC Link™</strong><span>Verified Intent Network for Agent Communication</span></div></div>
     <nav class="foot-links" aria-label="Footer">
-      <a href="/docs/">Docs</a><a href="/security.html">Security</a><a href="/about.html">About</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/LICENSE.txt">License</a><a href="/#contact">Contact</a>
+      <a href="/docs/">Docs</a><a href="/security.html">Security</a><a href="/about.html">About</a><a href="/roadmap.html">Roadmap</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/license.html">License</a><a href="/#contact">Contact</a>
     </nav>
     <p class="fine">© 2026 Mexley Marketing Inc. · Free and open source under Apache-2.0 · This site sets no cookies and loads no trackers. VINAC and VINAC Link are trademarks of Mexley Marketing Inc. Other product names and logos belong to their owners and are shown only to say what VINAC Link works with.</p>
   </div>
 </footer>`;
 
+// Cache key for styles and scripts: changes whenever their content does, even within one version.
+const ASSET_V = crypto.createHash('sha256').update(['styles.css', 'site.js', 'theme.js', 'field.js'].map(f => fs.readFileSync(path.join(SITE, f))).join('\n')).digest('hex').slice(0, 10);
 const head = ({ title, description, url, scripts = [] }) => `<!doctype html>
 <html lang="en" data-theme="dark">
 <head>
@@ -125,9 +149,9 @@ const head = ({ title, description, url, scripts = [] }) => `<!doctype html>
 <link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
 <link rel="icon" type="image/png" sizes="128x128" href="/brand/icon-128.png">
 <link rel="apple-touch-icon" href="/brand/icon-512.png">
-<script src="/theme.js?v=${version}"></script>
-<link rel="stylesheet" href="/styles.css?v=${version}">
-${['site.js', ...scripts].map(s => `<script src="/${s}?v=${version}" defer></script>`).join('\n')}
+<script src="/theme.js?v=${ASSET_V}"></script>
+<link rel="stylesheet" href="/styles.css?v=${ASSET_V}">
+${['site.js', ...scripts].map(s => `<script src="/${s}?v=${ASSET_V}" defer></script>`).join('\n')}
 </head>`;
 
 function docPage([source, url, title, group], body, headings) {
@@ -212,7 +236,7 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     ? `<video class="demo-video" controls preload="metadata" playsinline${fs.existsSync(path.join(SITE, 'media', 'poster.jpg')) ? ' poster="/media/poster.jpg"' : ''}><source src="/media/${demoFile}" type="video/${demoFile.split('.').pop()}">Your browser can't play this video. <a href="/media/${demoFile}">Download it</a>.</video>`
     : `<div class="demo-soon">${ICON_BIG}<p><strong>Video coming soon.</strong> Until then, the <a href="/docs/getting-started.html">quick start</a> takes about five minutes on two computers.</p></div>`;
   const home = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8')
-    .replaceAll('{{head}}', head({ title: 'VINAC Link · A secure link between your AI agents', description: 'Pair your computers once, by sound or a short code. Then their AI agents can pass each other API keys, tokens and requests, and your rules decide what each agent receives. No cloud, no account.', url: '/', scripts: ['field.js'] }))
+    .replaceAll('{{head}}', head({ title: 'VINAC Link · A secure link between your AI agents', description: 'The secure link between AI agents on your own computers: Claude Code, Codex and local models, from any vendor, online or offline. Your firewall decides what each agent receives. No cloud, no account.', url: '/', scripts: ['field.js'] }))
     .replaceAll('{{header}}', header('home'))
     .replaceAll('{{footer}}', footer)
     .replaceAll('{{demo}}', demo)
@@ -242,12 +266,14 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
 
   // 5. Plain pages (no docs sidebar): About, Privacy Policy, Terms of Use
   for (const [file, url, title, description, active] of PLAIN) {
-    const { html } = render(fs.readFileSync(path.join(SITE, file), 'utf8'), { link: href => resolveLink(`site/${file}`, href, missing) });
+    const src = fs.readFileSync(path.join(SITE, file), 'utf8');
+    const isHtml = file.endsWith('.html');
+    const html = isHtml ? src.replaceAll('{{license}}', escapeHtml(fs.readFileSync(path.join(ROOT, 'LICENSE'), 'utf8').trim())).replaceAll('{{notice}}', escapeHtml(fs.readFileSync(path.join(ROOT, 'NOTICE'), 'utf8').trim())) : render(src, { link: href => resolveLink(`site/${file}`, href, missing) }).html;
     write(url.slice(1), `${head({ title: `${title} · VINAC Link`, description, url })}
 <body class="plain-page">
 <a class="skip" href="#content">Skip to content</a>
 ${header(active)}
-<main id="content" class="wrap narrow prose about">${html}</main>
+<main id="content" class="${isHtml ? `wrap ${file.replace('.html', '')}-page` : 'wrap narrow prose about'}">${html}</main>
 ${footer}
 </body>
 </html>
@@ -282,6 +308,14 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
     if (z.status !== 0) throw new Error(`zip failed (needs bsdtar: Windows 10+, macOS): ${z.stderr}`);
     console.log(`  upload package: ${zip} (${Math.round(fs.statSync(zip).size / 1024)} KB)`);
     const big = fs.readdirSync(path.join(r.out, 'download')).filter(f => f.startsWith('VINAC-Link-'));
-    if (big.length) console.log(`  upload these separately into public_html/download/:\n    ${big.map(f => path.join(r.out, 'download', f)).join('\n    ')}`);
+    if (big.length) {
+      console.log(`  upload these separately into public_html/download/:\n    ${big.map(f => path.join(r.out, 'download', f)).join('\n    ')}`);
+      // The same, in one archive with the installers included (bigger, one upload).
+      const full = path.join(path.dirname(r.out), `vinac-tech-site-${version}-full.zip`);
+      fs.rmSync(full, { force: true });
+      const f = spawnSync('tar', ['-a', '-c', '-f', full, '-C', r.out, ...fs.readdirSync(r.out)], { encoding: 'utf8' });
+      if (f.status !== 0) throw new Error(`zip failed: ${f.stderr}`);
+      console.log(`  or everything in one archive (installers included): ${full} (${Math.round(fs.statSync(full).size / 1048576)} MB)`);
+    }
   }
 }

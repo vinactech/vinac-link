@@ -7,9 +7,9 @@
 <section class="hero">
   <canvas class="field" aria-hidden="true"></canvas>
   <div class="wrap hero-center">
-    <p class="chip"><span class="dot" aria-hidden="true"></span>Open source · Online or offline · v{{version}}</p>
+    <p class="chip"><span class="dot" aria-hidden="true"></span>Open source · Any vendor · Online or offline · v{{version}}</p>
     <h1>A secure link between<br>your <span class="grad-text">AI agents</span></h1>
-    <p class="lede">Pair your computers once, by sound or a short code. Then their AI agents can pass each other API keys, tokens and requests, your rules decide what each agent receives, and you stay in the loop for anything that matters.</p>
+    <p class="lede">Claude Code, Codex and local models on all your computers can ask each other for answers, reviews, files and API keys, online or offline. Your firewall decides what each agent receives, and nothing important happens without your OK.</p>
     <div class="cta">
       <a class="btn primary" href="#download">Download for free</a>
       <a class="btn ghost" href="/docs/getting-started.html">Read the quick start</a>
@@ -124,6 +124,7 @@
       <li><span class="num">3</span><div><h3>Send requests your rules check</h3><p>Each request says what it wants. Your rules let it through, ask you first, or block it.</p></div></li>
     </ol>
     <p class="fine center legend-note">Online with cloud agents like Claude Code and Codex, or fully offline with local models in LM Studio, Ollama, Goose or Open WebUI. The link between your computers never needs the internet.</p>
+    <p class="center"><a class="btn ghost" href="/how-it-works.html">See it step by step, with real screens →</a></p>
   </div>
 </section>
 
@@ -316,6 +317,8 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
     <h2 class="center">Questions</h2>
     <div class="faq">
       <details><summary>Do I need an account or a server?</summary><p>No. The two computers talk directly over whatever network connects them: Wi-Fi, a hotspot, a cable, or Tailscale. There is no server in between and no sign-up.</p></details>
+      <details><summary>Some AI tools can already message their other sessions. Why VINAC Link?</summary><p>Built-in messaging usually works within one vendor's tools and goes through that vendor's cloud and account. VINAC Link connects agents from any vendor (Claude Code, Codex, OpenClaw and local models) directly between your own computers, with no account or cloud in between, and works fully offline. It also adds what plain messaging leaves out: a firewall that checks every request, keys and tokens agents can use but never see, and a person who approves what matters.</p></details>
+      <details><summary>What about A2A and other agent standards?</summary><p>Standards such as A2A connect companies' cloud services to each other. VINAC Link is for the agents on your own computers, including ones that are never online. We plan to make VINAC Link work with A2A, so the two fit together rather than compete.</p></details>
       <details><summary>Does it work online and offline?</summary><p>Both. The link between your computers never needs the internet: Wi-Fi without internet, a hotspot or a cable is enough. Cloud agents such as Claude Code, Codex or Cursor need the internet for their own AI model; local models in LM Studio, Ollama, Goose or Open WebUI can run with no internet at all. You only need a connection once, to download VINAC Link, and you can copy the package over on a USB stick instead.</p></details>
       <details><summary>What leaves my computer?</summary><p>Only what you or your agent send to a device you paired, encrypted for that device. Nothing goes to us. This website sets no cookies and loads no trackers either.</p></details>
       <details><summary>Can an agent approve its own requests?</summary><p>No. Agents get tools to send and read. Confirming a pairing, approving a request, changing a rule or revealing a secret value only happens on the VINAC Link page, by a person.</p></details>
@@ -326,7 +329,23 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
   </div>
 </section>
 
-<section class="section" id="contact">
+<section class="section" id="teams">
+  <div class="wrap narrow">
+    <div class="teams">
+      <div>
+        <p class="kicker">For teams and organisations</p>
+        <h2>Running agents across a team, a lab or an offline network?</h2>
+        <p class="sub">VINAC Link is free for everyone on their own computers, and it stays free. We're working with a small number of organisations on what teams need next: shared firewall rules, central audit, single sign-on, and on-premises or air-gapped setups.</p>
+      </div>
+      <div class="teams-cta">
+        <a class="btn primary" href="/?topic=teams#contact">Talk to us</a>
+        <a class="btn ghost" href="/roadmap.html">See the roadmap</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="section alt" id="contact">
   <div class="wrap contact">
     <div class="contact-copy">
       <p class="kicker">Contact</p>
@@ -346,10 +365,12 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
       </div>
       <label>Topic
         <select name="topic">
-          <option>General question</option>
-          <option>Partnership</option>
-          <option>Press</option>
-          <option>Security</option>
+          <option value="General question">General question</option>
+          <option value="Relay waitlist" data-topic="relay">Relay waitlist</option>
+          <option value="Teams and organisations" data-topic="teams">Teams and organisations</option>
+          <option value="Partnership">Partnership</option>
+          <option value="Press">Press</option>
+          <option value="Security">Security</option>
         </select>
       </label>
       <label>Message<textarea name="message" rows="6" maxlength="5000" required></textarea></label>

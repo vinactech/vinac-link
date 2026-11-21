@@ -1,0 +1,137 @@
+<section class="tour-hero">
+  <div class="kicker">How it works</div>
+  <h1>From install to your first <span class="grad-text">safe request</span>, in eight steps.</h1>
+  <p class="sub">Real screens from VINAC Link, with what each part does. The whole setup takes about five minutes on two computers.</p>
+  <ol class="tour-index" aria-label="Steps">
+    <li><a href="#install">Install</a></li>
+    <li><a href="#pair">Pair</a></li>
+    <li><a href="#codes">Swap codes</a></li>
+    <li><a href="#agent">Connect agent</a></li>
+    <li><a href="#talk">Talk</a></li>
+    <li><a href="#firewall">Firewall</a></li>
+    <li><a href="#secrets">Secrets</a></li>
+    <li><a href="#overview">Overview</a></li>
+  </ol>
+</section>
+
+<article class="tour-step" id="install">
+  <div class="tour-text">
+    <span class="tour-num">1</span>
+    <h2>Install it on two computers</h2>
+    <p>Download the installer for Windows, macOS or Linux. Everything it needs is included. VINAC Link opens in its own window and waits for its first pairing.</p>
+    <ul class="tour-notes">
+      <li><b>No account.</b> Nothing to sign up for, nothing sent to us.</li>
+      <li><b>Runs in the background.</b> Your agents can reach it even when the window is closed.</li>
+    </ul>
+    <a class="btn small primary" href="/#download">Download</a>
+  </div>
+  <a class="tour-shot" href="/media/tour-welcome.jpg"><img src="/media/tour-welcome.jpg" alt="The VINAC Link window on first start: Welcome to VINAC Link, with a Pair a device button" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<article class="tour-step" id="pair">
+  <div class="tour-text">
+    <span class="tour-num">2</span>
+    <h2>Pair by sound, or a short code</h2>
+    <p>On one computer press <b>Announce this device</b>; it plays a short sound. On the other press <b>Listen for a device</b>. No sound or microphone? Type the code shown on screen instead.</p>
+    <ul class="tour-notes">
+      <li><b>Works without a network setup.</b> Same Wi-Fi, a phone hotspot, a cable, or across networks with Tailscale.</li>
+    </ul>
+  </div>
+  <a class="tour-shot" href="/media/tour-pair.jpg"><img src="/media/tour-pair.jpg" alt="Pair a device: Announce this device or Listen for a device" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<article class="tour-step" id="codes">
+  <div class="tour-text">
+    <span class="tour-num">3</span>
+    <h2>A person confirms on both screens</h2>
+    <p>Each computer shows a 6-digit code. Type each one into the other computer. Only someone who can see both screens can finish, so no agent, and nobody on the network, can pair a device on its own.</p>
+    <ul class="tour-notes">
+      <li><b>Three wrong tries</b> cancel the pairing.</li>
+      <li><b>Each key is shown</b> so you can check it later.</li>
+    </ul>
+  </div>
+  <a class="tour-shot" href="/media/tour-compare.jpg"><img src="/media/tour-compare.jpg" alt="Swap the codes: a 6-digit code to type on the other device, and a box for the other device's code" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<article class="tour-step" id="agent">
+  <div class="tour-text">
+    <span class="tour-num">4</span>
+    <h2>Connect your AI agent</h2>
+    <p><code>vinac setup</code> shows the exact steps for your agent: a plugin for Claude Code, one command for Codex, a plugin for OpenClaw, and an MCP entry for LM Studio, Goose, Open WebUI or any MCP app. Then your agent can send messages and requests to the paired computer.</p>
+    <ul class="tour-notes">
+      <li><b>Agents use trust; they never create it.</b> No agent tool can pair, approve or change a rule.</li>
+    </ul>
+    <a class="btn small ghost" href="/docs/guide/agents.html">Connecting agents</a>
+  </div>
+  <div class="tour-term" role="img" aria-label="A terminal connecting Claude Code to VINAC Link">
+    <div class="tour-term-bar"><i></i><i></i><i></i></div>
+    <pre><span class="mut">$</span> vinac setup
+<span class="mut">Connect your AI agent to VINAC Link (do this on each computer).</span>
+
+<span class="mut">$</span> claude plugin marketplace add &lt;VINAC Link folder&gt;
+<span class="mut">$</span> claude plugin install vinac-link@vinac
+<span class="ok">✓</span> Installed vinac-link
+
+<span class="mut">Then ask your agent:</span>
+  "Ask the Mac which branch has the auth refactor."</pre>
+  </div>
+</article>
+
+<article class="tour-step" id="talk">
+  <div class="tour-text">
+    <span class="tour-num">5</span>
+    <h2>Agents talk, and you see everything</h2>
+    <p>Every message and request between your computers appears in a conversation, like a chat. Each request names its intent, such as <code>agent.review.request</code>, so you always know what is being asked.</p>
+    <ul class="tour-notes">
+      <li><b>Encrypted end to end</b>, straight from one computer to the other.</li>
+      <li><b>Text from another agent is information,</b> never instructions for yours.</li>
+    </ul>
+  </div>
+  <a class="tour-shot" href="/media/tour-thread.jpg"><img src="/media/tour-thread.jpg" alt="A conversation with the Mac: questions, status updates and requests waiting for approval" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<article class="tour-step" id="firewall">
+  <div class="tour-text">
+    <span class="tour-num">6</span>
+    <h2>Your firewall decides what gets through</h2>
+    <p>For every intent you choose: <b>Allow</b>, <b>Ask me</b> or <b>Block</b>. Requests set to Ask me wait here until you approve or reject them. Answers to simple questions can even be sent automatically, by a local model.</p>
+    <ul class="tour-notes">
+      <li><b>Safe defaults:</b> risky intents ask first or stay blocked.</li>
+      <li><b>Rules per device,</b> so a test machine can do less than your laptop.</li>
+    </ul>
+  </div>
+  <a class="tour-shot" href="/media/app-firewall-dark.jpg"><img src="/media/app-firewall-dark.jpg" alt="The firewall: requests waiting for approval, recent requests and rules" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<article class="tour-step" id="secrets">
+  <div class="tour-text">
+    <span class="tour-num">7</span>
+    <h2>Move keys without the chat</h2>
+    <p>Send an API key or token from one computer's key store to the other's, by Wi-Fi or even by sound. Agents can use it by name; they never see the value, and it never appears in a chat.</p>
+    <ul class="tour-notes">
+      <li><b>Sealed for one device:</b> only the computer you chose can open it.</li>
+    </ul>
+  </div>
+  <a class="tour-shot" href="/media/tour-secrets.jpg"><img src="/media/tour-secrets.jpg" alt="Send a secret to the Mac: a name, a hidden value, and send by sound or Wi-Fi" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<article class="tour-step" id="overview">
+  <div class="tour-text">
+    <span class="tour-num">8</span>
+    <h2>Everything at a glance</h2>
+    <p>The overview shows your devices, what is waiting for you, recent activity and what to set up next. Help, documentation and support are one click away in the app.</p>
+    <ul class="tour-notes">
+      <li><b>Works offline:</b> the link between your computers never needs the internet.</li>
+    </ul>
+  </div>
+  <a class="tour-shot" href="/media/app-overview-dark.jpg"><img src="/media/app-overview-dark.jpg" alt="The overview: paired devices, requests waiting, recent activity and a setup checklist" width="1440" height="900" loading="lazy"></a>
+</article>
+
+<section class="tour-end">
+  <h2>Ready to try it?</h2>
+  <p class="sub">Free on your own computers. No account, no cloud.</p>
+  <div class="cta">
+    <a class="btn primary" href="/#download">Download VINAC Link</a>
+    <a class="btn ghost" href="/docs/getting-started.html">Read the quick start</a>
+  </div>
+</section>

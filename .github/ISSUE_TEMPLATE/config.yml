@@ -1,0 +1,11 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security issue
+    url: https://vinac.tech/security.html
+    about: Please don't open a public issue for security problems.
+  - name: Documentation
+    url: https://vinac.tech/docs/
+    about: Guides for pairing, the firewall, secrets and connecting agents.
+  - name: Contact us
+    url: https://vinac.tech/#contact
+    about: Teams, partnerships and anything else.

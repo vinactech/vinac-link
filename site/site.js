@@ -28,12 +28,32 @@ const onScroll = () => siteHeader?.classList.toggle('scrolled', window.scrollY >
 window.addEventListener('scroll', onScroll, { passive: true });
 onScroll();
 
+// Phone menu: the hamburger button opens the links; a link, Escape, a click outside or a wider
+// window closes it.
+const menuBtn = document.querySelector('.menu-toggle');
+const setMenu = open => {
+  siteHeader?.classList.toggle('open', open);
+  menuBtn?.setAttribute('aria-expanded', String(open));
+  menuBtn?.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+};
+menuBtn?.addEventListener('click', () => setMenu(menuBtn.getAttribute('aria-expanded') !== 'true'));
+document.querySelector('.nav')?.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
+document.addEventListener('click', e => { if (siteHeader?.classList.contains('open') && !e.target.closest('.top')) setMenu(false); });
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape' && siteHeader?.classList.contains('open')) { setMenu(false); menuBtn?.focus(); }
+});
+window.matchMedia('(min-width: 1001px)').addEventListener('change', e => { if (e.matches) setMenu(false); });
+
 // Contact form: sends to /contact.php on this site (no outside service). Without this script
 // the form still posts normally and the server answers with a simple page.
 const contactForm = document.querySelector('.contact-form');
 if (contactForm) {
   const started = contactForm.querySelector('input[name="t"]');
   if (started) started.value = String(Math.floor(Date.now() / 1000));
+  // Links like /?topic=relay#contact pre-select a topic.
+  const wanted = new URLSearchParams(location.search).get('topic');
+  const option = wanted && contactForm.querySelector(`option[data-topic="${CSS.escape(wanted)}"]`);
+  if (option) option.selected = true;
   const status = contactForm.querySelector('.form-status');
   const button = contactForm.querySelector('button[type="submit"]');
   contactForm.addEventListener('submit', async e => {

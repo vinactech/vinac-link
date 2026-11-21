@@ -35,6 +35,9 @@ the topic you chose and your message. We use them **only to answer you** and to 
 conversation. We don't add you to a mailing list, and we don't sell, rent or share your details with
 anyone, except our email and hosting providers, who process them on our behalf.
 
+If you join the relay waitlist, we keep your email address only to tell you when the relay is
+ready, and delete it on request or when the waitlist closes.
+
 To stop spam, the form keeps a scrambled (hashed) version of the sender's internet address for up to
 one hour, only to limit how many messages can be sent.
 

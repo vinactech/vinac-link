@@ -4,4 +4,5 @@
   let saved = null;
   try { saved = localStorage.getItem('vinac-site-theme'); } catch { /* storage blocked */ }
   document.documentElement.dataset.theme = saved === 'light' ? 'light' : 'dark';
+  document.documentElement.classList.add('js'); // scripts run: the phone menu can fold away
 })();

@@ -59,6 +59,10 @@
           <span class="whoami-dot" aria-hidden="true"></span>
           <div><b id="deviceLine">Loading…</b><small><span id="keyPill">—</span></small></div>
         </div>
+        <button type="button" class="helpbtn" id="helpBtn">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M9.5 9.3a2.6 2.6 0 0 1 5 .9c0 1.8-2.5 2.3-2.5 3.8M12 17h.01"/></svg>
+          <span>Help &amp; about</span><small id="helpVersion"></small>
+        </button>
         <div class="theme-switch" role="group" aria-label="Appearance">
           <button type="button" data-theme-choice="system" title="Match the system"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="12" rx="2"/><path d="M8 20h8M12 16v4"/></svg>Auto</button>
           <button type="button" data-theme-choice="light" title="Light"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>Light</button>
@@ -114,10 +118,19 @@
       <!-- empty state -->
       <section class="view empty-view" data-main="empty">
         <div class="empty-inner">
-          <img class="big-mark" src="/web/icon.png" alt="" width="64" height="64">
-          <h2 id="emptyTitle">No paired devices yet</h2>
-          <p id="emptyText">Pair this computer with another one. Then AI agents on both can send each other messages, and you can follow along here.</p>
-          <button class="primary" id="emptyPairBtn">Pair a device</button>
+          <svg class="hero-art" viewBox="0 0 320 170" aria-hidden="true">
+            <defs><linearGradient id="heroGrad" x1="0" x2="1"><stop offset="0" stop-color="#4f6bff"/><stop offset="1" stop-color="#9a5cf0"/></linearGradient></defs>
+            <circle class="glow" cx="160" cy="86" r="70"/>
+            <g class="dev"><rect x="22" y="42" width="92" height="62" rx="9"/><path d="M10 112h116l-8 12H18z"/><rect class="scr" x="32" y="52" width="72" height="42" rx="4"/></g>
+            <g class="dev"><rect x="206" y="42" width="92" height="62" rx="9"/><path d="M194 112h116l-8 12H202z"/><rect class="scr" x="216" y="52" width="72" height="42" rx="4"/></g>
+            <g class="waves" stroke="url(#heroGrad)"><path d="M132 62q10 12 0 24"/><path d="M144 52q18 22 0 44"/><path d="M188 62q-10 12 0 24"/><path d="M176 52q-18 22 0 44"/></g>
+            <rect class="code" x="128" y="128" width="64" height="22" rx="11"/><text x="160" y="143.5" text-anchor="middle">483 920</text>
+            <circle class="d" cx="40" cy="20" r="3"/><circle class="d" cx="288" cy="26" r="2.5"/><circle class="d" cx="300" cy="150" r="3"/>
+          </svg>
+          <h2 id="emptyTitle">Welcome to VINAC Link</h2>
+          <p id="emptyText">Pair this computer with another one, by sound or a short code. Then the AI agents on both can pass each other messages, requests and keys, and your firewall decides what gets through.</p>
+          <button class="primary big" id="emptyPairBtn">Pair a device</button>
+          <a class="linkish-a" href="https://vinac.tech/docs/getting-started.html" target="_blank" rel="noopener noreferrer">How pairing works ↗</a>
         </div>
       </section>
 
@@ -355,6 +368,37 @@
           <button class="ghost" id="secretStop">Stop</button>
           <button class="primary" id="secretDone" hidden>Done</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== help & about ===== -->
+  <div class="overlay" id="helpModal" hidden>
+    <div class="modal about-modal" role="dialog" aria-modal="true" aria-labelledby="helpTitle">
+      <header class="info-head">
+        <b id="helpTitle">Help &amp; about</b>
+        <button class="icon" id="helpClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </header>
+      <div class="modal-body">
+        <div class="about-brand">
+          <img src="/web/icon.png" alt="" width="52" height="52">
+          <div><b>VINAC Link™</b><small id="aboutVersion"></small><small>Verified Intent Network for Agent Communication</small></div>
+        </div>
+        <nav class="about-links" aria-label="Help and legal">
+          <a href="https://vinac.tech/docs/" target="_blank" rel="noopener noreferrer"><b>Documentation</b><small>Guides for pairing, the firewall, secrets and agents</small></a>
+          <a href="https://vinac.tech/docs/guide/troubleshooting.html" target="_blank" rel="noopener noreferrer"><b>Troubleshooting</b><small>Fixes for the most common problems</small></a>
+          <a href="https://vinac.tech/#contact" target="_blank" rel="noopener noreferrer"><b>Get help</b><small>Write to us: hello@vinac.tech</small></a>
+          <a href="https://vinac.tech/roadmap.html" target="_blank" rel="noopener noreferrer"><b>What's next</b><small>The roadmap and new versions</small></a>
+          <a href="https://vinac.tech/security.html" target="_blank" rel="noopener noreferrer"><b>Security</b><small>How it protects you, and how to report an issue</small></a>
+          <a href="https://vinac.tech/" target="_blank" rel="noopener noreferrer"><b>Website</b><small>vinac.tech</small></a>
+        </nav>
+        <p class="about-legal">
+          <a href="https://vinac.tech/terms.html" target="_blank" rel="noopener noreferrer">Terms of Use</a> ·
+          <a href="https://vinac.tech/privacy.html" target="_blank" rel="noopener noreferrer">Privacy Policy</a> ·
+          <a href="https://vinac.tech/license.html" target="_blank" rel="noopener noreferrer">License (Apache-2.0)</a> ·
+          <a href="https://vinac.tech/license.html#notices" target="_blank" rel="noopener noreferrer">Notices</a>
+        </p>
+        <p class="hint small">© 2026 Mexley Marketing Inc. Free and open source under the Apache License 2.0. VINAC and VINAC Link are trademarks of Mexley Marketing Inc. This app sends nothing to us; these links open in your web browser.</p>
       </div>
     </div>
   </div>

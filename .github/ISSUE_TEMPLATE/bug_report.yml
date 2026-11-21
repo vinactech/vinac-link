@@ -1,0 +1,49 @@
+name: Bug report
+description: Something in VINAC Link doesn't work as expected
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. **Never paste keys, tokens or pairing codes here.**
+        Security issues go to SECURITY.md instead of a public issue.
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened?
+      description: What you did, what you expected, and what happened instead.
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. Start VINAC Link on two computers
+        2. ...
+  - type: input
+    id: version
+    attributes:
+      label: VINAC Link version
+      description: Shown under Help & about in the app, or `vinac version`.
+      placeholder: 0.8.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating systems
+      multiple: true
+      options: [Windows, macOS, Linux]
+  - type: dropdown
+    id: agent
+    attributes:
+      label: Agent
+      multiple: true
+      options: [Claude Code, Codex, OpenClaw, LM Studio, Ollama, Goose, Open WebUI, Other MCP app, None]
+  - type: textarea
+    id: doctor
+    attributes:
+      label: Output of `vinac doctor`
+      description: Optional. Check it for anything private before pasting.
+      render: text

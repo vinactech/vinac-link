@@ -32,6 +32,14 @@ function applyTheme(choice) {
 applyTheme(LS.get('theme', 'system'));
 for (const b of document.querySelectorAll('[data-theme-choice]')) b.onclick = () => { LS.set('theme', b.dataset.themeChoice); applyTheme(b.dataset.themeChoice); };
 
+// Help & about: links to the docs, support, terms, privacy and the license (they open in the browser).
+const helpModal = $('helpModal');
+const closeHelp = () => { helpModal.hidden = true; $('helpBtn').focus(); };
+$('helpBtn').onclick = () => { helpModal.hidden = false; $('helpClose').focus(); };
+$('helpClose').onclick = closeHelp;
+helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !helpModal.hidden) closeHelp(); });
+
 let state = null, lastPaired = null, firstLoad = true;
 let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantOverview = true, mobileMain = false;
 let thread = [], threadKey = '', justOpened = true, search = '', replyTo = null;
@@ -93,6 +101,8 @@ function render(s) {
   $('deviceLine').title = d.fingerprint;
   $('keyPill').textContent = `${KEYSTORE[d.keystore] || d.keystore} · ${d.fingerprint}`;
   $('keyPill').title = d.keystoreNote || '';
+  $('helpVersion').textContent = d.version ? `v${d.version}` : '';
+  $('aboutVersion').textContent = `Version ${d.version || '?'} · protocol v${d.protocol}`;
 
   if (selected && !peerById(selected)) selected = null;
 
@@ -196,9 +206,8 @@ function renderThread() {
   box.replaceChildren();
 
   if (!list.length) {
-    const none = document.createElement('p'); none.className = 'none';
-    none.textContent = q ? 'No messages match.' : 'No messages yet. Write one below, or ask your AI agent to use vinac_send.';
-    box.append(none);
+    if (q) { const none = document.createElement('p'); none.className = 'none'; none.textContent = 'No messages match.'; box.append(none); }
+    else box.append(emptyEl('div', 'bubbles', 'Say hello', 'Write a message below, or ask your AI agent to use vinac_send. Messages go straight to the device, encrypted.'));
   }
   let prev = null;
   for (const m of list) {
@@ -284,6 +293,24 @@ function messageEl(m, cont, q) {
 
 const text = (tag, t) => { const e = document.createElement(tag); e.textContent = t; return e; };
 function button(label, fn) { const b = document.createElement('button'); b.type = 'button'; b.textContent = label; b.onclick = fn; return b; }
+
+// Small line illustrations for empty lists (fixed strings, theme colours from CSS).
+const ART = {
+  shield: '<path class="a" d="M80 12l32 12v24c0 22-14 37-32 44-18-7-32-22-32-44V24l32-12Z"/><path class="s" d="M66 51l10 10 19-20"/>',
+  flow: '<rect class="a" x="22" y="26" width="46" height="34" rx="8"/><rect class="a" x="92" y="50" width="46" height="34" rx="8"/><path class="s" d="M32 38h26M32 48h16M102 62h26M102 72h16M72 40h20l-6-6M88 70H68l6 6"/>',
+  key: '<circle class="a" cx="58" cy="58" r="20"/><circle class="s" cx="58" cy="58" r="7"/><path class="s" d="M73 45l38-26M100 27l8 11M91 33l6 8"/>',
+  bubbles: '<path class="a" d="M24 22h70a10 10 0 0 1 10 10v22a10 10 0 0 1-10 10H48l-16 12V64h-8a10 10 0 0 1-10-10V32a10 10 0 0 1 10-10Z"/><path class="b" d="M136 46H82a10 10 0 0 0-10 10v18a10 10 0 0 0 10 10h34l14 10V84h6a10 10 0 0 0 10-10V56a10 10 0 0 0-10-10Z"/><path class="s" d="M36 38h44M36 48h28"/>',
+  pulse: '<rect class="a" x="18" y="18" width="124" height="70" rx="12"/><path class="s" d="M30 58h22l8-18 12 34 10-26 6 10h42"/>',
+};
+function emptyEl(tag, kind, title, body) {
+  const el = document.createElement(tag); el.className = 'none empty-state';
+  const art = document.createElement('div'); art.className = 'art';
+  art.innerHTML = `<svg viewBox="0 0 160 100" aria-hidden="true">${ART[kind]}<circle class="d" cx="16" cy="18" r="3"/><circle class="d" cx="146" cy="16" r="2"/><circle class="d" cx="150" cy="92" r="3"/></svg>`;
+  el.append(art);
+  if (title) el.append(text('b', title));
+  el.append(text('span', body));
+  return el;
+}
 function iconButton(icon, label, fn) {
   const b = document.createElement('button'); b.type = 'button'; b.className = 'icon'; b.title = label; b.setAttribute('aria-label', label);
   b.innerHTML = ICON[icon]; b.onclick = fn; return b;
@@ -359,9 +386,8 @@ function renderSecrets(force = false) {
   renderUses();
   const list = $('secretList'); list.replaceChildren();
   if (!state.secrets.length) {
-    const li = document.createElement('li'); li.className = 'none';
-    li.textContent = 'No secrets yet. Press "Receive a secret", then send one from a paired device (the key button in its conversation).';
-    list.append(li); return;
+    list.append(emptyEl('li', 'key', 'No secrets yet', 'Press "Receive a secret", then send one from a paired device (the key button in its conversation). The value goes into this computer\'s key store, never into a chat.'));
+    return;
   }
   for (const s of [...state.secrets].reverse()) {
     const li = document.createElement('li'); li.className = 'secret';
@@ -500,7 +526,7 @@ function renderOverview() {
 
   // Recent activity (requests and held/blocked messages)
   const act = $('ovActivity'); act.replaceChildren();
-  if (!reqs.length) { const li = text('li', 'No requests yet. When agents send each other requests, each one and what your firewall did shows up here.'); li.className = 'none'; act.append(li); }
+  if (!reqs.length) act.append(emptyEl('li', 'pulse', 'No requests yet', 'When agents send each other requests, each one and what your firewall did shows up here.'));
   for (const r of reqs.slice(0, 7)) {
     const li = document.createElement('li');
     const st = text('span', FW_LABEL[r.firewall.status]); st.className = `fwtag ${r.firewall.status}`;
@@ -587,11 +613,11 @@ function renderFirewall() {
   const recent = fw.requests.filter(r => r.firewall.status !== 'pending').slice(0, 30);
   const fill = (id, list, empty) => {
     const ul = $(id); ul.replaceChildren();
-    if (!list.length) { const li = text('li', empty); li.className = 'none'; ul.append(li); return; }
+    if (!list.length) { ul.append(emptyEl('li', ...empty)); return; }
     for (const r of list) ul.append(requestItem(r));
   };
-  fill('fwWaiting', waiting, 'Nothing is waiting. Requests that your rules set to "Ask me" appear here.');
-  fill('fwRecent', recent, 'No requests yet. Agents on paired devices send them with an intent, like crm.contact.read.');
+  fill('fwWaiting', waiting, ['shield', 'All clear', 'Nothing is waiting. Requests that your rules set to "Ask me" appear here.']);
+  fill('fwRecent', recent, ['flow', 'No requests yet', 'Agents on paired devices send them with an intent, like agent.review.request.']);
 
   const scope = $('fwScope');
   if (fwScope !== '*' && !fw.peers.some(p => p.id === fwScope)) fwScope = '*';
@@ -612,64 +638,74 @@ function renderAutoReply() {
   const box = $('autoReply'); const a = fw.autoReply;
   if (!box || !a) return;
   box.replaceChildren();
-  const intro = text('p', `Answers ${a.intents.join(', ')} from the devices you choose, with a local model or a short agent run that only sees those messages and can only reply. Everything else waits for you as usual.`);
-  intro.className = 'auto-note';
+  // One settings row: a title and hint on the left, the control(s) on the right.
+  const setting = (title, hint, ...controls) => {
+    const row = document.createElement('div'); row.className = 'ar-row';
+    const t = document.createElement('div'); t.className = 'ar-label'; t.append(text('b', title));
+    if (hint) t.append(text('small', hint));
+    const c = document.createElement('div'); c.className = 'ar-control'; c.append(...controls);
+    row.append(t, c); return row;
+  };
+  const sw = (checked, label) => {
+    const l = document.createElement('label'); l.className = 'switch';
+    const i = document.createElement('input'); i.type = 'checkbox'; i.checked = checked; i.setAttribute('role', 'switch'); i.setAttribute('aria-label', label);
+    l.append(i, document.createElement('span')); return [l, i];
+  };
+  const intro = document.createElement('div'); intro.className = 'ar-intro';
+  intro.innerHTML = '<span class="ar-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 5h16v10H9l-5 4V5Z"/><path d="M9 10h.01M12 10h.01M15 10h.01"/></svg></span>';
+  intro.append(text('p', `Answers ${a.intents.join(', ')} from the devices you choose, with a local model or a short agent run that only sees those messages and can only reply. Everything else waits for you as usual.`));
   box.append(intro);
-  if (!a.devices.length) { const p = text('p', 'Pair a device first.'); p.className = 'auto-note'; box.append(p); }
+
+  const devs = document.createElement('div'); devs.className = 'ar-group';
+  devs.append(text('h4', 'Devices'));
+  if (!a.devices.length) devs.append(setting('No paired devices', 'Pair a device first.'));
   for (const d of a.devices) {
-    const row = document.createElement('div'); row.className = 'fw-row';
-    const name = document.createElement('div'); name.className = 'fw-name';
-    name.append(text('code', d.name), text('small', d.mode === 'questions' ? 'Questions and status updates get an automatic reply.' : 'Off: messages wait for you and your agent.'));
-    const sel = document.createElement('select');
-    sel.setAttribute('aria-label', `Auto-reply for ${d.name}`);
-    sel.append(new Option('Off', 'off'), new Option('Questions & status', 'questions'));
-    sel.value = d.mode; sel.className = d.mode === 'questions' ? 'set' : '';
-    sel.onchange = () => setAuto({ device: { id: d.id, mode: sel.value } }, sel.value === 'questions' ? `Auto-reply on for ${d.name}.` : `Auto-reply off for ${d.name}.`);
-    row.append(name, sel); box.append(row);
+    const [l, i] = sw(d.mode === 'questions', `Auto-reply for ${d.name}`);
+    i.onchange = () => setAuto({ device: { id: d.id, mode: i.checked ? 'questions' : 'off' } }, i.checked ? `Auto-reply on for ${d.name}.` : `Auto-reply off for ${d.name}.`);
+    devs.append(setting(d.name, d.mode === 'questions' ? 'Questions and status updates get an automatic reply.' : 'Off: messages wait for you and your agent.', l));
   }
-  // Limits
-  const limits = document.createElement('div'); limits.className = 'fw-row auto-limits';
+  box.append(devs);
+
+  const opts = document.createElement('div'); opts.className = 'ar-group';
+  opts.append(text('h4', 'Settings'));
   const per = document.createElement('input'); per.type = 'number'; per.min = '1'; per.max = '30'; per.value = a.maxPerHour; per.setAttribute('aria-label', 'Runs per device per hour');
   per.onchange = () => setAuto({ maxPerHour: Number(per.value) });
-  const quiet = document.createElement('input'); quiet.type = 'checkbox'; quiet.checked = !!a.quietHours; quiet.id = 'autoQuiet';
+  opts.append(setting('Limit', 'Runs per device per hour', per));
+  const [ql, quiet] = sw(!!a.quietHours, 'Quiet hours');
   const from = document.createElement('input'); from.type = 'time'; from.value = a.quietHours?.from || '22:00'; from.setAttribute('aria-label', 'Quiet from');
   const to = document.createElement('input'); to.type = 'time'; to.value = a.quietHours?.to || '07:00'; to.setAttribute('aria-label', 'Quiet until');
   const saveQuiet = () => setAuto({ quietHours: quiet.checked ? { from: from.value, to: to.value } : null });
   quiet.onchange = saveQuiet; from.onchange = () => quiet.checked && saveQuiet(); to.onchange = () => quiet.checked && saveQuiet();
-  const ql = document.createElement('label'); ql.htmlFor = 'autoQuiet'; ql.textContent = 'Quiet hours';
-  limits.append(text('span', 'At most'), per, text('span', 'runs per device per hour ·'), quiet, ql, from, text('span', '–'), to);
-  box.append(limits);
+  const span = document.createElement('span'); span.className = 'ar-times'; span.append(from, text('span', '–'), to);
+  if (!a.quietHours) span.classList.add('off');
+  opts.append(setting('Quiet hours', 'No automatic replies during these hours', span, ql));
   // Engine: an agent program (Claude Code) or a local model (Ollama, LM Studio), no internet needed
-  const eng = document.createElement('div'); eng.className = 'fw-row auto-limits';
-  const esel = document.createElement('select'); esel.setAttribute('aria-label', 'Auto-reply engine');
-  esel.append(new Option('Agent program (Claude Code)', 'program'), new Option('Local model (Ollama, LM Studio)', 'local'));
-  esel.value = a.engine || 'program';
-  esel.onchange = () => setAuto({ engine: esel.value }, esel.value === 'local' ? 'Auto-reply uses a local model.' : 'Auto-reply uses the agent program.');
-  eng.append(text('span', 'Answers by'), esel);
-  box.append(eng);
+  const seg = document.createElement('div'); seg.className = 'segmented'; seg.setAttribute('role', 'group'); seg.setAttribute('aria-label', 'Auto-reply engine');
+  for (const [v, label] of [['program', 'Agent program'], ['local', 'Local model']]) {
+    const b = button(label, () => { if ((a.engine || 'program') !== v) setAuto({ engine: v }, v === 'local' ? 'Auto-reply uses a local model.' : 'Auto-reply uses the agent program.'); });
+    b.setAttribute('aria-pressed', String((a.engine || 'program') === v)); seg.append(b);
+  }
+  opts.append(setting('Answers by', (a.engine || 'program') === 'local' ? 'Ollama or LM Studio on this computer; works offline' : 'A short Claude Code run that can only reply', seg));
   if ((a.engine || 'program') === 'local') {
-    const loc = document.createElement('div'); loc.className = 'fw-row auto-limits';
     const url = document.createElement('input'); url.type = 'text'; url.value = a.localUrl || ''; url.spellcheck = false; url.setAttribute('aria-label', 'Local model address');
     url.placeholder = 'http://127.0.0.1:11434/v1';
     url.onchange = () => setAuto({ localUrl: url.value }, 'Address saved.');
     const model = document.createElement('input'); model.type = 'text'; model.value = a.localModel || ''; model.spellcheck = false; model.setAttribute('aria-label', 'Model name');
     model.placeholder = 'llama3.1:8b';
     model.onchange = () => setAuto({ localModel: model.value }, 'Model saved.');
-    loc.append(text('span', 'Address'), url, text('span', 'Model'), model);
-    box.append(loc);
-    const tip = text('p', 'Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1 (start its server). The model only writes the reply text; it gets no tools.');
-    tip.className = 'auto-note'; box.append(tip);
+    opts.append(setting('Address', 'Ollama: http://127.0.0.1:11434/v1 · LM Studio: http://127.0.0.1:1234/v1', url));
+    opts.append(setting('Model', 'The model only writes the reply text; it gets no tools.', model));
   } else {
-    const prog = document.createElement('div'); prog.className = 'fw-row auto-limits';
     const pin = document.createElement('input'); pin.type = 'text'; pin.value = a.program; pin.spellcheck = false; pin.setAttribute('aria-label', 'Agent program');
     pin.onchange = () => setAuto({ program: pin.value }, 'Agent program saved.');
-    const found = text('span', a.programFound ? 'found' : 'not found'); found.className = `pill ${a.programFound ? 'ok' : 'muted'}`;
-    prog.append(text('span', 'Agent program'), pin, found);
-    box.append(prog);
+    const found = text('span', a.programFound ? 'Found' : 'Not found'); found.className = `pill ${a.programFound ? 'ok' : 'warn'}`;
+    opts.append(setting('Agent program', 'The command that runs your agent', pin, found));
   }
+  box.append(opts);
   if (a.running) { const p = text('p', `Running now for ${a.running.peer}…`); p.className = 'auto-note'; box.append(p); }
   // Log
   const ul = document.createElement('ul'); ul.className = 'auto-log';
+  const head = text('li', 'Activity'); head.className = 'ar-head'; ul.append(head);
   if (!a.log.length) { const li = text('li', 'No automatic replies yet.'); li.className = 'none'; ul.append(li); }
   for (const e of a.log) {
     const li = document.createElement('li');
@@ -1230,8 +1266,13 @@ async function refresh() {
   setTimeout(refresh, state?.pairing && VIEW_OF[state.pairing.state] ? 700 : 2000);
 }
 refresh.once = async () => {
-  try { render(await api('GET', '/ui/state')); }
-  catch (e) { $('deviceLine').textContent = e.message.includes('Reload') ? 'Session changed: reload this page.' : 'VINAC Link is not running.'; }
+  const who = document.querySelector('.whoami');
+  try { render(await api('GET', '/ui/state')); who?.classList.remove('down'); }
+  catch (e) {
+    who?.classList.add('down');
+    $('deviceLine').textContent = e.message.includes('Reload') ? 'Session changed: reload this page.' : 'VINAC Link is not running.';
+    $('keyPill').textContent = e.message.includes('Reload') ? '' : 'Start it from the VINAC Link shortcut, then reload.';
+  }
 };
 syncNotifyButton();
 fillSpeakers();

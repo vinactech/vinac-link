@@ -22,13 +22,13 @@ import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { Daemon, DEFAULT_PORT } from '../src/daemon.js';
 import { runMcpServer, AgentApi, VERSION } from '../src/mcp.js';
-import { openInBrowser } from '../src/net.js';
+import { openApp, openInBrowser } from '../src/net.js';
 import { doctor, formatChecks, stopDaemon, runHook, setupText } from '../src/setup.js';
 import { env } from '../src/env.js';
 import { defaultHome } from '../src/store.js';
 
 const [command = 'start', ...rest] = process.argv.slice(2);
-const FLAGS = new Set(['open', 'json', 'no-open', 'simple', 'verify', 'all']);
+const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all']);
 const REPEAT = new Set(['secret']);
 const opt = { _: [], cmd: [] };
 for (let i = 0; i < rest.length; i++) {
@@ -59,7 +59,7 @@ try {
     const api = new AgentApi({ home, port, name: opt.name });
     const how = await api.connect();
     const s = await api.tool('vinac_status');
-    if (!opt['no-open']) openInBrowser(s.approvalPage);
+    if (!opt['no-open']) (opt.tab ? openInBrowser : openApp)(s.approvalPage);
     console.log(`VINAC Link ${VERSION} is running (${how}).
   This device: ${s.device.name}  ·  ${s.device.fingerprint}
   Address:     ${s.device.address || 'no network found (connect Wi-Fi, a hotspot or a cable)'}
@@ -74,7 +74,7 @@ Next: pair another computer on the page, then connect your agent:
   } else if (command === 'daemon') {
     const d = await new Daemon({ home, port, name: opt.name, host: opt.host }).start();
     console.error(`[vinac] approval page: ${d.uiUrl}  (Ctrl+C to stop)`);
-    if (opt.open) openInBrowser(d.uiUrl);
+    if (opt.open) (opt.tab ? openInBrowser : openApp)(d.uiUrl);
     const stop = async () => { await d.stop(); process.exit(0); };
     process.on('SIGINT', stop); process.on('SIGTERM', stop);
   } else if (command === 'mcp') {
@@ -83,7 +83,7 @@ Next: pair another computer on the page, then connect your agent:
     const api = new AgentApi({ home, port, name: opt.name });
     const how = await api.connect();
     const s = await api.tool('vinac_status');
-    if (command === 'open') { openInBrowser(s.approvalPage); console.log(s.approvalPage); }
+    if (command === 'open') { (opt.tab ? openInBrowser : openApp)(s.approvalPage); console.log(s.approvalPage); }
     else console.log(JSON.stringify({ daemon: how, ...s }, null, 2));
     await api.daemon?.stop();
   } else if (command === 'doctor') {

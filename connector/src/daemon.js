@@ -21,7 +21,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
-import { defaultRouteAddress, lanAddress, linkLocalAddresses, tailscaleAddress, altAddressList, readJsonBody, readRawBody, sendJson, postJson, openInBrowser, RateLimiter } from './net.js';
+import { defaultRouteAddress, lanAddress, linkLocalAddresses, tailscaleAddress, altAddressList, readJsonBody, readRawBody, sendJson, postJson, openApp, RateLimiter } from './net.js';
 import {
   randomBytes, b64u, fromB64u, sha256, fingerprint, formatFingerprint, sign, verify, newEphemeral, sharedSecret,
   rendezvousId, commitment, canonicalMeta, transcript, roleCode, codesEqual, pairingKey, confirmTag, tagsEqual,
@@ -1599,7 +1599,7 @@ export class Daemon {
       case 'POST /api/pair/open': {
         const mode = body.mode === 'listen' ? 'listen' : 'announce';
         const link = `${this.uiUrl}#${mode}`;
-        const opened = body.open === false ? false : openInBrowser(link);
+        const opened = body.open === false ? false : openApp(link);
         return sendJson(res, 200, { approvalPage: link, opened });
       }
       case 'POST /api/unpair':

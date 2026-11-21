@@ -1,4 +1,6 @@
 import os from 'node:os';
+import fs from 'node:fs';
+import path from 'node:path';
 import dgram from 'node:dgram';
 import { spawn } from 'node:child_process';
 import { env } from './env.js';
@@ -144,6 +146,39 @@ export class RateLimiter {
     if (b.tokens < cost) return false;
     b.tokens -= cost; return true;
   }
+}
+
+// Browsers that can show a page as its own app window (no address bar or tabs): Edge, Chrome,
+// Brave, Chromium. Edge comes with every Windows PC.
+function appBrowser() {
+  const pf = [process.env.ProgramFiles, process.env['ProgramFiles(x86)'], process.env.LOCALAPPDATA].filter(Boolean);
+  const candidates = process.platform === 'win32'
+    ? pf.flatMap(d => [
+      path.join(d, 'Microsoft', 'Edge', 'Application', 'msedge.exe'),
+      path.join(d, 'Google', 'Chrome', 'Application', 'chrome.exe'),
+      path.join(d, 'BraveSoftware', 'Brave-Browser', 'Application', 'brave.exe')])
+    : process.platform === 'darwin'
+      ? ['Google Chrome', 'Microsoft Edge', 'Brave Browser', 'Chromium'].flatMap(n => [
+        `/Applications/${n}.app/Contents/MacOS/${n}`, path.join(os.homedir(), 'Applications', `${n}.app`, 'Contents', 'MacOS', n)])
+      : (process.env.PATH || '').split(':').filter(Boolean).flatMap(d =>
+        ['google-chrome', 'google-chrome-stable', 'chromium', 'chromium-browser', 'microsoft-edge', 'microsoft-edge-stable', 'brave-browser'].map(n => path.join(d, n)));
+  return candidates.find(f => { try { return fs.statSync(f).isFile(); } catch { return false; } }) || null;
+}
+
+/**
+ * Opens the VINAC Link page in its own window, like an app (falls back to a normal browser tab).
+ * VINAC_BROWSER_TAB=1 always uses a tab.
+ */
+export function openApp(url) {
+  if (env('NO_BROWSER')) return false;
+  const exe = !env('BROWSER_TAB') && appBrowser();
+  if (exe) {
+    try {
+      spawn(exe, [`--app=${url}`, '--window-size=1240,840', '--no-first-run'], { detached: true, stdio: 'ignore' }).unref();
+      return true;
+    } catch { /* fall back to a tab */ }
+  }
+  return openInBrowser(url);
 }
 
 export function openInBrowser(url) {

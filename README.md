@@ -1,25 +1,83 @@
-# VINAC Link
+<p align="center">
+  <img src="site/brand/icon-128.png" alt="VINAC Link" width="96" height="96">
+</p>
 
-**A secure link between AI agents on your computers. No cloud, no account, no internet needed.**
+<h1 align="center">VINAC Link</h1>
 
-VINAC Link connects the AI agents on your machines: local models (LM Studio, Goose, Open WebUI with
-Ollama), Claude Code, Codex, OpenClaw, or any MCP app. Pair two computers in seconds, by an inaudible
-sound or a typed code. Their agents can then send each other encrypted messages, requests, files up
-to 64 MB and git branches, directly over Wi-Fi, a hotspot or a cable. Every request says what it
-wants, and **your firewall** decides: let it through, ask you first, or block it. Keys and tokens
-move between your devices without ever passing through the chat.
+<p align="center">
+  <b>The secure link between AI agents on your own computers.</b><br>
+  Any vendor, online or offline, and nothing important happens without your OK.
+</p>
 
-Built first for **offline agents** (closed networks, local models, field and lab machines), and
-just as useful for cloud agents that need a private way to pair machines and move secrets.
+<p align="center">
+  <a href="https://vinac.tech">Website</a> ·
+  <a href="https://vinac.tech/how-it-works.html">How it works</a> ·
+  <a href="docs/getting-started.md">Quick start</a> ·
+  <a href="docs/README.md">Docs</a> ·
+  <a href="SECURITY.md">Security</a>
+</p>
 
-*VINAC = Verified Intent Network for Agent Communication.*
+<p align="center">
+  <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-4f6bff"></a>
+  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0-9a5cf0">
+  <img alt="Windows, macOS, Linux" src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20macOS%20%7C%20Linux-555">
+  <img alt="No runtime dependencies" src="https://img.shields.io/badge/dependencies-0-3ddc84">
+  <img alt="Node.js 22+" src="https://img.shields.io/badge/node-22%2B-555">
+</p>
 
-Website: **[vinac.tech](https://vinac.tech)** · by Mexley Marketing Inc.
+<p align="center">
+  <img src="site/media/app-firewall-dark.jpg" alt="The VINAC Link window: two requests from the Mac wait for approval, a status update was allowed by a rule" width="900">
+</p>
 
-> **Experimental.** The protocol has had one AI-assisted security review and no human review yet.
-> Use test keys, not production secrets. See [SECURITY.md](SECURITY.md) for what is and isn't solved.
+Claude Code, Codex, OpenClaw and local models (LM Studio, Ollama, Goose, Open WebUI) on all your
+computers can ask each other for answers, reviews, files and API keys, **directly between your own
+machines, with no account and no cloud in between**. Pair two computers once, by sound or a short
+code. Every request says what it wants, and **your firewall** decides: let it through, ask you
+first, or block it. Keys and tokens move from one key store to the other, so agents can use them
+but never see them, and they never appear in a chat.
 
-<!-- TODO before launch: docs/demo.gif — two laptops pair by sound, an agent sends a request, you tap Approve. -->
+It works on a normal network, across networks with Tailscale, and **fully offline**: a router with
+no internet, a phone hotspot or a cable is enough.
+
+*VINAC = Verified Intent Network for Agent Communication.* Made by Mexley Marketing Inc.
+
+> **Early access.** The protocol has had one AI-assisted security review and no independent audit
+> yet (one is planned, and its results will be published). Use test keys, not production secrets.
+> See [SECURITY.md](SECURITY.md) for what is and isn't solved.
+
+## Why
+
+If you run AI agents on more than one computer, they can't help each other. When one needs a
+key, a status or a review from another, a person carries it across by hand, and API keys end up
+pasted into chats. Machines kept offline on purpose are even harder to reach. VINAC Link gives
+your agents one safe channel, across vendors, with a person in charge of what each agent may do.
+
+| | VINAC Link |
+|---|---|
+| **Any vendor** | Claude Code, Codex, OpenClaw, local models and any MCP app, on the same link |
+| **No cloud, no account** | Computers talk directly; nothing goes through us |
+| **Online or offline** | Wi-Fi, hotspot, cable or Tailscale; never needs the internet |
+| **Firewall for every request** | Allow, Ask me or Block, per intent and per device |
+| **Secrets without exposure** | Agents use keys by name; values stay in the OS key store |
+| **People create trust** | Only a person can pair a device, approve a request or change a rule |
+
+## How it works
+
+| 1. Pair by sound or a code | 2. A person confirms both screens |
+|---|---|
+| <img src="site/media/tour-pair.jpg" alt="Pair a device: announce or listen" width="440"> | <img src="site/media/tour-compare.jpg" alt="Swap the 6-digit codes" width="440"> |
+| **3. Agents talk; you see everything** | **4. Move keys without the chat** |
+| <img src="site/media/tour-thread.jpg" alt="A conversation with requests waiting for approval" width="440"> | <img src="site/media/tour-secrets.jpg" alt="Send a secret to the Mac" width="440"> |
+
+The full walkthrough, with what each part does, is on
+**[vinac.tech/how-it-works](https://vinac.tech/how-it-works.html)**.
+
+## Install
+
+- **Installers** (Node.js included): Windows `.exe` and Linux `.tar.gz` (a macOS `.dmg` is coming) from
+  **[vinac.tech/#download](https://vinac.tech/#download)**. VINAC Link opens in its own window.
+- **From this repository:** Node.js 22+, then `node connector/bin/vinac.mjs start`. No `npm install`
+  needed; VINAC Link has no dependencies.
 
 ## Quick start
 
@@ -137,14 +195,21 @@ monitor: `vinac watch`. Command line: [docs/guide/cli.md](docs/guide/cli.md).
 ## Development
 
 ```
-cd connector && npm test        # 70+ tests, 127.0.0.1 only, no sound played
+cd connector && npm test        # 88 tests, 127.0.0.1 only, no sound played
 node connector/bin/vinac.mjs daemon --open
 npm run release:check           # versions, tests, plugin check, package contents, install-and-run
 npm run kit                     # the tester package: dist/vinac-link-<version>.zip + SHA256SUMS.txt
 ```
 
 
+## Contributing and support
+
+- **Questions and ideas:** open an issue, or write to **hello@vinac.tech**.
+- **Security issues:** please don't open a public issue; see [SECURITY.md](SECURITY.md).
+- **Code:** see [CONTRIBUTING.md](CONTRIBUTING.md). Small, focused pull requests with tests are welcome.
+
 ## License
 
-[Apache License 2.0](LICENSE). Copyright 2026 Mexley Marketing Inc. "VINAC" and "VINAC Link" are
-the project's names; the license doesn't grant trademark rights (see [NOTICE](NOTICE)).
+[Apache License 2.0](LICENSE). Copyright 2026 Mexley Marketing Inc. VINAC and VINAC Link are
+trademarks of Mexley Marketing Inc.; the license doesn't grant rights to the names or logo (see
+[NOTICE](NOTICE)).

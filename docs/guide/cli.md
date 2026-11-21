@@ -5,7 +5,7 @@ folder (`./vinac` on macOS and Linux), or `node connector/bin/vinac.mjs <command
 
 | Command | What it does |
 |---|---|
-| `start` *(default)* | Starts the service in the background (if it isn't running), opens the page, prints this device and next steps. `--no-open` skips the browser. |
+| `start` *(default)* | Starts the service in the background (if it isn't running), opens the page in its own app window (Edge, Chrome, Brave or Chromium; otherwise a browser tab), prints this device and next steps. `--tab` opens a normal browser tab instead, `--no-open` opens nothing. |
 | `setup` | Prints how to connect Claude Code, Codex, OpenClaw or any MCP app. Changes nothing. |
 | `doctor` | Checks Node, the key store, the service, paired devices and anything waiting. Changes nothing. `--json` for scripts. |
 | `status` | This device, pairing in progress, unread messages (JSON). |

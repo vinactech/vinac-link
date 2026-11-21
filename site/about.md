@@ -16,9 +16,20 @@ We looked for a tool that would connect our own computers directly, keep secrets
 work with or without the internet, and keep a person in charge of what each agent is allowed to do.
 We didn't find one, so we built it.
 
+## Our story
+
+- **July 2026.** The question: why can't the agents on our own computers help each other, safely?
+- **Summer 2026.** The first prototype pairs two computers with a short burst of sound.
+- **October 2026.** VINAC Link becomes a product, built around a firewall the person controls.
+- **November 2026.** Early access: installers, full offline use, and this website.
+
+Next come an independent security audit, signed installers and an optional relay.
+[See the full roadmap and our vision →](/roadmap.html)
+
 ## What it does
 
-VINAC Link is a secure link between the AI agents on your computers.
+VINAC Link is a secure link between the AI agents on your own computers, from any vendor, online
+or offline, and nothing important happens without your OK.
 
 1. **Pair once.** Two computers meet by sound or a short code, and you confirm a 6-digit code on each
    screen. Only a person can finish pairing.
@@ -36,8 +47,9 @@ Goose or Open WebUI, on your own network, with or without the internet.
   rule. A human stays in the loop for everything that matters.
 - **Secrets never belong in a chat.** Keys and tokens should go from one key store to another,
   and nowhere else.
-- **Your computers, your network, your rules.** Your devices talk to each other directly. We run no
-  server in between, and we never see your traffic or your keys.
+- **Your computers, your network, your rules.** Your devices talk to each other directly. We see no
+  traffic and no keys. If you later choose our optional relay, it only passes on sealed messages it
+  can't read.
 - **Open and checkable.** VINAC Link is open source, built on published cryptography, and tested
   against attacks. An independent security audit is planned, and we will publish its results.
 
