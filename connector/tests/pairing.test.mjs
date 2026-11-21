@@ -10,6 +10,22 @@ import { Store } from '../src/store.js';
 
 const pairingState = async d => (await state(d)).pairing?.state;
 
+test('the same sound heard twice (two open pages) keeps the pairing in progress', async () => {
+  const A = await startDevice('pc2'), B = await startDevice('mac2');
+  try {
+    const p = await startPair(A, B, { via: 'hex' });
+    const codeB = (await state(B)).pairing.showCode;
+    // A second page decodes the same repeated sound and reports it again, while codes are on screen.
+    assert.equal((await ui(B, 'POST', '/ui/heard', { hex: p.beaconHex })).status, 200);
+    assert.equal(await pairingState(B), 'comparing', 'still the same pairing');
+    assert.equal((await state(B)).pairing.showCode, codeB, 'the code on screen did not change');
+    const codeA = (await state(A)).pairing.showCode;
+    assert.equal((await ui(A, 'POST', '/ui/confirm', { code: codeB })).status, 200);
+    assert.equal((await ui(B, 'POST', '/ui/confirm', { code: codeA })).status, 200);
+    await waitFor(async () => (await pairingState(A)) === 'paired' && (await pairingState(B)) === 'paired', 4000);
+  } finally { await A.stop(); await B.stop(); }
+});
+
 test('two devices pair by swapping codes; each trusts the other', async () => {
   const A = await startDevice('pc'), B = await startDevice('mac');
   try {

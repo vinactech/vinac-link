@@ -107,24 +107,27 @@ test('version compare: older, newer, equal and pre-release', () => {
 test('`vinac start` after an update replaces an older running service, and leaves a newer one alone', { timeout: 60_000 }, async () => {
   const current = json('connector/package.json').version;
   const env = { ...process.env, VINAC_NO_BROWSER: '1' };
-  const startOld = async (home, port, version) => {
-    spawn(process.execPath, [BIN, 'daemon', '--home', home, '--port', String(port)], { env: { ...env, VINAC_TEST_VERSION: version }, stdio: 'ignore', detached: true }).unref();
-    await waitFor(() => new AgentApi({ home, port }).attach(), 20_000);
+  // Other test files run in parallel and may take a port this one just found free: retry on a new one.
+  const startOld = async (home, version) => {
+    for (let attempt = 0; ; attempt++) {
+      const port = await freePortPair();
+      spawn(process.execPath, [BIN, 'daemon', '--home', home, '--port', String(port)], { env: { ...env, VINAC_TEST_VERSION: version }, stdio: 'ignore', detached: true }).unref();
+      try { await waitFor(() => new AgentApi({ home, port }).attach(), 12_000); return port; }
+      catch (e) { if (attempt >= 2) throw e; }
+    }
   };
   const runningVersion = async (home, port) => { const a = new AgentApi({ home, port }); await a.attach(); return (await a.call('GET', '/api/status')).version; };
   const startCli = (home, port) => run(process.execPath, [BIN, 'start', '--home', home, '--port', String(port), '--no-open'], { timeout: 40_000, env });
 
-  const homeOld = tempHome('upd-old'); const portOld = await freePortPair();
-  const homeNew = tempHome('upd-new'); let portNew;
+  const homeOld = tempHome('upd-old'); const homeNew = tempHome('upd-new');
   try {
-    await startOld(homeOld, portOld, '0.1.0');
+    const portOld = await startOld(homeOld, '0.1.0');
     assert.equal(await runningVersion(homeOld, portOld), '0.1.0');
     const out = (await startCli(homeOld, portOld)).stdout;
     assert.match(out, new RegExp(`Updating the running VINAC Link from 0\\.1\\.0 to ${current.replace(/\./g, '\\.')}`));
     assert.equal(await runningVersion(homeOld, portOld), current, 'the new version runs now');
 
-    portNew = await freePortPair(); // only now: the first service holds its ports
-    await startOld(homeNew, portNew, '99.0.0');
+    const portNew = await startOld(homeNew, '99.0.0'); // after the first: it holds its ports now
     const out2 = (await startCli(homeNew, portNew)).stdout;
     assert.doesNotMatch(out2, /Updating the running/);
     assert.equal(await runningVersion(homeNew, portNew), '99.0.0', 'a newer service is not replaced');

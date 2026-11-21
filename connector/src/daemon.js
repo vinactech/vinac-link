@@ -504,6 +504,9 @@ export class Daemon {
     if (!b.ok) throw httpError(400, code ? 'That code is not valid. Check it and try again.' : 'Damaged pairing sound.');
     if (Buffer.from(b.fingerprint).equals(this.me.fp)) throw httpError(409, 'That pairing sound came from this device.');
     let p = this.current();
+    // The same sound heard again (the announcing device repeats it, and every open VINAC Link page
+    // listens): keep the pairing already in progress instead of replacing it.
+    if (p && p.role === 'listen' && p.state !== 'listening' && !TERMINAL.has(p.state) && p.secret && Buffer.from(b.secret).equals(p.secret)) return p;
     if (!p || p.role !== 'listen' || p.state !== 'listening') p = this.startListen();
     Object.assign(p, {
       via: hex ? 'sound' : 'code', secret: Buffer.from(b.secret), beaconFp: Buffer.from(b.fingerprint),
