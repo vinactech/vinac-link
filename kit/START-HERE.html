@@ -92,7 +92,7 @@
     <li><b>The firewall:</b> on the page, open <i>Firewall</i>. Requests like "read a contact" wait for your OK; plain messages go through. Change a rule and watch what your agent can see.</li>
     <li><b>Files:</b> the paperclip, or <code>vinac send-file report.pdf --to "Other PC"</code> from this folder (use <code>./vinac</code> on Mac/Linux).</li>
     <li><b>Code without GitHub:</b> in a git project, <code>vinac git send --to "Other PC"</code>. On the other side, <code>vinac files</code>, then <code>vinac git fetch &lt;id&gt;</code> adds the branch as <code>vinac/&lt;device&gt;/&lt;branch&gt;</code>. Nothing is merged for you.</li>
-    <li><b>Secrets:</b> <i>Secrets → Receive a secret</i> on one computer, then send one from the other (by sound or Wi-Fi). Agents only ever see its name. To use it in a program: <code>vinac run --secret API_KEY -- npm start</code>, and approve that run on the page.</li>
+    <li><b>Secrets:</b> <i>Secrets → Receive</i> on one computer, then send one from the other (by sound or Wi-Fi). Agents only ever see its name. To use it in a program: <code>vinac run --secret API_KEY -- npm start</code>, and approve that run on the page.</li>
     <li><b>Offline agents:</b> run a local model in Ollama or LM Studio. On the page, <i>Firewall → Auto-reply → Answers by: Local model</i>, and switch a device to <i>Questions &amp; status</i>. Questions from that device are answered while you're away, with no internet.</li>
     <li><b>No internet at all:</b> turn the router's internet off, or connect the two computers with a phone hotspot or a cable, and try again.</li>
     <li><b>Groups:</b> with three or more computers, <code>vinac group set team "PC 1,PC 2"</code>, then send to <code>team</code> or <code>all</code>.</li>

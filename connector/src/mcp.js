@@ -87,7 +87,7 @@ export const TOOLS = [
   },
   {
     name: 'vinac_secrets',
-    description: 'List the secrets (API keys, tokens) that paired devices sent to this computer: name, sender, when, by sound or Wi-Fi, and whether one is waiting for the person to approve a replacement. Values are never returned. Do not try to read them by other means (the key store, the page, files): only the person reveals them. To receive one, ask the person to press "Receive a secret" on the page; agents cannot send secrets.',
+    description: 'List the secrets (API keys, tokens) that paired devices sent to this computer: name, sender, when, by sound or Wi-Fi, and whether one is waiting for the person to approve a replacement. Values are never returned. Do not try to read them by other means (the key store, the page, files): only the person reveals them. To receive one, ask the person to press "Receive" on the Secrets page; agents cannot add or send secrets.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
   },

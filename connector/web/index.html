@@ -185,10 +185,15 @@
           <button class="icon back" id="secretsBackBtn" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
           </button>
-          <div class="head-text"><b>Secrets</b><small>Received from paired devices · stored in this device's key store</small></div>
-          <button class="primary small-btn" id="receiveBtn">Receive a secret</button>
+          <div class="head-text"><b>Secrets</b><small>Your vault: API keys and tokens in this device's key store. Agents see names only.</small></div>
+          <div class="vault-actions">
+            <button class="ghost small-btn" id="addSecretBtn">Add</button>
+            <button class="ghost small-btn" id="sendSecretBtn">Send</button>
+            <button class="primary small-btn" id="receiveBtn">Receive</button>
+          </div>
         </header>
         <div class="pair-body">
+          <input type="search" id="secretSearch" placeholder="Find a secret by name or device" aria-label="Find a secret" autocomplete="off">
           <div id="useBox" hidden>
             <h3 class="fw-h">Programs asking to use a secret</h3>
             <ul class="secret-list" id="useList"></ul>
@@ -339,15 +344,22 @@
       </header>
 
       <form class="modal-body" id="secretForm" data-mode="send" autocomplete="off">
-        <p class="hint">Sealed so only <b id="secretTo">the other device</b> can open it, then stored in its key store. Its agent tools show the name, never the value. Use test values until VINAC Link has had a security review.</p>
+        <p class="hint" id="secretHint">Sealed so only <b id="secretTo">the other device</b> can open it, then stored in its key store. Its agent tools show the name, never the value. Use test values until VINAC Link has had a security review.</p>
+        <div id="peerRow">
+          <label for="secretPeer">Send to</label>
+          <select id="secretPeer"></select>
+        </div>
         <label for="secretName">Name</label>
         <input id="secretName" placeholder="OPENAI_API_KEY" maxlength="40" spellcheck="false" autocapitalize="characters">
-        <label for="secretValue">Secret</label>
-        <div class="reveal-row">
-          <input id="secretValue" type="password" maxlength="200" spellcheck="false" placeholder="Paste the key or token" autocomplete="new-password">
-          <button type="button" class="ghost" id="secretShow">Show</button>
+        <div id="valueRow">
+          <label for="secretValue">Secret</label>
+          <div class="reveal-row">
+            <input id="secretValue" type="password" maxlength="200" spellcheck="false" placeholder="Paste the key or token" autocomplete="new-password">
+            <button type="button" class="ghost" id="secretShow">Show</button>
+          </div>
         </div>
-        <fieldset class="how">
+        <p class="hint small" id="storedNote" hidden>Sends the value stored in this device's key store. It never shows on this page.</p>
+        <fieldset class="how" id="howBox">
           <legend>Send by</legend>
           <label><input type="radio" name="how" value="sound" checked> Sound <small id="soundTime">near-ultrasound, works without a network</small></label>
           <label><input type="radio" name="how" value="wifi"> Wi-Fi <small>instant, needs both on the same network</small></label>
@@ -355,7 +367,7 @@
         <div id="speakerRow">
           <label for="secretSpeaker">Speaker</label>
           <select id="secretSpeaker"><option value="">System default</option></select>
-          <p class="hint small">On the other device, open Secrets and press <b>Receive a secret</b> first.</p>
+          <p class="hint small">On the other device, open Secrets and press <b>Receive</b> first.</p>
         </div>
         <button class="primary wide" id="secretSend">Send</button>
       </form>

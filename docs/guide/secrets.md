@@ -3,15 +3,27 @@
 Send an API key or token from one computer to the other **without it passing through any chat,
 agent or tool output**.
 
-1. On the **receiving** computer: page → **Secrets** → **Receive a secret**. It accepts secrets for
+1. On the **receiving** computer: page → **Secrets** → **Receive**. It accepts secrets for
    3 minutes, by sound or Wi-Fi.
-2. On the **sending** computer: open the conversation with that device → key button → name (like
-   `OPENAI_API_KEY`) and value → **By sound** (~15 s, devices close together) or **By Wi-Fi**.
+2. On the **sending** computer: **Secrets** → **Send** (or the key button in a conversation) →
+   pick the device, a name (like `OPENAI_API_KEY`) and the value → **Sound** (~15 s, devices close
+   together) or **Wi-Fi**.
 3. The receiver stores it in the OS key store and confirms. The sender shows *received*.
 
-Agents see secrets only by **name** (`vinac_secrets`). The person can Reveal or Copy a value on the
-page. An agent can ask for one with `person.secret.request { name, reason }`; the person still does
-the sending.
+## The vault
+
+The **Secrets** page is a small vault for this device:
+
+- **Add** keeps a key you already have (name and value) in this device's key store, without sending
+  it anywhere. Adding the same name again replaces your copy.
+- **Send…** on any stored secret sends it on to a paired device, by sound or Wi-Fi. The value goes
+  from the key store straight into the sealed message; it never shows on the page.
+- **Search** finds a secret by name or by the device it came from. Each one shows where it came
+  from (added here, or from which device) and when a program last used it.
+
+Agents see secrets only by **name** (`vinac_secrets`). They cannot add, send, reveal or delete one.
+The person can Reveal or Copy a value on the page. An agent can ask for one with
+`person.secret.request { name, reason }`; the person still does the sending.
 
 ## Using a secret in a program: `vinac run`
 

@@ -63,7 +63,7 @@ test('HIGH fix: nothing is accepted unless the person pressed "Receive a secret"
     const bySound = await ui(B, 'POST', '/ui/secret/heard', { hex });
     assert.equal(bySound.status, 409); assert.match(bySound.body.error, /NOT_RECEIVING/);
     const byWifi = await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'X', value: 'y' });
-    assert.equal(byWifi.status, 409); assert.match(byWifi.body.error, /Receive a secret/);
+    assert.equal(byWifi.status, 409); assert.match(byWifi.body.error, /press "Receive"/);
     assert.equal((await secretsOf(B)).length, 0);
     await receive(B);
     assert.equal((await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'X', value: 'y' })).status, 200);
@@ -142,5 +142,59 @@ test('input limits, and only the person can send: the agent API cannot seal a se
     assert.ok(max.body.bytes <= SECRET_MAX_BYTES);
     assert.ok(max.body.seconds < 40, `the longest secret (${max.body.seconds} s) fits the 45 s listening buffer`);
     assert.equal((await api(A, 'POST', '/api/secret/seal', { to: 'b', name: 'X', value: 'y' })).status, 404);
+  } finally { await A.stop(); await B.stop(); }
+});
+
+test('vault: the person adds a secret here, sends a stored one by Wi-Fi or sound, and agents can neither add nor send', async () => {
+  const A = await startDevice('vault-a'), B = await startDevice('vault-b');
+  try {
+    await pair(A, B);
+    const added = await ui(A, 'POST', '/ui/secrets/add', { name: 'STRIPE_TEST_KEY', value: 'sk_test_fake_vault_1' });
+    assert.equal(added.status, 200, JSON.stringify(added.body));
+    assert.equal(added.body.added.replaced, false);
+    assert.ok(!JSON.stringify(added.body).includes('sk_test_fake_vault_1'), 'the page state never carries the value');
+    let mine = (await secretsOf(A)).find(s => s.name === 'STRIPE_TEST_KEY');
+    assert.equal(mine.own, true); assert.equal(mine.via, 'added'); assert.equal(mine.lastUsedAt, null);
+    assert.equal((await ui(A, 'POST', '/ui/secrets/reveal', { id: mine.id })).body.value, 'sk_test_fake_vault_1');
+
+    // Same name again replaces the person's own copy; bad input is refused.
+    const again = await ui(A, 'POST', '/ui/secrets/add', { name: 'STRIPE_TEST_KEY', value: 'sk_test_fake_vault_2' });
+    assert.equal(again.body.added.replaced, true);
+    assert.equal((await secretsOf(A)).filter(s => s.name === 'STRIPE_TEST_KEY').length, 1);
+    mine = (await secretsOf(A)).find(s => s.name === 'STRIPE_TEST_KEY');
+    assert.equal((await ui(A, 'POST', '/ui/secrets/add', { name: 'has space', value: 'x' })).status, 400);
+    assert.equal((await ui(A, 'POST', '/ui/secrets/add', { name: 'EMPTY', value: '' })).status, 400);
+    assert.equal((await ui(A, 'POST', '/ui/secrets/add', { name: 'BIG', value: 'x'.repeat(201) })).status, 413);
+
+    // Agents: no add, no send of stored secrets, names only.
+    assert.equal((await api(A, 'POST', '/ui/secrets/add', { name: 'AGENT_KEY', value: 'x' })).status, 401);
+    assert.notEqual((await api(A, 'POST', '/api/secrets/add', { name: 'AGENT_KEY', value: 'x' })).status, 200);
+    assert.notEqual((await api(A, 'POST', '/ui/secrets/send', { id: mine.id, to: B.meId })).status, 200);
+    assert.ok(!JSON.stringify((await api(A, 'GET', '/api/secrets')).body).includes('sk_test_fake'));
+
+    // Send the stored one by Wi-Fi: B must be receiving.
+    const peerB = A.store.peers()[0].id;
+    assert.equal((await ui(A, 'POST', '/ui/secrets/send', { id: mine.id, to: peerB })).status, 409, 'B is not receiving');
+    await receive(B);
+    const sent = await ui(A, 'POST', '/ui/secrets/send', { id: mine.id, to: peerB });
+    assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    const got = (await secretsOf(B)).find(s => s.name === 'STRIPE_TEST_KEY');
+    assert.equal(got.own, false); assert.equal(got.via, 'wifi');
+    assert.equal((await ui(B, 'POST', '/ui/secrets/reveal', { id: got.id })).body.value, 'sk_test_fake_vault_2');
+
+    // Seal it for sound: the frame carries neither name nor value, and B can open it.
+    const sealed = await ui(A, 'POST', '/ui/secrets/seal', { id: mine.id, to: peerB });
+    assert.equal(sealed.status, 200, JSON.stringify(sealed.body));
+    assert.equal(sealed.body.name, 'STRIPE_TEST_KEY');
+    const frame = Buffer.from(fromHex(sealed.body.hex));
+    assert.equal(frame.indexOf('sk_test_fake'), -1); assert.equal(frame.indexOf('STRIPE'), -1);
+    assert.equal((await ui(A, 'POST', '/ui/secrets/seal', { id: 'nope', to: peerB })).status, 404);
+
+    // A program run with the secret marks it used.
+    const ask = await api(A, 'POST', '/api/secret-use', { names: ['STRIPE_TEST_KEY'], command: ['node', 'app.js'] });
+    const waiting = api(A, 'GET', `/api/secret-use?id=${ask.body.id}&wait=10`);
+    await ui(A, 'POST', '/ui/secret-use/decide', { id: ask.body.id, approve: true });
+    assert.equal((await waiting).body.values.STRIPE_TEST_KEY, 'sk_test_fake_vault_2');
+    assert.ok((await secretsOf(A)).find(s => s.name === 'STRIPE_TEST_KEY').lastUsedAt);
   } finally { await A.stop(); await B.stop(); }
 });

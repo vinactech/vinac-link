@@ -9,11 +9,13 @@ Secret values never pass through you. You guide; the person types and approves.
 
 1. Call `vinac_peers` to confirm the two devices are paired (otherwise use the `pair` skill).
 2. Tell the person:
-   - On the **receiving** computer: VINAC Link page → **Secrets** → **Receive a secret**
+   - On the **receiving** computer: VINAC Link page → **Secrets** → **Receive**
      (it accepts secrets for 3 minutes).
-   - On the **sending** computer: open the conversation with that device → key button →
-     enter a name (like `OPENAI_API_KEY`) and the value → **By sound** (~15 s, devices close
-     together) or **By Wi-Fi**.
+   - On the **sending** computer: **Secrets** → **Send** (or the key button in the conversation
+     with that device) → pick the device, enter a name (like `OPENAI_API_KEY`) and the value →
+     **Sound** (~15 s, devices close together) or **Wi-Fi**. A secret already kept there
+     (added with **Add**, or received earlier) can be sent with its **Send…** button, without
+     typing the value again.
    - If a secret with the same name already exists from that device, the new one waits as
      **Replacement waiting** until the person presses **Approve**.
 3. Afterwards call `vinac_secrets` to confirm the **name** arrived.

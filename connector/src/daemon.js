@@ -1135,12 +1135,14 @@ export class Daemon {
     if (u.status === 'pending') return { status: 'pending' };
     this.secretUses.delete(u.id);
     if (u.status !== 'approved') return { status: u.status };
-    const items = this.store.secrets().items;
+    const store = this.store.secrets();
     const values = {};
+    const now = new Date().toISOString();
     for (const n of u.names) {
-      const s = items.filter(x => x.name === n && !x.pending).at(-1);
-      if (s) values[n] = unprotect(s.keystore, s.keyLabel, s.wrapped).toString('utf8');
+      const s = store.items.filter(x => x.name === n && !x.pending).at(-1);
+      if (s) { values[n] = unprotect(s.keystore, s.keyLabel, s.wrapped).toString('utf8'); s.lastUsedAt = now; }
     }
+    this.store.saveSecrets(store);
     this.audit.add('secret.used', { names: u.names, command: u.command.slice(0, 120) });
     return { status: 'approved', values };
   }
@@ -1387,7 +1389,7 @@ export class Daemon {
     let r;
     try { r = await this.sendSealed(peer, 'secret', '/secret', id, frame); }
     catch (e) {
-      if (/NOT_RECEIVING/.test(e.message)) throw httpError(409, `${peer.name} is not ready. Ask the person there to open Secrets and press "Receive a secret", then send again.`);
+      if (/NOT_RECEIVING/.test(e.message)) throw httpError(409, `${peer.name} is not ready. Ask the person there to open Secrets and press "Receive", then send again.`);
       if (e.status === 502 && /receipt|session|proving/.test(e.message)) throw e;
       throw httpError(502, e.status ? `${peer.name} refused the secret: ${e.message}` : `Could not reach ${peer.name}. Try sending it by sound instead.`);
     }
@@ -1404,7 +1406,42 @@ export class Daemon {
   }
 
   secretsView() {
-    return this.store.secrets().items.map(s => ({ id: s.id, name: s.name, from: s.from, receivedAt: s.receivedAt, via: s.via, keystore: s.keystore, pending: !!s.pending }));
+    return this.store.secrets().items.map(s => ({ id: s.id, name: s.name, from: s.from, receivedAt: s.receivedAt, via: s.via, keystore: s.keystore, pending: !!s.pending, own: !!s.own, lastUsedAt: s.lastUsedAt || null }));
+  }
+
+  // ---- the vault: secrets the person adds here, and sending stored ones on ---------
+  // Only the page (the person) can add or send; agent tools still see names only.
+
+  /** Stores a secret the person typed on this device. A secret of theirs with the same name is replaced. */
+  addSecret({ name, value }) {
+    const n = String(name ?? '').trim();
+    if (!NAME_PATTERN.test(n)) throw httpError(400, 'Give the secret a short name: letters, digits, _ . - (up to 40).');
+    const v = Buffer.from(String(value ?? ''), 'utf8');
+    try {
+      if (!v.length) throw httpError(400, 'The secret is empty.');
+      if (v.length > SECRET_MAX_VALUE) throw httpError(413, `Secrets are limited to ${SECRET_MAX_VALUE} bytes.`);
+      const s = this.store.secrets();
+      const old = s.items.filter(x => x.own && x.name === n);
+      if (s.items.length - old.length >= MAX_SECRETS) throw httpError(507, `This device already holds ${MAX_SECRETS} secrets. Delete some first.`);
+      const id = randomBytes(8).toString('hex');
+      const label = `agentlink.secret.${id}`;
+      const w = protect(detectKeystore(), label, v); // fails closed
+      for (const o of old) forget(o.keystore, o.keyLabel);
+      s.items = s.items.filter(x => !(x.own && x.name === n));
+      const from = { id: this.meId, name: this.device().name };
+      s.items.push({ id, name: n, from, own: true, receivedAt: new Date().toISOString(), via: 'added', keystore: w.kind, keyLabel: label, wrapped: w.stored });
+      this.store.saveSecrets(s);
+      this.audit.add('secret.added', { name: n, ...(old.length ? { replaced: true } : {}) });
+      this.log(`secret "${n}" added on this device${old.length ? ' (replaced)' : ''}`);
+      return { id, name: n, keystore: w.kind, replaced: old.length > 0 };
+    } finally { v.fill(0); }
+  }
+
+  /** The stored value of a secret, for sending it on (never returned to the page). */
+  storedValue(id) {
+    const { item } = this.findSecret(String(id));
+    if (item.pending) throw httpError(409, 'Approve or reject this replacement first.');
+    return { name: item.name, value: unprotect(item.keystore, item.keyLabel, item.wrapped).toString('utf8') };
   }
 
   findSecret(id) {
@@ -1508,6 +1545,19 @@ export class Daemon {
       case 'POST /ui/secret/receive': this.setReceiving(body.on !== false); break;
       case 'POST /ui/secret/heard': return sendJson(res, 200, this.receiveSecret(fromHex(String(body.hex || '')), 'sound'));
       case 'POST /ui/secrets/reveal': return sendJson(res, 200, this.revealSecret(body.id));
+      case 'POST /ui/secrets/add': return sendJson(res, 200, state({ added: this.addSecret(body) }));
+      // Send a stored secret on: the value goes from the key store into the sealed frame here,
+      // and never through the page.
+      case 'POST /ui/secrets/send': {
+        const { name, value } = this.storedValue(body.id);
+        return sendJson(res, 200, await this.sendSecretWifi({ to: body.to, name, value }));
+      }
+      case 'POST /ui/secrets/seal': {
+        const { name: n, value } = this.storedValue(body.id);
+        const { peer, id, frame, name } = this.sealSecret({ to: body.to, name: n, value });
+        this.outSecrets.get(id).via = 'sound';
+        return sendJson(res, 200, { id, name, to: peer.name, hex: toHex(frame), bytes: frame.length, seconds: this.secretAirtime(frame.length) });
+      }
       case 'POST /ui/secrets/approve': this.approveSecret(body.id); break;
       case 'POST /ui/secrets/delete': this.deleteSecret(body.id); break;
       case 'GET /ui/messages': return sendJson(res, 200, { messages: this.thread(String(url.searchParams.get('peer') || '')) });

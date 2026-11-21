@@ -380,20 +380,26 @@ function renderUses() {
 }
 
 function renderSecrets(force = false) {
-  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id));
+  const q = ($('secretSearch').value || '').trim().toLowerCase();
+  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q;
   if (key === secretsKey && !force) return;
   secretsKey = key;
   renderUses();
   const list = $('secretList'); list.replaceChildren();
+  $('secretSearch').hidden = state.secrets.length < 4 && !q;
   if (!state.secrets.length) {
-    list.append(emptyEl('li', 'key', 'No secrets yet', 'Press "Receive a secret", then send one from a paired device (the key button in its conversation). The value goes into this computer\'s key store, never into a chat.'));
+    list.append(emptyEl('li', 'key', 'Your vault is empty', 'Add a key you have, or receive one from a paired device. Values stay in this computer\'s key store, never in a chat, and agents see only their names.'));
     return;
   }
-  for (const s of [...state.secrets].reverse()) {
+  const shown = [...state.secrets].reverse().filter(s => !q || s.name.toLowerCase().includes(q) || (s.from?.name || '').toLowerCase().includes(q));
+  if (!shown.length) { const li = text('li', 'No secret matches.'); li.className = 'none'; list.append(li); return; }
+  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  for (const s of shown) {
     const li = document.createElement('li'); li.className = 'secret';
     const name = text('b', s.name);
     if (s.pending) { const t = text('span', 'Replacement waiting'); t.className = 'pendingtag'; name.append(t); }
-    const meta = text('small', `From ${s.from.name} · ${new Date(s.receivedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} · by ${s.via === 'wifi' ? 'Wi-Fi' : 'sound'} · ${KEYSTORE_SHORT[s.keystore] || s.keystore}${s.pending ? ' · approve to replace the current one' : ''}`);
+    const origin = s.own ? `Added on this device · ${when(s.receivedAt)}` : `From ${s.from.name} · ${when(s.receivedAt)} · by ${s.via === 'wifi' ? 'Wi-Fi' : 'sound'}`;
+    const meta = text('small', `${origin} · ${KEYSTORE_SHORT[s.keystore] || s.keystore}${s.lastUsedAt ? ` · last used ${when(s.lastUsedAt)}` : ''}${s.pending ? ' · approve to replace the current one' : ''}`);
     const row = document.createElement('div'); row.className = 'row';
     const showing = shownSecret?.id === s.id;
     const reveal = button(showing ? 'Hide' : 'Reveal', async () => {
@@ -413,6 +419,7 @@ function renderSecrets(force = false) {
       act('POST', '/ui/secrets/delete', { id: s.id });
     });
     const buttons = [reveal, copy, del];
+    if (!s.pending) buttons.splice(2, 0, button('Send…', () => openSecretModal('stored', { item: s })));
     if (s.pending) buttons.unshift(button('Approve', () => act('POST', '/ui/secrets/approve', { id: s.id })));
     for (const b of buttons) b.className = 'ghost';
     if (s.pending) buttons[0].className = 'primary small-btn';
@@ -542,7 +549,7 @@ function renderOverview() {
     [s.peers.length > 0, 'Pair a second computer', 'Sound or a typed code; you swap 6-digit codes.', openPair],
     [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'Run npx vinac-link setup for Claude Code, Codex or OpenClaw.', null],
     [!!fw && fw.intents.some(i => i.all || Object.keys(i.devices).length), 'Set your firewall rules', 'Allow what you trust, keep risky intents blocked.', openFirewall],
-    [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive a secret, then send from the other computer.', () => $('ovReceiveBtn').click()],
+    [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive, then send from the other computer.', () => $('ovReceiveBtn').click()],
     [!!d.tailscale, 'Reach your devices from anywhere', 'Install Tailscale on both computers.', null],
   ];
   const ul = $('ovChecklist'); ul.replaceChildren();
@@ -1139,21 +1146,45 @@ function updateSoundTime() {
   $('soundTime').textContent = `about ${secretAirtimeGuess(n, v)} s, works without a network`;
 }
 
-function openSecretModal(mode) {
-  const peer = peerById(selected);
-  if (mode === 'send' && !peer?.canMessage) return toast('Pair this device again before sending it secrets.');
+// The secret dialog: 'send' (type a key and send it), 'stored' (send a key from the vault),
+// 'add' (keep a key on this device) or 'receive'.
+let secretMode = 'send', storedItem = null;
+function secretPeers() { return (state?.peers || []).filter(p => p.canMessage); }
+function syncSecretPeer() {
+  const p = peerById($('secretPeer').value);
+  $('secretTo').textContent = p ? p.name : 'the other device';
+  if (secretMode !== 'add') $('secretTitle').textContent = secretMode === 'stored' ? `Send ${storedItem.name}${p ? ` to ${p.name}` : ''}` : `Send a secret${p ? ` to ${p.name}` : ''}`;
+}
+function openSecretModal(mode, { item = null, fromConversation = false } = {}) {
+  const sending = mode === 'send' || mode === 'stored';
+  const peers = secretPeers();
+  if (sending && !peers.length) return toast('Pair a device first: secrets go only to paired devices.');
+  if (sending && fromConversation && !peerById(selected)?.canMessage) return toast('Pair this device again before sending it secrets.');
+  secretMode = mode; storedItem = item;
   secretRun = null;
   $('secretModal').hidden = false;
-  $('secretForm').hidden = mode !== 'send';
-  $('secretProgress').hidden = mode === 'send';
+  $('secretForm').hidden = mode === 'receive';
+  $('secretProgress').hidden = mode !== 'receive';
   $('secretResult').hidden = true; $('secretDone').hidden = true; $('secretStop').hidden = false;
   $('secretPulse').hidden = false;
-  if (mode === 'send') {
-    $('secretTitle').textContent = `Send a secret to ${peer.name}`;
-    $('secretTo').textContent = peer.name;
-    $('secretName').value = ''; $('secretValue').value = ''; $('secretValue').type = 'password'; $('secretShow').textContent = 'Show';
-    updateSoundTime(); syncHow();
-    $('secretName').focus();
+  if (mode !== 'receive') {
+    $('peerRow').hidden = !sending; $('howBox').hidden = !sending; $('speakerRow').hidden = !sending;
+    $('valueRow').hidden = mode === 'stored'; $('storedNote').hidden = mode !== 'stored';
+    $('secretName').readOnly = mode === 'stored';
+    $('secretName').value = item ? item.name : ''; $('secretValue').value = ''; $('secretValue').type = 'password'; $('secretShow').textContent = 'Show';
+    if (sending) {
+      $('secretPeer').replaceChildren(...peers.map(p => new Option(p.name, p.id)));
+      const pre = fromConversation ? selected : (peers.find(p => p.id === selected) || peers[0]).id;
+      $('secretPeer').value = pre;
+      $('secretHint').replaceChildren(text('span', 'Sealed so only '), text('b', ''), text('span', ' can open it, then stored in its key store. Its agent tools show the name, never the value. Use test values until VINAC Link has had a security review.'));
+      $('secretHint').children[1].id = 'secretTo';
+      syncSecretPeer(); updateSoundTime(); syncHow();
+    } else {
+      $('secretTitle').textContent = 'Add a secret to this device';
+      $('secretHint').textContent = 'Kept in this device\'s key store. Agents can ask to use it by name (you approve each run), but never see the value. You can send it to a paired device later.';
+      $('secretSend').textContent = 'Save';
+    }
+    (mode === 'stored' ? $('secretPeer') : $('secretName')).focus();
   } else {
     $('secretTitle').textContent = 'Receive a secret';
     $('secretMeter').hidden = false;
@@ -1182,13 +1213,18 @@ function closeSecretModal() {
 }
 
 function syncHow() {
+  if (secretMode === 'add') return;
   const sound = $('secretForm').how.value === 'sound';
   $('speakerRow').hidden = !sound;
   $('secretSend').textContent = sound ? 'Play it' : 'Send over Wi-Fi';
 }
 
-$('secretBtn').onclick = () => openSecretModal('send');
+$('secretBtn').onclick = () => openSecretModal('send', { fromConversation: true });
 $('receiveBtn').onclick = () => openSecretModal('receive');
+$('addSecretBtn').onclick = () => openSecretModal('add');
+$('sendSecretBtn').onclick = () => openSecretModal('send');
+$('secretPeer').addEventListener('change', syncSecretPeer);
+$('secretSearch').addEventListener('input', () => renderSecrets(true));
 $('secretClose').onclick = closeSecretModal;
 $('secretDone').onclick = closeSecretModal;
 $('secretStop').onclick = () => {
@@ -1205,11 +1241,21 @@ for (const r of $('secretForm').how) r.addEventListener('change', syncHow);
 
 $('secretForm').onsubmit = async e => {
   e.preventDefault();
-  const peer = peerById(selected);
+  const stored = secretMode === 'stored';
   const name = $('secretName').value.trim(), value = $('secretValue').value, how = $('secretForm').how.value;
-  if (!peer) return;
   if (!/^[A-Za-z0-9_.-]{1,40}$/.test(name)) return toast('Name: letters, digits, _ . - only (for example OPENAI_API_KEY).');
-  if (!value) return toast('Paste the secret first.');
+  if (!stored && !value) return toast('Paste the secret first.');
+  if (secretMode === 'add') {
+    $('secretValue').value = '';
+    try {
+      const r = await api('POST', '/ui/secrets/add', { name, value });
+      secretFinish('ok', `${name} is ${r.added?.replaced ? 'updated' : 'saved'} in this device's key store.`);
+      render(r);
+    } catch (err) { secretFinish('bad', err.message); }
+    return;
+  }
+  const peer = peerById($('secretPeer').value);
+  if (!peer) return;
   if (how === 'sound') engine.ensureContext().catch(() => {}); // while the click still counts as a user gesture
   $('secretValue').value = ''; // the page doesn't keep it
   $('secretForm').hidden = true; $('secretProgress').hidden = false; $('secretMeter').hidden = true;
@@ -1217,13 +1263,16 @@ $('secretForm').onsubmit = async e => {
   $('secretStatus').textContent = 'Sealing…';
 
   if (how === 'wifi') {
-    try { await api('POST', '/ui/secret/wifi', { to: peer.id, name, value }); secretFinish('ok', `Sent ${name} to ${peer.name} over Wi-Fi. It is in its key store now.`); refresh.once(); }
-    catch (err) { secretFinish('bad', err.message); }
+    try {
+      if (stored) await api('POST', '/ui/secrets/send', { id: storedItem.id, to: peer.id });
+      else await api('POST', '/ui/secret/wifi', { to: peer.id, name, value });
+      secretFinish('ok', `Sent ${name} to ${peer.name} over Wi-Fi. It is in its key store now.`); refresh.once();
+    } catch (err) { secretFinish('bad', err.message); }
     return;
   }
 
   let sealed;
-  try { sealed = await api('POST', '/ui/secret/seal', { to: peer.id, name, value }); }
+  try { sealed = stored ? await api('POST', '/ui/secrets/seal', { id: storedItem.id, to: peer.id }) : await api('POST', '/ui/secret/seal', { to: peer.id, name, value }); }
   catch (err) { return secretFinish('bad', err.message); }
   const run = secretRun = { stop: false };
   const acked = async () => { try { return (await api('GET', `/ui/secret/status?id=${sealed.id}`)).acked; } catch { return false; } };

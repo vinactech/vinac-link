@@ -622,3 +622,14 @@ button.kpi:hover { box-shadow: var(--shadow); border-color: var(--line); }
   .about-links { grid-template-columns: 1fr; }
 }
 @media (prefers-reduced-motion: reduce) { .hero-art .waves path { animation: none; } }
+
+/* vault (0.9.0) */
+.vault-actions { display: flex; gap: 8px; margin-left: auto; flex-wrap: wrap; justify-content: flex-end; }
+#secretSearch { margin-bottom: 14px; }
+.secret .row { flex-wrap: wrap; justify-content: flex-end; }
+@media (max-width: 760px) {
+  .secrets-view .thread-head.plain { flex-wrap: wrap; }
+  .vault-actions { width: 100%; justify-content: flex-start; margin-left: 0; }
+  .secret { grid-template-columns: minmax(0, 1fr); }
+  .secret .row { grid-row: auto; grid-column: 1; justify-content: flex-start; }
+}
