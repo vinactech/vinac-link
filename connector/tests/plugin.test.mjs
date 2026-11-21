@@ -60,7 +60,8 @@ test('marketplaces at the repo root list the plugin (the repo root is the plugin
   assert.equal(pkg.name, 'vinac-link');
   assert.equal(pkg.version, json('connector/package.json').version);
   assert.ok(fs.existsSync(path.join(ROOT, pkg.bin.vinac)));
-  for (const f of pkg.files) assert.ok(fs.existsSync(path.join(ROOT, f.replace(/^!/, ''))), `package files: ${f}`);
+  // Exclusions ("!docs/…") may name files a checkout doesn't have (the public copy leaves internal notes out).
+  for (const f of pkg.files.filter(f => !f.startsWith('!'))) assert.ok(fs.existsSync(path.join(ROOT, f)), `package files: ${f}`);
 });
 
 test('session-start hook: silent without a daemon, reports unread messages without reading them', { timeout: 30_000 }, async () => {
