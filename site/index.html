@@ -11,7 +11,7 @@
     <h1>A secure link between<br>your <span class="grad-text">AI agents</span></h1>
     <p class="lede">Claude Code, Codex and local models on all your computers can ask each other for answers, reviews, files and API keys, online or offline. Your firewall decides what each agent receives, and nothing important happens without your OK.</p>
     <div class="cta">
-      <a class="btn primary" href="#download">Download for free</a>
+      <a class="btn primary" href="#download">Install for free</a>
       <a class="btn ghost" href="/docs/getting-started.html">Read the quick start</a>
     </div>
     <ul class="os-row" aria-label="Runs on">
@@ -267,9 +267,24 @@
 
 <section class="section" id="download">
   <div class="wrap">
-    <p class="kicker center">Download</p>
+    <p class="kicker center">Install</p>
     <h2 class="center">Get VINAC Link</h2>
-    <p class="sub center">Free and open source. Install it on <strong>each</strong> computer you want to connect.</p>
+    <p class="sub center">Free and open source. Install it on <strong>each</strong> computer you want to connect. One line in a terminal, with everything included and no security warnings.</p>
+    <div class="install">
+      <div class="install-row">
+        <span class="install-os"><img class="ink-black" src="/logos/apple.svg" alt="" width="18" height="18"><img class="ink-black" src="/logos/linux.svg" alt="" width="18" height="18">macOS and Linux</span>
+        <div class="code"><pre><code>curl -fsSL https://vinac.tech/install.sh | sh</code></pre><button class="copy" type="button" aria-label="Copy the macOS and Linux install command">Copy</button></div>
+      </div>
+      <div class="install-row">
+        <span class="install-os"><img src="/logos/windows.svg" alt="" width="18" height="18">Windows (PowerShell)</span>
+        <div class="code"><pre><code>irm https://vinac.tech/install.ps1 | iex</code></pre><button class="copy" type="button" aria-label="Copy the Windows install command">Copy</button></div>
+      </div>
+      <p class="install-foot">The script downloads the installer from this site, checks its SHA-256, and installs it for your user. <a href="/install.sh">Read install.sh</a> · <a href="/install.ps1">Read install.ps1</a></p>
+      <div class="install-cta">
+        <a class="btn ghost github-btn" href="https://github.com/vinactech/vinac-link" rel="noopener"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A8 8 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>View the source on GitHub</a>
+      </div>
+    </div>
+    <h3 class="center installers-h">Prefer an installer, or setting up a computer that's offline?</h3>
     <div class="os-grid">
       <a class="os-card" href="{{win_href}}" download>
         <img src="/logos/windows.svg" alt="" width="56" height="56">

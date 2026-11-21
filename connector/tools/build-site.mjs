@@ -119,11 +119,18 @@ const header = active => `<header class="top">
   </div>
 </header>`;
 
+// Social profiles (the GitHub repository may still be private; the link is ready for launch).
+const LINKEDIN = 'https://www.linkedin.com/company/vinac-link';
+const GITHUB = 'https://github.com/vinactech/vinac-link';
 const footer = `<footer class="foot">
   <div class="wrap foot-in">
     <div class="foot-brand">${ICON}<div><strong>VINAC Link™</strong><span>Verified Intent Network for Agent Communication</span></div></div>
     <nav class="foot-links" aria-label="Footer">
       <a href="/docs/">Docs</a><a href="/security.html">Security</a><a href="/about.html">About</a><a href="/roadmap.html">Roadmap</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/license.html">License</a><a href="/#contact">Contact</a>
+    </nav>
+    <nav class="foot-social" aria-label="Follow VINAC Link">
+      <a href="${LINKEDIN}" rel="noopener" aria-label="VINAC Link on LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.86-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0Z"/></svg>LinkedIn</a>
+      <a href="${GITHUB}" rel="noopener" aria-label="VINAC Link on GitHub"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A8 8 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>GitHub</a>
     </nav>
     <p class="fine">© 2026 Mexley Marketing Inc. · Free and open source under Apache-2.0 · This site sets no cookies and loads no trackers. VINAC and VINAC Link are trademarks of Mexley Marketing Inc. Other product names and logos belong to their owners and are shown only to say what VINAC Link works with.</p>
   </div>
@@ -216,6 +223,8 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
 
   // 2. Static assets
   for (const f of ['styles.css', 'site.js', 'theme.js', 'field.js', '_headers', '.htaccess', 'robots.txt', 'contact.php']) fs.copyFileSync(path.join(SITE, f), path.join(OUT, f));
+  // One-line install scripts (curl … | sh, irm … | iex), stamped with this version.
+  for (const f of ['install.sh', 'install.ps1']) fs.writeFileSync(path.join(OUT, f), fs.readFileSync(path.join(SITE, f), 'utf8').replaceAll('{{version}}', version));
   if (fs.existsSync(path.join(SITE, 'media'))) fs.cpSync(path.join(SITE, 'media'), path.join(OUT, 'media'), { recursive: true });
   // The icon sizes only; the 1.4 MB source image (vinac-icon.png) stays out of the site.
   fs.mkdirSync(path.join(OUT, 'brand'), { recursive: true });

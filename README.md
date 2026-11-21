@@ -74,8 +74,21 @@ The full walkthrough, with what each part does, is on
 
 ## Install
 
-- **Installers** (Node.js included): Windows `.exe` and Linux `.tar.gz` (a macOS `.dmg` is coming) from
-  **[vinac.tech/#download](https://vinac.tech/#download)**. VINAC Link opens in its own window.
+One line, with Node.js included. The script downloads the installer from vinac.tech, checks its
+SHA-256, and installs it for your user ([install.sh](site/install.sh), [install.ps1](site/install.ps1)):
+
+```sh
+# macOS and Linux
+curl -fsSL https://vinac.tech/install.sh | sh
+```
+
+```powershell
+# Windows (PowerShell)
+irm https://vinac.tech/install.ps1 | iex
+```
+
+- **Installers** (for offline computers, or if you prefer): Windows `.exe`, macOS `.dmg`, Linux
+  `.tar.gz` from **[vinac.tech/#download](https://vinac.tech/#download)**. VINAC Link opens in its own window.
 - **From this repository:** Node.js 22+, then `node connector/bin/vinac.mjs start`. No `npm install`
   needed; VINAC Link has no dependencies.
 

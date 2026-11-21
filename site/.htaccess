@@ -17,6 +17,8 @@ ErrorDocument 404 /404.html
 AddType image/svg+xml .svg
 AddType application/zip .zip
 AddType application/xml .xml
+# The one-line install scripts: plain text, so curl, PowerShell and browsers all read them as text.
+AddType "text/plain; charset=utf-8" .sh .ps1
 
 <IfModule mod_headers.c>
   Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"

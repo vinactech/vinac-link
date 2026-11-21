@@ -266,7 +266,9 @@ codesign --force --sign - "VINAC Link.app" 2>/dev/null || codesign --force --dee
 rm -rf dmg-stage && mkdir dmg-stage
 cp -R "VINAC Link.app" dmg-stage/
 ln -s /Applications dmg-stage/Applications
-hdiutil create -volname "VINAC Link" -srcfolder dmg-stage -ov -format UDZO "VINAC-Link-${V}.dmg"
+# Size the image explicitly (the app plus room to spare): hdiutil's own estimate can run out of space.
+MB=$(( $(du -sm dmg-stage | cut -f1) * 3 / 2 + 64 ))
+hdiutil create -size "\${MB}m" -volname "VINAC Link" -srcfolder dmg-stage -ov -format UDZO "VINAC-Link-${V}.dmg"
 rm -rf dmg-stage
 echo
 echo "Made VINAC-Link-${V}.dmg. Copy it to the PC into build/installers/out/ (or upload it to the site's download folder)."

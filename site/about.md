@@ -62,4 +62,5 @@ agents states its intent, and every intent is checked, by your rules and, when i
 
 VINAC Link™ is made by Mexley Marketing Inc., a Canadian company. We'd love to hear how you use it,
 what's missing, or how we could work together: [write to us](/#contact) or email
-**hello@vinac.tech**.
+**hello@vinac.tech**. Follow us on [LinkedIn](https://www.linkedin.com/company/vinac-link) and
+[GitHub](https://github.com/vinactech/vinac-link).
