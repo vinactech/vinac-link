@@ -35,3 +35,5 @@ npm-debug.log*
 
 # Pitch deck: shared by link from the website only, never in the public repository
 site/media/vinac-link-pitch-deck.pdf
+
+video/render-check/

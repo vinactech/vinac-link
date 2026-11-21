@@ -26,9 +26,9 @@ On first start your OS may ask:
 
 On the page, **Pair a device**:
 
-1. Computer A: **Announce this device**. It plays a short, almost inaudible sound for 6 seconds.
-2. Computer B: **Listen for a device** (allow the microphone). No sound, or too far apart? Type the
-   code shown under *No sound?* on A into B instead.
+1. Computer A: **Show a code here** (recommended). A code appears.
+2. Computer B: **Enter a code** and type the code from A. Prefer no typing? Use **Play the sound** on
+   A and **Listen for it** on B instead (beta: devices close together, microphone allowed).
 3. Each screen now shows a **6-digit code**. Type **A's code on B** and **B's code on A**.
 
 Done: both list each other under conversations. Only a person can do step 3; agents can open the

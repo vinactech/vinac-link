@@ -1,6 +1,6 @@
 ---
 name: pair
-description: Pair this computer with another one through VINAC Link (sound beacon or typed code, then a 6-digit code swap done by the person). Use when the person wants to connect a second computer, phone or agent to this one.
+description: Pair this computer with another one through VINAC Link (a typed code, or a sound beacon in beta, then a 6-digit code swap done by the person). Use when the person wants to connect a second computer, phone or agent to this one.
 ---
 
 # Pair with another device
@@ -11,9 +11,10 @@ the page, explain the steps, and report the result.
 1. Call `vinac_status`. If a device with that name is already in `vinac_peers`, say so and stop.
 2. Call `vinac_pair_request`. It opens the VINAC Link page in the browser (http://127.0.0.1:47801).
 3. Tell the person, in short steps:
-   - On **this** computer press **Announce this device**. On the **other** computer press
-     **Listen for a device**. Keep them within a couple of metres; the beacon takes ~6 seconds.
-     No sound? The other computer can type the code shown under "No sound?".
+   - Recommended, with a code: on **this** computer press **Pair a device → Show a code here**;
+     on the **other** computer press **Pair a device → Enter a code** and type that code.
+   - Or by sound (beta, no typing): **Play the sound** here and **Listen for it** there, within a
+     couple of metres; the sound takes ~6 seconds.
    - Each screen then shows its own 6-digit code. **Type this computer's code on the other one,
      and the other one's code here.** Three wrong codes cancel the pairing.
 4. Wait with `vinac_pair_status` (check every few seconds, at most ~3 minutes).

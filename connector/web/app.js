@@ -177,7 +177,7 @@ function renderHead() {
   $('headStatus').textContent = `${peer.online === true ? 'Online' : peer.online === false ? 'Offline' : 'Checking…'} · ${peer.fingerprint}`;
   const banner = $('banner');
   if (!peer.canMessage) { banner.hidden = false; banner.textContent = 'This device was paired before messaging existed. Remove it and pair again to send messages.'; }
-  else if (peer.online === false) { banner.hidden = false; banner.textContent = `${peer.name} seems to be offline. Messages go directly to the device and are not queued, so sending will fail until VINAC Link runs there.`; }
+  else if (peer.online === false) { banner.hidden = false; banner.textContent = `${peer.name} seems to be offline. Messages and requests wait here and go out by themselves when it's back (up to 24 hours). Files and secrets need it online.`; }
   else banner.hidden = true;
   $('composeText').disabled = $('sendBtn').disabled = $('attachBtn').disabled = !peer.canMessage;
 }

@@ -8,15 +8,16 @@ giving any of them more trust than you decided to give.
 VINAC Link combines technology we designed ourselves with cryptography the security community has
 studied for years:
 
-- **Pairing that only people can complete.** Two computers meet by sound or a short code, and each
+- **Pairing that only people can complete.** Two computers meet with a short code (or by sound, in beta), and each
   person confirms a 6-digit code shown on the other screen. Someone nearby, someone on the network,
   or an agent on either computer can't complete a pairing on their own.
 - **An intent firewall.** Agents don't send each other free-form commands. Every request names its
   purpose from a fixed, versioned list, and your rules decide (allow, ask you first, or block)
-  before your agent sees anything.
+  before your agent sees anything. Pick a mode (Restricted, Standard or Auto) to set the defaults in
+  one click; high-risk requests stay blocked in every mode.
 - **Secrets that never touch the chat.** Keys and tokens travel straight into your operating
   system's own secure key store. Agents can use them in programs you approve, but never see the
-  values.
+  values. Lock the vault with a passphrase and, while it's locked, no program can read them.
 - **Published, well-studied cryptography.** Pairing and every connection are built on the Noise
   protocol framework, the same family of protocols behind WireGuard and WhatsApp's transport
   encryption, with fresh keys for every session.
@@ -30,7 +31,8 @@ studied for years:
 | **Proof of delivery** | "Delivered" means the other computer proved it received exactly that message. Replays and altered messages are refused. |
 | **Your rules first** | Requests, files and plain messages are checked against your rules before an agent sees them. Only you can change the rules or approve a request, on the VINAC Link page. |
 | **Human in the loop** | Agents can use the devices you paired, but only a person can pair a device, approve a request, change a rule or reveal a secret. |
-| **Keys stay protected at rest** | Pairing keys and secrets are kept by Windows, macOS or Linux's own key store, and message history is encrypted on disk. |
+| **Keys stay protected at rest** | Pairing keys and secrets are kept by Windows, macOS or Linux's own key store, and message history is encrypted on disk. With a vault passphrase, secrets are sealed again with a key only your passphrase opens. |
+| **No flood of requests** | At most 25 requests from one device wait for you at a time, and a request nobody decides on expires after 3 days. |
 | **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents. |
 | **A private local page** | The VINAC Link page only answers on your own computer and refuses other websites. |
 
@@ -44,8 +46,8 @@ planned, and we will publish its results.
 
 - VINAC Link is in early access. For the most sensitive production keys, we suggest waiting for the
   published audit.
-- Like any app, VINAC Link can't protect you from malware that is already running on your computer
-  under your account.
+- Like any app, VINAC Link can't fully protect you from malware that is already running on your
+  computer under your account. A vault passphrase keeps your secrets sealed from it while the vault is locked.
 - A message that your rules let through is still just text: an agent should treat it as information,
   not as orders.
 

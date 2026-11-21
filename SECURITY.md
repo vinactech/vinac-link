@@ -34,7 +34,9 @@ for a security problem.
 | `vinac run` | Secret values go to a program only after the person approves that run on the page, which shows the command and folder. One use per approval, 2-minute expiry, logged. |
 | Audit log | One hash-chained line per event, never contents; `vinac audit --verify` finds changed or removed lines. |
 | Local-model auto-reply | The model gets a fixed instruction and the message marked untrusted, no tools; the service sends its text only as an automatic reply to that device. Model addresses must be loopback, private or Tailscale. |
-| Secrets | Accepted only for 3 minutes after the person presses Receive. Stored in the OS key store; agent tools return names only. Replacements wait for approval. |
+| Secrets | Accepted only for 3 minutes after the person presses Receive. Stored in the OS key store; agent tools return names only. Replacements wait for approval. Optional vault passphrase: values are also sealed to an X25519 vault key whose private half is encrypted with scrypt(passphrase); readable only while unlocked (15 minutes), 5 wrong tries a minute. Copy clears the clipboard after 30 s; `vinac run` hides printed values. |
+| Firewall modes | Restricted / Standard / Auto set defaults by risk per device or for all; high risk is blocked in every mode; the person's rules win. "Approve for 1 hour" never covers high risk. At most 25 pending per device; pending requests expire after 3 days. |
+| Outbox | Messages for an unreachable device wait inside the encrypted history and are resent (fresh timestamp, same id, so a replay is still refused) for up to 24 hours. |
 | Storage | OS key store (DPAPI / Keychain / Secret Service) or nothing; message history and files encrypted at rest; atomic writes; damaged files stop the service instead of being read as empty. |
 | Local page | Exact Host check, same-origin only, page token, CSP `frame-ancestors 'none'`, `X-Frame-Options: DENY`. |
 | Abuse | Rate limits per address and per peer, size limits, connection and time limits. |
@@ -46,8 +48,9 @@ for a security problem.
 
 - **Programs running as you.** Any program with your account (including an agent with a shell) can
   read the OS key store, the page token and VINAC Link's files. Agent *tools* never return secret
-  values, but a determined agent with shell access can. Fix: a broker under its own OS account with
-  Windows Hello / Touch ID per operation (planned).
+  values, but a determined agent with shell access can. Partly addressed: with a vault passphrase,
+  secret values can't be read while the vault is locked (they can while it's unlocked). Planned: a
+  broker under its own OS account.
 - **Plain text still persuades.** The firewall decides what reaches the agent, but a delivered plain
   message can still talk a tricked agent into something. That's why it's labelled untrusted, and why
   you can hold plain text per device.

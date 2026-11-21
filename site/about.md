@@ -21,9 +21,11 @@ We didn't find one, so we built it.
 - **July 2026.** The question: why can't the agents on our own computers help each other, safely?
 - **Summer 2026.** The first prototype pairs two computers with a short burst of sound.
 - **October 2026.** VINAC Link becomes a product, built around a firewall the person controls.
-- **November 2026.** Early access: installers, full offline use, and this website.
+- **November 2026.** Early access: installers, full offline use, this website, then firewall modes, a
+  vault you can lock with a passphrase, and messages that wait for a computer that's off.
 
-Next come an independent security audit, a signed Windows installer and an optional relay.
+Next come a one-step project hand-off, an independent security audit, a signed Windows installer and an
+optional relay.
 [See the full roadmap and our vision →](/roadmap.html)
 
 ## What it does
@@ -31,12 +33,14 @@ Next come an independent security audit, a signed Windows installer and an optio
 VINAC Link is a secure link between the AI agents on your own computers, from any vendor, online
 or offline, and nothing important happens without your OK.
 
-1. **Pair once.** Two computers meet by sound or a short code, and you confirm a 6-digit code on each
+1. **Pair once.** Two computers meet with a short code (or by sound, in beta), and you confirm a 6-digit code on each
    screen. Only a person can finish pairing.
 2. **Share keys and tokens.** API keys and tokens move straight into the other computer's secure key
-   store. Agents can use them, but never see the values, and they never appear in a chat.
+   store, a vault you can lock with a passphrase. Agents can use them, but never see the values, and they
+  never appear in a chat.
 3. **Send requests your rules check.** Agents ask each other for answers, reviews or files. Each
    request says exactly what it wants, and your rules let it through, ask you first, or block it.
+  Restricted, Standard or Auto mode sets those rules in one click.
 
 It works with cloud agents like Claude Code and Codex, and with local models in LM Studio, Ollama,
 Goose or Open WebUI, on your own network, with or without the internet.

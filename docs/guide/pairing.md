@@ -7,9 +7,9 @@ person can complete it**: each person types the other screen's 6-digit code.
 
 | Situation | Do this |
 |---|---|
-| Both computers in the same room | A: **Announce** (6-second near-ultrasound sound). B: **Listen** (microphone). |
-| No speaker/microphone, or noisy room | A: **Announce**, open *No sound?* and read out the code. B: **Listen**, type the code. |
-| Computers on different networks, both on Tailscale | A: *announce over Tailscale* (link under the two buttons). B: type the code shown on A. |
+| Any two computers on the same network (recommended) | A: **Show a code here**. B: **Enter a code**, type A's code. No speaker or microphone needed. |
+| Same room, no typing (beta) | A: **Play the sound** (6-second near-ultrasound). B: **Listen for it** (microphone). If it isn't heard, B can still type the code shown on A. |
+| Computers on different networks, both on Tailscale | A: *announce over Tailscale* (link under the choices). B: **Enter a code**, type the code shown on A. |
 
 The sound and the code carry the same 25 bytes: A's address and port, an 8-byte one-time secret
 and A's key fingerprint. It's useless to anyone who isn't on the network (or tailnet) during those

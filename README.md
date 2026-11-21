@@ -104,9 +104,9 @@ has no dependencies.
 
 That starts VINAC Link in the background and opens its page. Then:
 
-1. **Pair.** On one computer press **Announce this device**, on the other **Listen for a device**
-   (or type the code shown under "No sound?"). Each screen shows a 6-digit code: type each one into
-   the *other* computer. Only a person can do this step.
+1. **Pair.** **Pair a device**: on one computer press **Show a code here**, on the other **Enter a
+   code** and type it (or pair by sound, beta: **Play the sound** / **Listen for it**). Each screen
+   then shows a 6-digit code: type each one into the *other* computer. Only a person can do this step.
 2. **Connect your agent.** `vinac setup` prints the exact commands for your folder (**Connect my
    agent** in the package):
    - **Claude Code:** `claude plugin marketplace add <folder>`, then `claude plugin install vinac-link@vinac`
@@ -208,7 +208,7 @@ monitor: `vinac watch`. Command line: [docs/guide/cli.md](docs/guide/cli.md).
 ## Development
 
 ```
-cd connector && npm test        # 88 tests, 127.0.0.1 only, no sound played
+cd connector && npm test        # 102 tests, 127.0.0.1 only, no sound played
 node connector/bin/vinac.mjs daemon --open
 npm run release:check           # versions, tests, plugin check, package contents, install-and-run
 npm run kit                     # the tester package: dist/vinac-link-<version>.zip + SHA256SUMS.txt

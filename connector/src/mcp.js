@@ -207,8 +207,8 @@ export class AgentApi {
       case 'vinac_pair_request': {
         const r = await this.call('POST', '/api/pair/open', { mode: args.mode });
         const step = args.mode === 'listen'
-          ? 'On the approval page, the person presses "Listen for a device" while the other device plays its pairing sound.'
-          : 'On the approval page, the person presses "Announce this device"; the other device should be listening.';
+          ? 'On the approval page, under Pair a device, the person presses "Enter a code" and types the code shown on the other device (or "Listen for it" if the other device plays the sound, beta).'
+          : 'On the approval page, under Pair a device, the person presses "Show a code here" and types that code on the other device (or "Play the sound" for pairing by sound, beta).';
         return { ...r, nextSteps: [step, 'Each screen then shows its own 6-digit code. The person types each device\'s code into the other device. No tool can do this step.', 'Use vinac_pair_status to follow progress.'] };
       }
       case 'vinac_unpair': return this.call('POST', '/api/unpair', { id: String(args.id || '') });

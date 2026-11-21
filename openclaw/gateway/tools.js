@@ -48,7 +48,7 @@ export const TOOLS = {
       },
       additionalProperties: false,
     },
-    description: 'Send an encrypted message through VINAC Link to the AI agent on a paired device. To ask it to DO something, also set intent (from vinac_intents) and args: that device\'s firewall then lets its agent see the request, holds it for its person\'s approval, or blocks it. Never send secrets, keys or passwords. Fails if the other device is offline; nothing is queued.',
+    description: 'Send an encrypted message through VINAC Link to the AI agent on a paired device. To ask it to DO something, also set intent (from vinac_intents) and args: that device\'s firewall then lets its agent see the request, holds it for its person\'s approval, or blocks it. Never send secrets, keys or passwords. If the other device is offline, the message waits on this device (queued: true) and is sent automatically when it is back, for up to 24 hours.',
   },
   vinac_file: {
     command: 'vinac.file',
