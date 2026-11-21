@@ -243,8 +243,13 @@ export class Store {
   saveSecrets(s) { writeAtomic(this.file('secrets.json'), JSON.stringify({ items: s.items }, null, 1)); }
 
   /** Firewall rules for requests from paired devices (see firewall.js). */
-  firewall() { const f = readJson(this.file('firewall.json'), { v: 1, rules: {} }); return { v: 1, rules: f.rules || {} }; }
-  saveFirewall(f) { writeAtomic(this.file('firewall.json'), JSON.stringify({ v: 1, rules: f.rules }, null, 1)); }
+  /** The vault lock record (see vault.js), or null when the vault has no passphrase. */
+  vault() { return readJson(this.file('vault.json'), null); }
+  saveVault(r) { const f = this.file('vault.json'); if (r) writeAtomic(f, JSON.stringify(r, null, 1)); else fs.rmSync(f, { force: true }); }
+
+  // rules: the person's rules; modes: restricted/standard/auto per device or '*'; temporary: "allow for a while" (intent -> until, ms).
+  firewall() { const f = readJson(this.file('firewall.json'), { v: 1, rules: {} }); return { v: 1, rules: f.rules || {}, modes: f.modes || {}, temporary: f.temporary || {} }; }
+  saveFirewall(f) { writeAtomic(this.file('firewall.json'), JSON.stringify({ v: 1, rules: f.rules, modes: f.modes || {}, temporary: f.temporary || {} }, null, 1)); }
 
   /**
    * Remembers an id until `expiresAt` (ms). Returns false if it was already

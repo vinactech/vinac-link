@@ -193,13 +193,14 @@
           </div>
         </header>
         <div class="pair-body">
+          <div class="vault-lock" id="vaultLock"></div>
           <input type="search" id="secretSearch" placeholder="Find a secret by name or device" aria-label="Find a secret" autocomplete="off">
           <div id="useBox" hidden>
             <h3 class="fw-h">Programs asking to use a secret</h3>
             <ul class="secret-list" id="useList"></ul>
           </div>
           <ul class="secret-list" id="secretList"></ul>
-          <p class="foot">VINAC Link's agent tools show names only. Values are in this device's key store, which any program running as you can read, so keep production keys elsewhere for now.</p>
+          <p class="foot">VINAC Link's agent tools show names only. Without a passphrase, values are protected by this device's key store, which other programs running as you can ask for. With a passphrase, they can't read them while the vault is locked. Until VINAC Link's security audit, use test or low-risk keys.</p>
         </div>
       </section>
 
@@ -212,6 +213,8 @@
           <div class="head-text"><b>Firewall</b><small>What paired devices may ask your agent to do · intents <span id="logosVersion"></span></small></div>
         </header>
         <div class="pair-body">
+          <h3 class="fw-h">Mode</h3>
+          <div class="fw-modes" id="fwModes"></div>
           <h3 class="fw-h">Waiting for you</h3>
           <ul class="secret-list" id="fwWaiting"></ul>
           <h3 class="fw-h">Recent requests</h3>
@@ -240,11 +243,27 @@
         <div class="pair-body">
           <section class="card" id="pairCard" aria-live="polite">
             <div data-view="idle">
-              <h2>Pair a nearby device</h2>
-              <p class="hint">One device plays a short sound, the other listens. Then you compare 6 digits on both screens.</p>
-              <div class="choices">
-                <button class="choice" id="announceBtn"><b>Announce this device</b><span>Plays a 6-second sound</span></button>
-                <button class="choice" id="listenBtn"><b>Listen for a device</b><span>Uses the microphone</span></button>
+              <h2>Pair a device</h2>
+              <p class="hint">Choose a way for the two devices to find each other. Either way, you then swap 6 digits on both screens, so only you can finish pairing.</p>
+              <div class="pair-way">
+                <p class="way-head"><b>With a code</b><span class="tag rec">Recommended</span></p>
+                <p class="hint small">Works on the same network or over Tailscale. No speaker or microphone needed.</p>
+                <div class="choices">
+                  <button class="choice" id="showCodeBtn"><b>Show a code here</b><span>Type it on the other device</span></button>
+                  <button class="choice" id="enterCodeBtn"><b>Enter a code</b><span>Shown on the other device</span></button>
+                </div>
+                <form class="coderow" id="idleCodeForm" hidden>
+                  <input id="idleCodeInput" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-…" aria-label="Pairing code from the other device">
+                  <button class="primary">Pair</button>
+                </form>
+              </div>
+              <div class="pair-way">
+                <p class="way-head"><b>By sound</b><span class="tag beta">Beta</span></p>
+                <p class="hint small">No typing: one device plays a short sound, the other hears it. Devices within a few metres, speaker and microphone on.</p>
+                <div class="choices">
+                  <button class="choice" id="announceBtn"><b>Play the sound</b><span>About 6 seconds, repeats</span></button>
+                  <button class="choice" id="listenBtn"><b>Listen for it</b><span>Uses the microphone</span></button>
+                </div>
               </div>
               <p class="hint small" id="tailscaleRow" hidden>Device on another network? Both devices on Tailscale:
                 <button type="button" class="linkish" id="announceTsBtn">announce over Tailscale</button>, then type the code shown on the other device.</p>
@@ -253,10 +272,10 @@
             </div>
 
             <div data-view="announcing">
-              <h2>Announcing</h2>
+              <h2 id="announceTitle">Announcing</h2>
               <div class="status"><i class="pulse"></i><span id="announceText">Playing the pairing sound…</span></div>
-              <p class="hint">On the other device, open VINAC Link and press <b>Listen for a device</b>. The sound repeats until it is heard.</p>
-              <details class="fallback">
+              <p class="hint" id="announceHint">On the other device, open VINAC Link, press <b>Pair a device</b>, then <b>Listen for it</b>. The sound repeats until it is heard.</p>
+              <details class="fallback" id="codeBox">
                 <summary>No sound? Type this code on the other device</summary>
                 <code class="bigcode" id="beaconCode"></code>
               </details>
@@ -267,7 +286,7 @@
               <div class="status"><i class="pulse"></i><span id="listenText">Waiting for the pairing sound…</span></div>
               <div class="meter" id="meter" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
               <details class="fallback">
-                <summary>No sound? Enter the code shown on the other device</summary>
+                <summary>Not heard? Enter the code shown on the other device</summary>
                 <form class="coderow" id="codeForm">
                   <input id="codeInput" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-…" aria-label="Pairing code">
                   <button class="ghost">Use code</button>
@@ -361,8 +380,8 @@
         <p class="hint small" id="storedNote" hidden>Sends the value stored in this device's key store. It never shows on this page.</p>
         <fieldset class="how" id="howBox">
           <legend>Send by</legend>
-          <label><input type="radio" name="how" value="sound" checked> Sound <small id="soundTime">near-ultrasound, works without a network</small></label>
-          <label><input type="radio" name="how" value="wifi"> Wi-Fi <small>instant, needs both on the same network</small></label>
+          <label><input type="radio" name="how" value="wifi" checked> Wi-Fi <small>instant, needs both on the same network or Tailscale</small></label>
+          <label><input type="radio" name="how" value="sound"> Sound <span class="tag beta">Beta</span> <small id="soundTime">near-ultrasound, works without a network</small></label>
         </fieldset>
         <div id="speakerRow">
           <label for="secretSpeaker">Speaker</label>
@@ -395,6 +414,14 @@
         <div class="about-brand">
           <img src="/web/icon.png" alt="" width="52" height="52">
           <div><b>VINAC Link™</b><small id="aboutVersion"></small><small>Verified Intent Network for Agent Communication</small></div>
+        </div>
+        <div class="about-how">
+          <p><b>What it's for.</b> Your AI agents on different computers (Claude Code, Codex, local models) can ask each other for answers, reviews, files and keys, without a cloud in between. Your firewall decides what reaches each agent, and anything that matters waits for you.</p>
+          <ul>
+            <li><b>Pairing:</b> with a code (recommended, works on any network the devices share or over Tailscale) or by sound (beta, no typing, devices close together). Either way you swap 6 digits, so only you can finish it.</li>
+            <li><b>Messages, requests and files</b> travel over your local network or Tailscale, encrypted end to end. No internet needed.</li>
+            <li><b>Secrets</b> live in this computer's key store. Send one by Wi-Fi, or by sound (beta) when there is no network. Agents see names only.</li>
+          </ul>
         </div>
         <nav class="about-links" aria-label="Help and legal">
           <a href="https://vinac.tech/docs/" target="_blank" rel="noopener noreferrer"><b>Documentation</b><small>Guides for pairing, the firewall, secrets and agents</small></a>

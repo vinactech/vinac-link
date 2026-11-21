@@ -32,6 +32,7 @@ import { Handshake } from './noise.js';
 import { SECRET_MAGIC, SECRET_HEADER, SECRET_MAX_NAME, SECRET_MAX_VALUE, SECRET_FEC, NAME_PATTERN, secretFrameLooksValid, withCrc } from '../web/secret-frame.js';
 import { codedLength } from '../../lab/js/fec.js';
 import { detectKeystore, protect, unprotect, forget } from './keystore.js';
+import { Vault, sealTo, openWith, checkPassphrase } from './vault.js';
 import { encodeBeacon, decodeBeacon, beaconToCode, codeToBeacon, fromHex, toHex, BEACON_BPS } from '../web/beacon.js';
 import { createHash } from 'node:crypto';
 import { LOGOS_VERSION, isIntent, catalog, riskOf, ARG_SHAPES } from './logos.js';
@@ -72,6 +73,10 @@ const CLOCK_SKEW_MS = 10 * 60_000;
 const REPLAY_KEEP_MS = 2 * CLOCK_SKEW_MS + 60_000;   // ids are remembered for the whole acceptance window
 const MAX_WAIT_S = 60;
 const PEER_CHECK_MS = 15_000;
+const ASK_TTL_MS = 3 * 24 * 60 * 60_000;            // a request nobody decided on expires after 3 days
+const MAX_WAITING_PER_PEER = 25;
+const OUTBOX_TTL_MS = 24 * 60 * 60_000;          // a message for an offline device waits this long
+const MAX_QUEUED = 200;                           // messages waiting to be sent, all devices                    // more than this waiting from one device: block the rest
 const SESSION_TTL_MS = 60 * 60_000;                   // fresh session keys at least hourly
 const SESSION_MAX_USES = 500;
 const MAX_IN_SESSIONS = 256;
@@ -201,6 +206,8 @@ export class Daemon {
     this.handshakeLimiter = new RateLimiter(30);
     this.peerMsgLimiter = new RateLimiter(120);
     this.peerSecretLimiter = new RateLimiter(10);
+    this.vaultFails = [];                              // times of wrong vault passphrases (5 a minute at most)
+    this.vault = new Vault({ load: () => this.store.vault(), save: r => this.store.saveVault(r) });
     this.chunkLimiter = new RateLimiter(600);       // file parts per device per minute
     this.audit = new AuditLog(this.store.home);
     this.secretUses = new Map();   // `vinac run` requests: id -> { names, command, cwd, status, expires, values? }
@@ -235,8 +242,13 @@ export class Daemon {
     const gen = this.peerGen = (this.peerGen || 0) + 1; // a newer check replaces this loop
     const run = async () => {
       let peers = [];
-      try { peers = this.store.peers().filter(p => p.address && p.keyLabel); } catch { /* reported elsewhere */ }
-      await Promise.all(peers.map(async p => this.setOnline(p.id, (await this.provesIdentity(p, p.address)) || !!(await this.tryAlternates(p)))));
+      try { peers = this.store.peers().filter(p => p.address && p.keyLabel); this.expireRequests(); } catch { /* reported elsewhere */ }
+      await Promise.all(peers.map(async p => {
+        const up = (await this.provesIdentity(p, p.address)) || !!(await this.tryAlternates(p));
+        this.setOnline(p.id, up);
+        if (up) await this.flushOutbox(p.id).catch(() => {});
+      }));
+      try { this.expireOutbox(); } catch { /* next round */ }
       if (gen === this.peerGen && this.lan?.listening) { this.peerTimer = setTimeout(run, PEER_CHECK_MS); this.peerTimer.unref?.(); }
     };
     run();
@@ -306,7 +318,7 @@ export class Daemon {
     const p = this.current();
     if (!p) return null;
     const v = {
-      role: p.role, state: p.state, message: p.error || STATE_TEXT[p.state], via: p.via,
+      role: p.role, state: p.state, message: p.error || STATE_TEXT[p.state], via: p.via, quiet: !!p.quiet,
       peer: p.peer ? { name: p.peer.name, fingerprint: p.peer.idPub ? formatFingerprint(fingerprint(p.peer.idPub)) : null } : null,
       confirmedHere: !!p.localConfirmed, confirmedThere: !!p.remoteConfirmed, attemptsLeft: CODE_ATTEMPTS - (p.attempts || 0),
       secondsLeft: TERMINAL.has(p.state) ? 0 : Math.max(0, Math.round((p.expiresAt - Date.now()) / 1000)),
@@ -387,13 +399,14 @@ export class Daemon {
 
   // ---- pairing: announcing device (plays the beacon) -----------------------
 
-  /** `over: 'tailscale'` puts the Tailscale address in the beacon, for a device on another network. */
-  startAnnounce({ over } = {}) {
+  /** `over: 'tailscale'` puts the Tailscale address in the beacon, for a device on another network.
+   *  `quiet`: the person chose to pair by typed code, so the page shows the code and plays no sound. */
+  startAnnounce({ over, quiet } = {}) {
     const ip = over === 'tailscale' ? this.tailscale : this.address;
     if (!ip) throw httpError(409, over === 'tailscale' ? 'Tailscale is not running on this device.' : 'This device has no local network address, so others cannot reach it.');
     const secret = randomBytes(8);
     const beacon = encodeBeacon({ ip, port: this.port, secret, fingerprint: this.me.fp });
-    return this.newPairing('announce', { state: 'announcing', id: rendezvousId(secret).toString('hex'), secret, beacon, via: 'sound' });
+    return this.newPairing('announce', { state: 'announcing', id: rendezvousId(secret).toString('hex'), secret, beacon, via: 'sound', quiet: !!quiet });
   }
 
   announcing(rid, states, req) {
@@ -896,6 +909,8 @@ export class Daemon {
       ...(m.intent ? { intent: m.intent, args: m.args ?? null } : {}),
       ...(m.firewall ? { firewall: m.firewall } : {}),
       ...(m.auto ? { auto: true } : {}),
+      ...(m.outbox ? { queued: true, queuedAt: m.outbox.queuedAt } : {}),
+      ...(m.undelivered ? { undelivered: m.undelivered } : {}),
     };
   }
 
@@ -938,11 +953,12 @@ export class Daemon {
     for (const p of peers) {
       try {
         const r = opts.file ? await this.sendFileTo(p, msg, by) : await this.sendOne(p, msg, by, opts);
-        results.push({ to: p.name, sent: true, id: r.id });
+        results.push({ to: p.name, sent: r.sent !== false, id: r.id, ...(r.queued ? { queued: true } : {}) });
       } catch (e) { results.push({ to: p.name, sent: false, error: e.message }); }
     }
     const ok = results.filter(r => r.sent).length;
-    return { sent: ok > 0, to: peers.map(p => p.name), results, note: `Delivered to ${ok} of ${peers.length} devices.` };
+    const waiting = results.filter(r => r.queued).length;
+    return { sent: ok > 0, to: peers.map(p => p.name), results, note: `Delivered to ${ok} of ${peers.length} devices.${waiting ? ` ${waiting} waiting to be sent when back online.` : ''}` };
   }
 
   /** A file (bytes) to one device: inside one message when small, else in sealed parts first. */
@@ -969,7 +985,48 @@ export class Daemon {
     return this.sendOne(peer, { text, replyTo, intent: FILE_SHARE }, by, { transfer: { ...meta, transfer, parts } });
   }
 
-  async sendOne(peer, { text, replyTo, intent, args }, by = 'agent', { auto = false, transfer = null } = {}) {
+  /** Sends what waits in the outbox for one device, oldest first; stops at the first failure. */
+  async flushOutbox(peerId) {
+    if (this.flushing?.has(peerId)) return;
+    (this.flushing ??= new Set()).add(peerId);
+    try {
+      for (;;) {
+        const list = this.store.messages();
+        const m = list.find(x => x.outbox && x.peer.id === peerId);
+        if (!m) return;
+        const peer = this.store.peers().find(p => p.id === peerId);
+        if (!peer) return;
+        const inner = { ...m.outbox.inner, sentAt: new Date().toISOString() };   // inside the other device's time window
+        await this.sendSealed(peer, 'msg', '/msg', inner.id, JSON.stringify(inner));
+        const now = this.store.messages();
+        const rec = now.find(x => x.id === m.id && x.outbox);
+        if (rec) { delete rec.outbox; rec.sentAt = inner.sentAt; rec.deliveredLate = true; this.store.saveMessages(now); }
+        this.audit.add('msg.out', { peer: { id: peer.id, name: peer.name }, id: m.id, intent: m.intent, by: m.by, chars: m.text.length, fromOutbox: true });
+        this.log(`queued message → ${peer.name} delivered`);
+        this.changed?.();
+      }
+    } finally { this.flushing.delete(peerId); }
+  }
+
+  /** Outbox messages older than a day are given up on (marked not delivered). */
+  expireOutbox() {
+    const list = this.store.messages();
+    const cutoff = Date.now() - OUTBOX_TTL_MS;
+    let changed = false;
+    for (const m of list) if (m.outbox && Date.parse(m.outbox.queuedAt) < cutoff) { delete m.outbox; m.undelivered = 'The device was not reachable for 24 hours.'; changed = true; }
+    if (changed) this.store.saveMessages(list);
+  }
+
+  cancelQueued(id) {
+    const list = this.store.messages();
+    const m = list.find(x => x.id === id && x.outbox);
+    if (!m) throw httpError(404, 'That message is no longer waiting.');
+    delete m.outbox; m.undelivered = 'Cancelled before it was sent.';
+    this.store.saveMessages(list);
+    this.audit.add('msg.cancelled', { peer: m.peer, id: m.id });
+  }
+
+  async sendOne(peer, { text, replyTo, intent, args }, by = 'agent', { auto = false, transfer = null, queue = true } = {}) {
     if (intent != null && intent !== '' && !isIntent(intent)) throw httpError(400, `"${intent}" is not a known intent. Use vinac_intents for the list, or send plain text.`);
     if (!intent && args != null) throw httpError(400, 'args need an intent.');
     // reqArgs: what is kept in history; sendArgs: what travels (a shared file's bytes only travel).
@@ -994,7 +1051,16 @@ export class Daemon {
       if (e.status && /UNKNOWN_INTENT/.test(e.message)) throw httpError(502, `${peer.name} does not know the intent "${intent}" yet (its intent catalog is older than ${LOGOS_VERSION}). Update VINAC Link there, or send plain text.`);
       if (e.status) throw httpError(502, `${peer.name} refused the message: ${e.message}`);
       this.setOnline(peer.id, false);
-      throw httpError(502, `Could not reach ${peer.name} at ${peer.address}. VINAC Link must be running there, on the same network, and allowed through its firewall.`);
+      const hint = macNetHint(e);
+      // Unreachable: keep it in the outbox (inside the encrypted history) and send it when the device is back.
+      if (queue && !auto && !transfer && intent !== FILE_SHARE && this.store.messages().filter(m => m.outbox).length < MAX_QUEUED) {
+        const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by, outbox: { inner, queuedAt: new Date().toISOString() } };
+        this.store.saveMessages([...this.store.messages(), rec]);
+        this.audit.add('msg.queued', { peer, id: inner.id, intent, by });
+        this.log(`message for ${peer.name} queued: not reachable now`);
+        return { sent: false, queued: true, delivered: false, ...this.messageView(rec), note: `${peer.name} is not reachable right now. The message waits on this device and is sent automatically when ${peer.name} is back (for up to 24 hours).${hint}` };
+      }
+      throw httpError(502, `Could not reach ${peer.name} at ${peer.address}. VINAC Link must be running there, on the same network, and allowed through its firewall.${hint}`);
     }
     const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by };
     this.store.saveMessages([...this.store.messages(), rec]);
@@ -1043,13 +1109,17 @@ export class Daemon {
     if (fileBytes) { args.file = this.store.fileId(); this.store.saveFile(args.file, fileBytes); }
     // The firewall decides here, before any agent could see it: requests by intent,
     // plain messages by the person's rule for plain text (default: deliver).
-    const { decision, source } = this.fw.decide(peer.id, inner.intent ?? null);
+    let { decision, source } = this.fw.decide(peer.id, inner.intent ?? null);
+    if (decision === 'ask' && this.store.messages().filter(m => m.dir === 'in' && m.peer.id === peer.id && m.firewall?.status === 'pending').length >= MAX_WAITING_PER_PEER) {
+      decision = 'block'; source = `more than ${MAX_WAITING_PER_PEER} requests from this device are already waiting`;
+    }
     if (inner.intent) Object.assign(rec, { intent: inner.intent, args, firewall: { status: FW_STATUS[decision], rule: source, at: now } });
     else if (decision !== 'allow') rec.firewall = { status: FW_STATUS[decision], rule: source, at: now };
     const list = [...this.store.messages(), rec];
     this.store.saveMessages(list);
     if (fileBytes) this.store.pruneFiles(new Set(list.slice(-500).map(m => m.args?.file).filter(Boolean)));
     this.setOnline(peer.id, true);
+    setImmediate(() => this.flushOutbox(peer.id).catch(() => {})); // it's back: send what waited for it
     this.log(`message ← ${peer.name} (${text.length} chars${rec.intent ? `, request ${rec.intent}` : ''}${rec.firewall ? `: ${rec.firewall.status}` : ''})`);
     this.audit.add('msg.in', { peer, id, intent: rec.intent, chars: text.length, firewall: rec.firewall?.status || 'delivered', rule: rec.firewall?.rule, ...(args?.size ? { fileBytes: args.size } : {}), ...(rec.auto ? { auto: true } : {}) });
     if (agentVisible(rec)) { for (const w of this.waiters) w(); this.auto.consider(rec); }
@@ -1140,7 +1210,7 @@ export class Daemon {
     const now = new Date().toISOString();
     for (const n of u.names) {
       const s = store.items.filter(x => x.name === n && !x.pending).at(-1);
-      if (s) { values[n] = unprotect(s.keystore, s.keyLabel, s.wrapped).toString('utf8'); s.lastUsedAt = now; }
+      if (s) { values[n] = this.readValue(s).toString('utf8'); s.lastUsedAt = now; }
     }
     this.store.saveSecrets(store);
     this.audit.add('secret.used', { names: u.names, command: u.command.slice(0, 120) });
@@ -1148,6 +1218,7 @@ export class Daemon {
   }
 
   decideSecretUse(id, approve) {
+    if (approve && this.vault.protected && !this.vault.unlocked) throw httpError(423, 'VAULT_LOCKED: unlock the vault on this device first.');
     const u = this.secretUses.get(String(id));
     if (!u || u.status !== 'pending' || u.expires < Date.now()) throw httpError(404, 'That request is no longer waiting.');
     u.status = approve ? 'approved' : 'denied';
@@ -1162,21 +1233,27 @@ export class Daemon {
   }
 
   /** The person approves or rejects a request that waits for them. */
-  decideRequest(id, approve) {
+  decideRequest(id, approve, { forMinutes } = {}) {
+    this.expireRequests();
     const list = this.store.messages();
     const m = list.find(x => x.id === id && x.dir === 'in' && x.firewall);
     if (!m) throw httpError(404, 'No such request.');
+    if (m.firewall.status === 'expired') throw httpError(409, 'This request expired: nobody decided on it for 3 days. Ask the other device to send it again.');
     if (m.firewall.status !== 'pending') throw httpError(409, 'This request is not waiting for a decision.');
-    m.firewall = { ...m.firewall, status: approve ? 'approved' : 'rejected', decidedAt: new Date().toISOString(), decidedBy: 'person on this device' };
+    // "Approve and allow for a while": the same intent from the same device is allowed until then (never high risk).
+    let allowedUntil = null;
+    if (approve && forMinutes) allowedUntil = new Date(this.fw.allowFor(m.peer.id, m.intent ?? null, Number(forMinutes) * 60_000)).toISOString();
+    m.firewall = { ...m.firewall, status: approve ? 'approved' : 'rejected', decidedAt: new Date().toISOString(), decidedBy: 'person on this device', ...(allowedUntil ? { allowedUntil } : {}) };
     this.store.saveMessages(list);
     this.log(`${m.intent ? `request ${m.intent}` : 'message'} from ${m.peer.name}: ${m.firewall.status} by the person`);
-    this.audit.add('request.decided', { peer: m.peer, id: m.id, intent: m.intent, status: m.firewall.status });
+    this.audit.add('request.decided', { peer: m.peer, id: m.id, intent: m.intent, status: m.firewall.status, ...(allowedUntil ? { allowedUntil } : {}) });
     if (approve) { for (const w of this.waiters) w(); this.auto.consider(m); }
     return this.messageView(m);
   }
 
   /** Requests and held/blocked messages received, newest first, for the page's firewall view. */
   requests() {
+    this.expireRequests();
     return this.store.messages().filter(m => m.dir === 'in' && (m.intent || m.firewall)).slice(-100).reverse()
       .map(m => ({ ...this.messageView(m), risk: m.intent ? riskOf(m.intent) : 'text' }));
   }
@@ -1191,6 +1268,21 @@ export class Daemon {
   }
 
   pendingCount() { return this.store.messages().filter(m => m.dir === 'in' && m.firewall?.status === 'pending').length; }
+
+  /** Requests nobody decided on for ASK_TTL_MS expire: they never reach the agent. */
+  expireRequests() {
+    const list = this.store.messages();
+    const cutoff = Date.now() - ASK_TTL_MS;
+    let changed = false;
+    for (const m of list) {
+      if (m.dir === 'in' && m.firewall?.status === 'pending' && Date.parse(m.receivedAt) < cutoff) {
+        m.firewall = { ...m.firewall, status: 'expired', decidedAt: new Date().toISOString(), decidedBy: 'expired after 3 days' };
+        this.audit.add('request.expired', { peer: m.peer, id: m.id, intent: m.intent });
+        changed = true;
+      }
+    }
+    if (changed) this.store.saveMessages(list);
+  }
 
   lanUnpair(body, req) {
     const { peer, plain, receipt } = this.receiveSealed(body, req, 'unpair');
@@ -1344,12 +1436,12 @@ export class Daemon {
       const s = this.store.secrets();
       if (s.items.length >= MAX_SECRETS) throw httpError(507, `This device already holds ${MAX_SECRETS} secrets. Delete some first.`);
       const label = `agentlink.secret.${id}`;
-      const w = protect(detectKeystore(), label, plain.subarray(13 + nl)); // fails closed
+      const w = this.wrapValue(label, plain.subarray(13 + nl)); // fails closed; sealed to the vault when it has a passphrase
       const existing = s.items.find(x => x.from.id === peer.id && x.name === name && !x.pending);
       // An earlier unapproved replacement for the same name is superseded.
       for (const old of s.items.filter(x => x.from.id === peer.id && x.name === name && x.pending)) forget(old.keystore, old.keyLabel);
       s.items = s.items.filter(x => !(x.from.id === peer.id && x.name === name && x.pending));
-      const item = { id, name, from, receivedAt: new Date().toISOString(), sentAt: new Date(sentAt).toISOString(), via, keystore: w.kind, keyLabel: label, wrapped: w.stored };
+      const item = { id, name, from, receivedAt: new Date().toISOString(), sentAt: new Date(sentAt).toISOString(), via, keystore: w.kind, keyLabel: label, wrapped: w.stored, ...(w.vault ? { vault: true } : {}) };
       if (existing) Object.assign(item, { pending: true, replaces: existing.id });
       s.items.push(item);
       this.store.saveSecrets(s);
@@ -1409,6 +1501,69 @@ export class Daemon {
     return this.store.secrets().items.map(s => ({ id: s.id, name: s.name, from: s.from, receivedAt: s.receivedAt, via: s.via, keystore: s.keystore, pending: !!s.pending, own: !!s.own, lastUsedAt: s.lastUsedAt || null }));
   }
 
+  // ---- the vault lock: values sealed to a key only the person's passphrase opens ----
+
+  /** Stores a value in the OS key store, sealed to the vault first when it has a passphrase. */
+  wrapValue(label, bytes) {
+    const pub = this.vault.publicRaw();
+    const data = pub ? sealTo(pub, label, bytes) : bytes;
+    try { return { ...protect(detectKeystore(), label, data), vault: !!pub }; } finally { if (pub) data.fill(0); }
+  }
+
+  /** Reads a stored value. With a passphrase set, the vault must be unlocked. */
+  readValue(item) {
+    if (this.vault.protected) this.vault.privateKey();       // throws VAULT_LOCKED (423) while locked
+    const raw = unprotect(item.keystore, item.keyLabel, item.wrapped);
+    if (!item.vault) return raw;
+    try { return openWith(this.vault.privateKey(), this.vault.publicRaw(), item.keyLabel, raw); } finally { raw.fill(0); }
+  }
+
+  /** Re-wraps every stored secret with (or without) the vault seal. */
+  rewrapSecrets(seal) {
+    const s = this.store.secrets();
+    for (const item of s.items) {
+      if (!!item.vault === seal) continue;
+      const plain = this.readValue(item);
+      try {
+        const pub = seal ? this.vault.publicRaw() : null;
+        const data = seal ? sealTo(pub, item.keyLabel, plain) : plain;
+        const w = protect(detectKeystore(), item.keyLabel, data);
+        Object.assign(item, { keystore: w.kind, wrapped: w.stored });
+        if (seal) item.vault = true; else delete item.vault;
+      } finally { plain.fill(0); }
+    }
+    this.store.saveSecrets(s);
+    return s.items.length;
+  }
+
+  vaultAction(action, { passphrase } = {}) {
+    if (action === 'lock') { this.vault.lock(); this.audit.add('vault.locked', {}); return this.vault.view(); }
+    this.vaultFails = this.vaultFails.filter(t => t > Date.now() - 60_000);
+    if (this.vaultFails.length >= 5) throw httpError(429, 'Too many wrong passphrases. Wait a minute.');
+    try { return this.vaultStep(action, passphrase); }
+    catch (e) { if (e.status === 403) this.vaultFails.push(Date.now()); throw e; }
+  }
+
+  vaultStep(action, passphrase) {
+    if (action === 'setup') {
+      checkPassphrase(passphrase);
+      this.vault.create(passphrase);
+      const n = this.rewrapSecrets(true);
+      this.audit.add('vault.passphrase.set', { secrets: n });
+      this.log(`vault: passphrase set, ${n} secret(s) sealed`);
+    } else if (action === 'unlock') {
+      this.vault.unlock(String(passphrase ?? ''));
+      this.audit.add('vault.unlocked', {});
+    } else if (action === 'remove') {
+      this.vault.unlock(String(passphrase ?? ''));       // proves the person knows it
+      const n = this.rewrapSecrets(false);
+      this.vault.remove();
+      this.audit.add('vault.passphrase.removed', { secrets: n });
+      this.log(`vault: passphrase removed, ${n} secret(s) back in the key store only`);
+    } else throw httpError(404, 'Not found');
+    return this.vault.view();
+  }
+
   // ---- the vault: secrets the person adds here, and sending stored ones on ---------
   // Only the page (the person) can add or send; agent tools still see names only.
 
@@ -1425,11 +1580,11 @@ export class Daemon {
       if (s.items.length - old.length >= MAX_SECRETS) throw httpError(507, `This device already holds ${MAX_SECRETS} secrets. Delete some first.`);
       const id = randomBytes(8).toString('hex');
       const label = `agentlink.secret.${id}`;
-      const w = protect(detectKeystore(), label, v); // fails closed
+      const w = this.wrapValue(label, v); // fails closed; sealed to the vault when it has a passphrase
       for (const o of old) forget(o.keystore, o.keyLabel);
       s.items = s.items.filter(x => !(x.own && x.name === n));
       const from = { id: this.meId, name: this.device().name };
-      s.items.push({ id, name: n, from, own: true, receivedAt: new Date().toISOString(), via: 'added', keystore: w.kind, keyLabel: label, wrapped: w.stored });
+      s.items.push({ id, name: n, from, own: true, receivedAt: new Date().toISOString(), via: 'added', keystore: w.kind, keyLabel: label, wrapped: w.stored, ...(w.vault ? { vault: true } : {}) });
       this.store.saveSecrets(s);
       this.audit.add('secret.added', { name: n, ...(old.length ? { replaced: true } : {}) });
       this.log(`secret "${n}" added on this device${old.length ? ' (replaced)' : ''}`);
@@ -1441,7 +1596,7 @@ export class Daemon {
   storedValue(id) {
     const { item } = this.findSecret(String(id));
     if (item.pending) throw httpError(409, 'Approve or reject this replacement first.');
-    return { name: item.name, value: unprotect(item.keystore, item.keyLabel, item.wrapped).toString('utf8') };
+    return { name: item.name, value: this.readValue(item).toString('utf8') };
   }
 
   findSecret(id) {
@@ -1454,7 +1609,7 @@ export class Daemon {
   revealSecret(id) {
     const { item } = this.findSecret(String(id));
     this.audit.add('secret.revealed', { name: item.name, from: item.from, by: 'person on the page' });
-    return { id: item.id, name: item.name, value: unprotect(item.keystore, item.keyLabel, item.wrapped).toString('utf8') };
+    return { id: item.id, name: item.name, value: this.readValue(item).toString('utf8') };
   }
 
   approveSecret(id) {
@@ -1522,7 +1677,7 @@ export class Daemon {
     const state = extra => ({
       device: this.device(), pairing: this.pairingView({ forHuman: true }), peers: this.peers(), conversations: this.conversations(),
       secrets: this.secretsView(), receiving: this.receiving() ? Math.round((this.receiveUntil - Date.now()) / 1000) : 0,
-      waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), ...extra,
+      waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), vaultLock: this.vault.view(), ...extra,
     });
     if (req.method === 'POST' && url.pathname === '/ui/send-file') {
       // The person attaches a file in a conversation (raw bytes; name and device in the query).
@@ -1545,6 +1700,9 @@ export class Daemon {
       case 'POST /ui/secret/receive': this.setReceiving(body.on !== false); break;
       case 'POST /ui/secret/heard': return sendJson(res, 200, this.receiveSecret(fromHex(String(body.hex || '')), 'sound'));
       case 'POST /ui/secrets/reveal': return sendJson(res, 200, this.revealSecret(body.id));
+      case 'POST /ui/outbox/cancel': this.cancelQueued(String(body.id ?? '')); return sendJson(res, 200, state({}));
+      case 'POST /ui/vault/setup': case 'POST /ui/vault/unlock': case 'POST /ui/vault/lock': case 'POST /ui/vault/remove':
+        return sendJson(res, 200, state({ vault: this.vaultAction(url.pathname.split('/').pop(), body) }));
       case 'POST /ui/secrets/add': return sendJson(res, 200, state({ added: this.addSecret(body) }));
       // Send a stored secret on: the value goes from the key store into the sealed frame here,
       // and never through the page.
@@ -1563,7 +1721,7 @@ export class Daemon {
       case 'GET /ui/messages': return sendJson(res, 200, { messages: this.thread(String(url.searchParams.get('peer') || '')) });
       case 'POST /ui/send': return sendJson(res, 200, state({ sent: await this.send(body, 'person') }));
       case 'POST /ui/ping': this.checkPeers(); break;
-      case 'POST /ui/announce': this.startAnnounce({ over: body.over === 'tailscale' ? 'tailscale' : undefined }); break;
+      case 'POST /ui/announce': this.startAnnounce({ over: body.over === 'tailscale' ? 'tailscale' : undefined, quiet: body.quiet === true }); break;
       case 'POST /ui/listen': this.startListen(); break;
       case 'POST /ui/heard': this.heard(body); break;
       case 'POST /ui/confirm': await this.confirm(body.code); break;
@@ -1571,7 +1729,15 @@ export class Daemon {
       case 'POST /ui/unpair': return sendJson(res, 200, state({ unpaired: await this.unpair(String(body.id)) }));
       // Firewall: only the page (the person) can read or change rules and decide requests.
       case 'GET /ui/firewall':
-        return sendJson(res, 200, { logos: LOGOS_VERSION, intents: this.fw.view(this.store.peers()), peers: this.peers().map(p => ({ id: p.id, name: p.name })), requests: this.requests(), autoReply: this.auto.view(this.store.peers()) });
+        return sendJson(res, 200, { logos: LOGOS_VERSION, intents: this.fw.view(this.store.peers()), modes: this.fw.modesView(this.store.peers()), peers: this.peers().map(p => ({ id: p.id, name: p.name })), requests: this.requests(), autoReply: this.auto.view(this.store.peers()) });
+      case 'POST /ui/firewall/mode':
+        this.fw.setMode(String(body.scope ?? ''), String(body.mode ?? ''), this.store.peers().map(p => p.id));
+        this.audit.add('mode.changed', { scope: String(body.scope), mode: String(body.mode) });
+        return sendJson(res, 200, { ok: true, intents: this.fw.view(this.store.peers()), modes: this.fw.modesView(this.store.peers()) });
+      case 'POST /ui/firewall/temporary/clear':
+        this.fw.clearTemporary(body.peer ? String(body.peer) : null);
+        this.audit.add('temporary.cleared', { peer: body.peer ? String(body.peer) : 'all' });
+        return sendJson(res, 200, { ok: true, modes: this.fw.modesView(this.store.peers()) });
       // Auto-reply settings: the person only (agent tools have no route for them).
       case 'POST /ui/autoreply':
         this.auto.set(body, this.store.peers().map(p => p.id));
@@ -1588,7 +1754,7 @@ export class Daemon {
         return res.end(bytes);
       }
       case 'POST /ui/firewall/decide':
-        return sendJson(res, 200, state({ request: this.decideRequest(String(body.id ?? ''), body.approve === true) }));
+        return sendJson(res, 200, state({ request: this.decideRequest(String(body.id ?? ''), body.approve === true, { forMinutes: body.forMinutes }) }));
       default: throw httpError(404, 'Not found');
     }
     sendJson(res, 200, state());
@@ -1732,5 +1898,12 @@ function friendlyNetError(e, target) {
   if (e.status === 404) return 'The other device is no longer waiting for this pairing. Start again on both devices.';
   if (e.status === 400 && /UNSUPPORTED_VERSION/.test(e.message)) return 'The other device runs a different VINAC Link version. Update both devices.';
   if (e.status) return `The other device refused: ${e.message}`;
-  return `Could not reach the other device at ${target.replace('http://', '')}. Both need to be on the same network, and its firewall must allow VINAC Link.`;
+  return `Could not reach the other device at ${target.replace('http://', '')}. Both need to be on the same network, and its firewall must allow VINAC Link.${macNetHint(e)}`;
+}
+
+/** macOS blocks apps from the local network until the person allows it (Privacy & Security, Local Network). */
+function macNetHint(e) {
+  if (process.platform !== 'darwin') return '';
+  const t = `${e?.code} ${e?.cause?.code} ${e?.message} ${e?.cause?.message}`;
+  return /EHOSTUNREACH|ENETUNREACH|No route to host/i.test(t) ? ' On this Mac, allow VINAC Link in System Settings > Privacy & Security > Local Network, then quit and reopen it.' : '';
 }

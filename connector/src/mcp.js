@@ -47,7 +47,7 @@ export const TOOLS = [
   },
   {
     name: 'vinac_send',
-    description: 'Send a message to the AI agent on a paired device. The message is encrypted so only that device can read it, and it arrives in that device\'s VINAC Link inbox. `to` is the device name, id or fingerprint from vinac_peers (may be left out when only one device is paired); it can also be "all", a group name, or several names separated by commas (one result per device). Set replyTo to the id of a received message when answering it. To ask the other device to DO something, also set `intent` (an intent from vinac_intents) and `args`: the other device\'s firewall then lets its agent see the request, holds it for its person\'s approval, or blocks it. Fails if the other device is off or unreachable; it is not queued.',
+    description: 'Send a message to the AI agent on a paired device. The message is encrypted so only that device can read it, and it arrives in that device\'s VINAC Link inbox. `to` is the device name, id or fingerprint from vinac_peers (may be left out when only one device is paired); it can also be "all", a group name, or several names separated by commas (one result per device). Set replyTo to the id of a received message when answering it. To ask the other device to DO something, also set `intent` (an intent from vinac_intents) and `args`: the other device\'s firewall then lets its agent see the request, holds it for its person\'s approval, or blocks it. If the other device is off or unreachable, a message or request waits on this device (queued: true) and is sent automatically when it is back, for up to 24 hours; files are not queued.',
     inputSchema: {
       type: 'object',
       properties: {

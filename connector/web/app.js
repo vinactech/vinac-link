@@ -274,7 +274,11 @@ function messageEl(m, cont, q) {
     const f = text('span', '· Not delivered'); f.className = 'fail'; f.title = m.error || ''; meta.append(f);
     meta.append(button('Retry', () => { pending = pending.filter(x => x !== m); sendMessage(m.text, m.replyTo); }));
     meta.append(button('Discard', () => { pending = pending.filter(x => x !== m); renderThread(); }));
-  } else if (out) meta.append(text('span', '· Delivered'));
+  } else if (out && m.queued) {
+    const q = text('span', '· Waiting to send: device offline'); q.className = 'queued'; q.title = 'Sent automatically when the device is back, for up to 24 hours.';
+    meta.append(q, button('Cancel', async () => { try { render(await api('POST', '/ui/outbox/cancel', { id: m.id })); loadThread?.(); } catch (e) { toast(e.message); } }));
+  } else if (out && m.undelivered) { const f = text('span', '· Not delivered'); f.className = 'fail'; f.title = m.undelivered; meta.append(f); }
+  else if (out) meta.append(text('span', '· Delivered'));
   else if (m.firewall && !['allowed', 'approved'].includes(m.firewall.status)) {
     const f = button(`· ${FW_LABEL[m.firewall.status]}`, () => openFirewall());
     f.className = `linkish fw-${m.firewall.status}`; meta.append(f);
@@ -381,9 +385,10 @@ function renderUses() {
 
 function renderSecrets(force = false) {
   const q = ($('secretSearch').value || '').trim().toLowerCase();
-  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q;
+  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock);
   if (key === secretsKey && !force) return;
   secretsKey = key;
+  renderVaultLock();
   renderUses();
   const list = $('secretList'); list.replaceChildren();
   $('secretSearch').hidden = state.secrets.length < 4 && !q;
@@ -409,8 +414,15 @@ function renderSecrets(force = false) {
     const copy = button('Copy', async () => {
       try {
         const r = await api('POST', '/ui/secrets/reveal', { id: s.id });
-        await navigator.clipboard.writeText(r.value);
-        toast(`${s.name} copied. Paste it where it's needed, then copy something else to clear it.`);
+        let value = r.value;
+        await navigator.clipboard.writeText(value);
+        toast(`${s.name} copied. It is cleared from the clipboard in 30 seconds.`);
+        // Clear it after 30 s, but only if it is still what's on the clipboard.
+        setTimeout(async () => {
+          try { if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText(''); }
+          catch { if (document.hasFocus()) navigator.clipboard.writeText('').catch(() => {}); }
+          value = null;
+        }, 30_000);
       } catch (e) { toast(e.message.includes('clipboard') ? 'Could not copy.' : e.message); }
     });
     const del = button(s.pending ? 'Reject' : 'Delete', () => {
@@ -436,6 +448,54 @@ function showSecret(r) {
   showSecret.timer = setTimeout(hideSecret, 30_000); // hide again after 30 s
   renderSecrets(true);
 }
+// The vault lock: an optional passphrase. Locked, nothing can read the values, not even programs running as you.
+async function vaultDo(action, passphrase) {
+  try {
+    render(await api('POST', `/ui/vault/${action}`, passphrase ? { passphrase } : {}));
+    toast({ setup: 'Passphrase set. Your secrets are sealed; the vault locks itself after 15 minutes.', unlock: 'Vault unlocked for 15 minutes.', lock: 'Vault locked.', remove: 'Passphrase removed. Secrets are in the key store only.' }[action]);
+    renderSecrets(true);
+    return true;
+  } catch (e) { toast(e.message); return false; }
+}
+function vaultForm(label, button1, action, hint) {
+  const f = document.createElement('form'); f.className = 'vault-form';
+  const i = document.createElement('input'); i.type = 'password'; i.autocomplete = action === 'setup' ? 'new-password' : 'current-password'; i.placeholder = label; i.setAttribute('aria-label', label);
+  const b = document.createElement('button'); b.className = 'primary small-btn'; b.textContent = button1;
+  f.append(i, b);
+  f.onsubmit = async e => {
+    e.preventDefault();
+    const v = i.value; i.value = '';
+    if (action === 'setup') {
+      if ([...v].length < 8) return toast('Choose at least 8 characters.');
+      const again = prompt('Type the passphrase again to confirm. If you forget it, the values are lost (send them again from another device).');
+      if (again !== v) return toast('The two passphrases differ. Nothing changed.');
+    }
+    await vaultDo(action, v);
+  };
+  if (hint) f.append(text('small', hint));
+  return f;
+}
+function renderVaultLock() {
+  const box = $('vaultLock'); const v = state?.vaultLock;
+  if (!box || !v) return;
+  box.replaceChildren(); box.className = `vault-lock ${!v.protected ? 'off' : v.locked ? 'locked' : 'open'}`;
+  const head = document.createElement('div'); head.className = 'vl-head';
+  if (!v.protected) {
+    head.append(text('b', 'Lock the vault with a passphrase'), text('small', 'Recommended. Values get sealed with a key only your passphrase opens, so no other program can read them while the vault is locked. Receiving still works.'));
+    box.append(head, vaultForm('New passphrase (8+ characters)', 'Set passphrase', 'setup'));
+  } else if (v.locked) {
+    head.append(text('b', 'Vault locked'), text('small', 'Unlock to reveal, copy or send a secret, or to approve a program run. New secrets still arrive.'));
+    box.append(head, vaultForm('Passphrase', 'Unlock', 'unlock'));
+  } else {
+    const until = new Date(v.unlockedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    head.append(text('b', `Vault unlocked until ${until}`), text('small', 'It locks itself after 15 minutes.'));
+    const row = document.createElement('div'); row.className = 'row';
+    const lock = button('Lock now', () => vaultDo('lock')); lock.className = 'ghost small-btn';
+    const off = button('Remove passphrase…', () => { const p = prompt('Type your passphrase to remove it. Secrets then rely on the OS key store only.'); if (p) vaultDo('remove', p); }); off.className = 'linkish';
+    row.append(lock, off);
+    box.append(head, row);
+  }
+}
 function hideSecret() { shownSecret = null; clearTimeout(showSecret.timer); if (state) renderSecrets(true); }
 
 $('secretsNav').onclick = () => { wantSecrets = true; wantPair = false; wantFirewall = false; mobileMain = true; render(state); };
@@ -443,7 +503,7 @@ $('secretsBackBtn').onclick = () => { wantSecrets = false; mobileMain = false; h
 
 // ---- firewall: requests (intents) from paired devices ---------------------
 
-const FW_LABEL = { pending: 'Waiting for you', blocked: 'Blocked by your firewall', rejected: 'Rejected by you', allowed: 'Allowed by a rule', approved: 'Approved by you' };
+const FW_LABEL = { pending: 'Waiting for you', blocked: 'Blocked by your firewall', rejected: 'Rejected by you', allowed: 'Allowed by your firewall', approved: 'Approved by you', expired: 'Expired: nobody decided' };
 const RISK_LABEL = { text: 'Plain messages', info: 'Asks or tells something', read: 'Looks things up', change: 'Creates or changes things', high: 'Changes files or runs commands' };
 const INTENT_LABEL = { '@text': 'Plain messages (no intent)' };
 const kb = n => (n < 1024 ? `${n} B` : `${(n / 1024).toFixed(n < 10240 ? 1 : 0)} KB`);
@@ -587,8 +647,12 @@ function requestItem(r) {
   if (r.firewall.status === 'pending') {
     const yes = button('Approve', () => decide(r, true)); yes.className = 'primary small-btn';
     const no = button('Reject', () => decide(r, false)); no.className = 'ghost';
-    row.append(yes, no);
+    row.append(yes);
+    // Approve, and let the same kind of request from this device through for an hour (never high risk).
+    if (r.risk !== 'high') { const hour = button('Approve for 1 hour', () => decide(r, true, 60)); hour.className = 'ghost'; hour.title = `Also allow ${r.intent || 'plain messages'} from ${r.peer.name} for the next hour`; row.append(hour); }
+    row.append(no);
   }
+  if (r.firewall.allowedUntil) meta.textContent += ` · allowed until ${new Date(r.firewall.allowedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
   li.append(name, row, meta);
   if (r.intent === 'document.file.share' && r.args?.file) {
     // A shared file: show what it is, and let the person look before approving.
@@ -605,10 +669,12 @@ function requestItem(r) {
   return li;
 }
 
-async function decide(r, approve) {
+async function decide(r, approve, forMinutes) {
   try {
-    render(await api('POST', '/ui/firewall/decide', { id: r.id, approve }));
-    toast(approve ? `Approved. Your agent can now see ${r.intent || 'the message'} from ${r.peer.name}.` : 'Rejected. Your agent will not see it.');
+    render(await api('POST', '/ui/firewall/decide', { id: r.id, approve, ...(forMinutes ? { forMinutes } : {}) }));
+    toast(!approve ? 'Rejected. Your agent will not see it.' : forMinutes
+      ? `Approved. ${r.intent || 'Plain messages'} from ${r.peer.name} also go straight through for the next hour.`
+      : `Approved. Your agent can now see ${r.intent || 'the message'} from ${r.peer.name}.`);
     loadFirewall(true);
   } catch (e) { toast(e.message); }
 }
@@ -631,8 +697,46 @@ function renderFirewall() {
   scope.replaceChildren(new Option('All devices', '*'), ...fw.peers.map(p => new Option(p.name, p.id)));
   scope.value = fwScope;
 
+  renderModes();
   renderRules();
   renderAutoReply();
+}
+
+// Modes: the defaults by risk, for all devices or one device. Rules the person set still win.
+const MODE_INFO = {
+  restricted: ['Restricted', 'Everything waits for you, even questions and plain messages. Changes and high-risk requests are blocked.'],
+  standard: ['Standard', 'Questions, status and messages go through. Reads and changes wait for you. High risk is blocked.'],
+  auto: ['Auto', 'For your own trusted devices: questions, messages and reads go through. Changes wait for you. High risk is still blocked.'],
+};
+function renderModes() {
+  const box = $('fwModes'); const m = fw.modes;
+  if (!box || !m) return;
+  box.replaceChildren();
+  const cur = fwScope === '*' ? m.all : (m.devices[fwScope] || 'default');
+  const who = fwScope === '*' ? 'all devices' : (fw.peers.find(p => p.id === fwScope)?.name || 'this device');
+  const seg = document.createElement('div'); seg.className = 'mode-seg'; seg.setAttribute('role', 'radiogroup'); seg.setAttribute('aria-label', `Mode for ${who}`);
+  const opts = fwScope === '*' ? Object.keys(MODE_INFO) : ['default', ...Object.keys(MODE_INFO)];
+  for (const k of opts) {
+    const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(k === cur));
+    b.className = k === cur ? 'on' : '';
+    b.textContent = k === 'default' ? `Same as all (${MODE_INFO[m.all][0]})` : MODE_INFO[k][0];
+    b.onclick = async () => {
+      if (k === cur) return;
+      try { await api('POST', '/ui/firewall/mode', { scope: fwScope, mode: k }); toast(`${k === 'default' ? 'Follows the mode for all devices' : `${MODE_INFO[k][0]} mode`} for ${who}.`); loadFirewall(true); }
+      catch (e) { toast(e.message); }
+    };
+    seg.append(b);
+  }
+  const eff = cur === 'default' ? m.all : cur;
+  const hint = text('p', `${MODE_INFO[eff][1]} Rules you set below still win. Applies to ${who}; change "Rules for" to set one device.`); hint.className = 'hint small';
+  box.append(seg, hint);
+  const temp = fwScope === '*' ? Object.entries(m.temporary) : Object.entries(m.temporary).filter(([p]) => p === fwScope);
+  if (temp.length) {
+    const names = temp.flatMap(([p, x]) => Object.entries(x).map(([k, u]) => `${k === '@text' ? 'plain messages' : k} from ${fw.peers.find(q => q.id === p)?.name || p} until ${new Date(u).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`));
+    const t = text('p', `Allowed for a while: ${names.join('; ')}. `); t.className = 'hint small';
+    const end = button('End now', async () => { try { await api('POST', '/ui/firewall/temporary/clear', fwScope === '*' ? {} : { peer: fwScope }); loadFirewall(true); } catch (e) { toast(e.message); } });
+    end.className = 'linkish'; t.append(end); box.append(t);
+  }
 }
 
 // Auto-reply: per device Off / Questions & status, limits, and a log of runs.
@@ -956,9 +1060,20 @@ function renderPairing(p) {
   card.dataset.viewNow = view;
   $('cancelRow').hidden = view === 'idle';
   $('timeLeft').textContent = p && p.secondsLeft ? `Times out in ${Math.floor(p.secondsLeft / 60)}:${String(p.secondsLeft % 60).padStart(2, '0')}` : '';
-  $('speakerCard').hidden = !(view === 'idle' || view === 'announcing');
+  $('speakerCard').hidden = !(view === 'idle' || (view === 'announcing' && !p?.quiet));
+  if (view !== 'idle') $('idleCodeForm').hidden = true;
 
-  if (view === 'announcing') $('beaconCode').textContent = p.beaconCode || '';
+  if (view === 'announcing') {
+    $('beaconCode').textContent = p.beaconCode || '';
+    // Pairing by code: no sound, the code is the main thing on screen.
+    $('announceTitle').textContent = p.quiet ? 'Your pairing code' : 'Playing the sound';
+    $('announceText').textContent = p.quiet ? 'Waiting for the other device…' : 'Playing the pairing sound…';
+    $('announceHint').innerHTML = p.quiet
+      ? 'On the other device, open VINAC Link, press <b>Pair a device</b>, then <b>Enter a code</b>, and type this:'
+      : 'On the other device, open VINAC Link, press <b>Pair a device</b>, then <b>Listen for it</b>. The sound repeats until it is heard.';
+    $('codeBox').classList.toggle('plain', !!p.quiet);
+    if (p.quiet) $('codeBox').open = true;
+  }
   if (view === 'connecting') $('connectText').textContent = p.message;
   if (view === 'comparing') {
     $('digits').textContent = p.showCode ? `${p.showCode.slice(0, 3)} ${p.showCode.slice(3)}` : '--- ---';
@@ -1004,7 +1119,7 @@ let playing = false, listening = false, micBlocked = false, chunks = [], samples
 let listenMode = null; // 'pair' (beacon) or 'secret'
 
 function syncAudio(p) {
-  if (p?.state === 'announcing' && !playing) playLoop(p.beaconHex);
+  if (p?.state === 'announcing' && !p.quiet && !playing) playLoop(p.beaconHex);
   if (listenMode === 'secret') return; // the secret dialog owns the microphone
   if (p?.state === 'listening' && !listening && !micBlocked) startListening('pair');
   if (p?.state !== 'listening') { micBlocked = false; if (listening) stopListening(); }
@@ -1293,6 +1408,9 @@ $('secretForm').onsubmit = async e => {
 
 $('announceBtn').onclick = async () => { await engine.ensureContext().catch(() => {}); act('POST', '/ui/announce'); };
 $('listenBtn').onclick = () => act('POST', '/ui/listen');
+$('showCodeBtn').onclick = () => act('POST', '/ui/announce', { quiet: true });
+$('enterCodeBtn').onclick = () => { const f = $('idleCodeForm'); f.hidden = !f.hidden; if (!f.hidden) $('idleCodeInput').focus(); };
+$('idleCodeForm').onsubmit = e => { e.preventDefault(); const code = $('idleCodeInput').value.trim(); if (code) { $('idleCodeInput').value = ''; act('POST', '/ui/heard', { code }); } };
 $('announceTsBtn').onclick = async () => { await engine.ensureContext().catch(() => {}); act('POST', '/ui/announce', { over: 'tailscale' }); };
 $('compareActions').onsubmit = async e => {
   e.preventDefault();

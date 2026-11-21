@@ -69,7 +69,7 @@ test('defaults: read/change requests wait for the person; high-risk ones are blo
     const fw = (await ui(A, 'GET', '/ui/firewall')).body;
     const byIntent = Object.fromEntries(fw.requests.map(r => [r.intent, r.firewall.status]));
     assert.deepEqual(byIntent, { 'crm.contact.read': 'pending', 'system.command.execute': 'blocked' });
-    assert.equal(fw.requests.find(r => r.intent === 'system.command.execute').firewall.rule, 'default');
+    assert.equal(fw.requests.find(r => r.intent === 'system.command.execute').firewall.rule, 'standard mode');
 
     // The hook tells the agent a decision is waiting, without the request itself.
     const ctx = await sessionStartContext({ home: A.homeDir });
@@ -124,7 +124,7 @@ test('rules: per device beats all devices beats default, and one device\'s rule 
     const seen = (await inbox(A)).messages.map(m => `${m.peer.name}:${m.intent}`).sort();
     assert.deepEqual(seen, ['FW B:calendar.appointment.list', 'FW B:crm.task.create']);
     const status = Object.fromEntries((await ui(A, 'GET', '/ui/firewall')).body.requests.map(r => [`${r.peer.name}:${r.intent}`, `${r.firewall.status} (${r.firewall.rule})`]));
-    assert.equal(status['FW C:calendar.appointment.list'], 'pending (default)');
+    assert.equal(status['FW C:calendar.appointment.list'], 'pending (standard mode)');
     assert.equal(status['FW C:crm.task.create'], 'blocked (rule for all devices)');
     assert.equal(status['FW B:crm.task.create'], 'allowed (device rule)');
 

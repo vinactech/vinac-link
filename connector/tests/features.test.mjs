@@ -49,7 +49,8 @@ test('other addresses (e.g. Tailscale): kept as candidates, used only where the 
     // A candidate where a different device answers is never adopted.
     const list2 = B.store.peers(); const recA = list2.find(p => p.name === 'F A');
     recA.address = '127.0.0.1:1'; recA.alt = [`127.0.0.1:${C.port}`]; B.store.savePeers(list2);
-    assert.equal((await send(B, { to: 'F A', text: 'to the wrong device?' })).status, 502);
+    const wrong = await send(B, { to: 'F A', text: 'to the wrong device?' });
+    assert.equal(wrong.body.queued, true, 'not delivered to a device that could not prove itself: it waits instead');
     assert.equal(peerA().address, '127.0.0.1:1', 'not moved to an address that could not prove itself');
   } finally { await stop(); }
 });

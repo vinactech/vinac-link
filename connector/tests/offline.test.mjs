@@ -119,6 +119,7 @@ test('groups and "all": one send reaches several devices, with one result each',
     const partial = await api(A, 'POST', '/api/send', { to: 'builders', text: 'still there?' });
     assert.equal(partial.status, 200);
     assert.deepEqual(partial.body.results.map(r => r.sent), [true, false]);
+    assert.deepEqual(partial.body.results.map(r => !!r.queued), [false, true], 'the device that is off gets it later');
     assert.equal((await api(A, 'POST', '/api/groups', { name: 'builders', members: null })).body.groups.length, 0);
   } finally { await A.stop(); await B.stop(); await C.stop().catch(() => {}); }
 });

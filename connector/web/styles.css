@@ -633,3 +633,35 @@ button.kpi:hover { box-shadow: var(--shadow); border-color: var(--line); }
   .secret { grid-template-columns: minmax(0, 1fr); }
   .secret .row { grid-row: auto; grid-column: 1; justify-content: flex-start; }
 }
+
+/* pairing: code (recommended) or sound (beta) */
+.pair-way { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-top: 14px; display: grid; gap: 8px; }
+.pair-way .choices { margin-top: 2px; }
+.way-head { display: flex; align-items: center; gap: 8px; margin: 0; }
+.tag { font: 700 10.5px var(--font); letter-spacing: .04em; text-transform: uppercase; padding: 2px 7px; border-radius: 999px; }
+.tag.rec { background: var(--ok-soft, #e3f6ea); color: var(--ok, #1a7f43); }
+.tag.beta { background: var(--warn-soft); color: var(--warn); }
+#codeBox.plain > summary { display: none; }
+#codeBox.plain .bigcode { font-size: 22px; }
+.about-how { font-size: 13.5px; line-height: 1.5; margin: 4px 0 14px; }
+.about-how p { margin: 0 0 6px; }
+.about-how ul { margin: 0; padding-left: 18px; display: grid; gap: 4px; color: var(--text); }
+
+/* firewall modes */
+.fw-modes { display: grid; gap: 8px; }
+.mode-seg { display: inline-flex; flex-wrap: wrap; gap: 4px; padding: 4px; background: var(--fill); border-radius: 12px; justify-self: start; }
+.mode-seg button { border: 0; background: transparent; padding: 7px 14px; border-radius: 9px; font: inherit; font-size: 14px; color: var(--muted); cursor: pointer; }
+.mode-seg button.on { background: var(--panel); color: var(--text); font-weight: 600; box-shadow: var(--shadow-sm); }
+.fw-modes .hint { margin: 0; }
+.fwtag.expired { background: var(--hover); color: var(--muted); }
+
+/* vault lock */
+.vault-lock { border: 1px solid var(--line); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 14px; display: grid; gap: 10px; background: var(--panel); }
+.vault-lock.locked { border-color: var(--warn); }
+.vault-lock.open { border-color: var(--ok); }
+.vl-head { display: grid; gap: 2px; }
+.vl-head small { color: var(--muted); font-size: 13px; }
+.vault-form { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.vault-form input { flex: 1; min-width: 200px; padding: 8px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--fill); }
+.vault-form small { flex-basis: 100%; color: var(--muted); }
+.vault-lock .row { display: flex; gap: 10px; align-items: center; }

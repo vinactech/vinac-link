@@ -44,7 +44,7 @@
     <figure class="schematic">
       <svg viewBox="0 0 1200 560" role="img" aria-labelledby="schem-title schem-desc">
         <title id="schem-title">How VINAC Link works</title>
-        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once by sound or a short code. Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline.</desc>
+        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once with a short code, or by sound (beta). Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline.</desc>
         <defs>
           <linearGradient id="sg-link" gradientUnits="userSpaceOnUse" x1="420" x2="780" y1="250" y2="250"><stop offset="0" class="sg-a"/><stop offset="1" class="sg-b"/></linearGradient>
           <linearGradient id="sg-chip" x1="0" x2="1" y1="0" y2="1"><stop offset="0" class="sg-a"/><stop offset="1" class="sg-b"/></linearGradient>
@@ -119,7 +119,7 @@
       </svg>
     </figure>
     <ol class="legend">
-      <li><span class="num">1</span><div><h3>Pair once</h3><p>By sound or a short code. You confirm a 6-digit code on each screen; only a person can finish pairing.</p></div></li>
+      <li><span class="num">1</span><div><h3>Pair once</h3><p>With a short code, or by sound (beta). You confirm a 6-digit code on each screen; only a person can finish pairing.</p></div></li>
       <li><span class="num">2</span><div><h3>Share keys and tokens</h3><p>They go straight into the other computer's key store. Agents can use them, never see them.</p></div></li>
       <li><span class="num">3</span><div><h3>Send requests your rules check</h3><p>Each request says what it wants. Your rules let it through, ask you first, or block it.</p></div></li>
     </ol>
@@ -144,7 +144,7 @@
         <div class="panel-copy">
           <h3>Trust that only people can create</h3>
           <p>Each screen shows its own six digits, and you type them into the other computer. Nobody nearby or on the network can slip in, and an agent can start pairing but can't finish it.</p>
-          <ul class="ticks"><li>By sound, or a typed code when there's no microphone</li><li>Built on the Noise protocol, a published standard</li><li>Works on your own network, or across networks with Tailscale</li></ul>
+          <ul class="ticks"><li>A short code that works on any network the two devices share, or over Tailscale</li><li>Or by sound, with no typing at all (beta)</li><li>Built on the Noise protocol, a published standard</li><li>Works on your own network, or across networks with Tailscale</li></ul>
           <a class="link" href="/docs/guide/pairing.html">How pairing works →</a>
         </div>
         <div class="panel-visual">
@@ -181,7 +181,7 @@
       <div class="panel" role="tabpanel" id="panel-secrets" aria-labelledby="tab-secrets">
         <div class="panel-copy">
           <h3>Keys and tokens move between computers, never through the chat</h3>
-          <p>Send an API key or token from one computer to the other. It goes straight into that computer's secure key store. Your agent can use it in a program you approve, but only ever sees its name.</p>
+          <p>Keep your API keys and tokens in a vault on each computer, and send one to another computer by Wi-Fi, or by sound (beta) when there's no network. It goes straight into that computer's secure key store. Your agent can use it in a program you approve, but only ever sees its name.</p>
           <ul class="ticks"><li>Stored by Windows, macOS or Linux's own key store</li><li>Only accepted while you choose to receive one</li><li>Each use needs your OK on the VINAC Link page</li></ul>
           <a class="link" href="/docs/guide/secrets.html">Moving secrets →</a>
         </div>
@@ -190,7 +190,7 @@
             <div class="term-bar"><i></i><i></i><i></i><span>Agent on the Mac</span></div>
 <pre><span class="mut">› what secrets do I have?</span>
 <span class="acc">vinac_secrets</span>
-  DEMO_API_KEY   <span class="mut">from the PC · by sound · in Keychain</span>
+  DEMO_API_KEY   <span class="mut">from the PC · by Wi-Fi · in Keychain</span>
   <span class="mut">value: never shown to agents</span>
 
 <span class="mut">› start the app with it</span>
@@ -222,6 +222,26 @@
           </div>
         </div>
       </div>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="today">
+  <div class="wrap">
+    <p class="kicker center">What works today</p>
+    <h2 class="center">Start on your PC. Continue on your Mac.</h2>
+    <p class="sub center">One real job, start to finish: your code comes from GitHub, your keys come from your own computer, and no key ever passes through a chat.</p>
+    <ol class="story">
+      <li><span class="st-tag avail">Available</span><h3>Pair the two computers</h3><p>Type a short code shown on one screen into the other, then swap 6 digits. Once.</p></li>
+      <li><span class="st-tag avail">Available</span><h3>Agents talk and hand off work</h3><p>Questions, reviews, task hand-offs, files and git branches, encrypted, on your network or over Tailscale. Your firewall checks every request.</p></li>
+      <li><span class="st-tag avail">Available</span><h3>Move the keys the project needs</h3><p>Send them from the vault on your PC straight into the Mac's key store, one approval each. The agent only ever sees their names.</p></li>
+      <li><span class="st-tag avail">Available</span><h3>Run the build with them</h3><p><code>vinac run --secret STRIPE_KEY -- npm start</code>. You approve the exact command; the program gets the value, the agent doesn't.</p></li>
+      <li><span class="st-tag next">Next</span><h3>One-step project hand-off</h3><p>VINAC Link reads <code>.env.example</code>, shows which keys are missing on the Mac, and sends them all with one approval.</p></li>
+    </ol>
+    <div class="status-row">
+      <div><span class="st-tag avail">Available</span><p>Code pairing · messages and requests, sent later if a device is off · intent firewall with Restricted / Standard / Auto modes · secrets vault with a passphrase lock · files and git · approved runs · offline on Wi-Fi, hotspot or cable · Tailscale</p></div>
+      <div><span class="st-tag beta">Beta</span><p>Pairing and moving keys by sound: works today, no network needed, still being tested on more speakers and microphones</p></div>
+      <div><span class="st-tag next">Next</span><p>One-step project hand-off · independent security audit · a relay for computers on different networks</p></div>
     </div>
   </div>
 </section>
@@ -337,7 +357,7 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
       <details><summary>Does it work online and offline?</summary><p>Both. The link between your computers never needs the internet: Wi-Fi without internet, a hotspot or a cable is enough. Cloud agents such as Claude Code, Codex or Cursor need the internet for their own AI model; local models in LM Studio, Ollama, Goose or Open WebUI can run with no internet at all. You only need a connection once, to download VINAC Link, and you can copy the package over on a USB stick instead.</p></details>
       <details><summary>What leaves my computer?</summary><p>Only what you or your agent send to a device you paired, encrypted for that device. Nothing goes to us. This website sets no cookies and loads no trackers either.</p></details>
       <details><summary>Can an agent approve its own requests?</summary><p>No. Agents get tools to send and read. Confirming a pairing, approving a request, changing a rule or revealing a secret value only happens on the VINAC Link page, by a person.</p></details>
-      <details><summary>Is the sound safe? Can people hear it?</summary><p>It's a six-second, very high tone that most adults barely hear. It only helps the two computers find each other; the real check is the 6-digit code you confirm on each side, so overhearing the sound isn't enough to pair.</p></details>
+      <details><summary>Do I need sound? Is it safe?</summary><p>No: pairing with a short code works everywhere and is what we recommend. Sound is an optional beta that saves typing. It's a six-second, very high tone that most adults barely hear. It only helps the two computers find each other; the real check is the 6-digit code you confirm on each side, so overhearing the sound isn't enough to pair.</p></details>
       <details><summary>Which agents work with it?</summary><p>Claude Code, Codex and OpenClaw have their own setup; LM Studio, Goose, Open WebUI, Cursor and any other MCP app use it as a standard MCP server.</p></details>
       <details><summary>Who makes it?</summary><p>VINAC Link™ is built by Mexley Marketing Inc., a Canadian company, and released as open source under the Apache-2.0 license. VINAC stands for Verified Intent Network for Agent Communication.</p></details>
     </div>

@@ -242,6 +242,7 @@ function buildMac(files) {
   <key>CFBundleExecutable</key><string>VINAC Link</string>
   <key>LSArchitecturePriority</key>
   <array><string>arm64</string><string>x86_64</string></array>
+  <key>NSLocalNetworkUsageDescription</key><string>VINAC Link connects directly to the computers you paired with on your network, so your AI agents can exchange encrypted messages, requests and keys.</string>
   <key>CFBundleIconFile</key><string>vinac.icns</string>
   <key>CFBundlePackageType</key><string>APPL</string>
   <key>LSMinimumSystemVersion</key><string>13.5</string>

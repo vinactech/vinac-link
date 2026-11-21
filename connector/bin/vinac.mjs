@@ -16,7 +16,7 @@
 // vinac git fetch ID [--repo DIR]                  add a received bundle's branches as vinac/<device>/<branch>
 // vinac group list | set NAME DEV1,DEV2 | remove NAME   names for sets of devices ("to": the group name)
 // vinac audit  [--verify] [--last N] [--json]      the hash-chained log of what happened (no message text)
-// vinac run --secret NAME[=ENV] ... -- COMMAND ARGS   run a program with secrets in its environment (approved on the page)
+// vinac run --secret NAME[=ENV] ... [--show-output] -- COMMAND ARGS   run a program with secrets in its environment (approved on the page); values it prints show as [hidden: NAME]
 import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
@@ -27,9 +27,10 @@ import { doctor, formatChecks, stopDaemon, runHook, setupText } from '../src/set
 import { env } from '../src/env.js';
 import { isOlderVersion } from '../src/version.js';
 import { defaultHome } from '../src/store.js';
+import { redactor } from '../src/redact.js';
 
 const [command = 'start', ...rest] = process.argv.slice(2);
-const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all']);
+const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output']);
 const REPEAT = new Set(['secret']);
 const opt = { _: [], cmd: [] };
 for (let i = 0; i < rest.length; i++) {
@@ -205,11 +206,20 @@ Next: pair another computer on the page, then connect your agent:
     const [cmd, ...args] = opt.cmd;
     // Windows: npm, npx and other .cmd files need cmd.exe; quote each argument ourselves.
     const winQuote = a => (/^[\w./:=@+-]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
+    // By default the program's output passes through a filter that hides the values
+    // ([hidden: NAME]). --show-output keeps the terminal as is (colours, prompts).
+    const stdio = opt['show-output'] ? 'inherit' : ['inherit', 'pipe', 'pipe'];
     const child = process.platform === 'win32'
-      ? spawn([cmd, ...args].map(winQuote).join(' '), { stdio: 'inherit', env: childEnv, shell: true })
-      : spawn(cmd, args, { stdio: 'inherit', env: childEnv });
+      ? spawn([cmd, ...args].map(winQuote).join(' '), { stdio, env: childEnv, shell: true })
+      : spawn(cmd, args, { stdio, env: childEnv });
+    if (!opt['show-output']) {
+      const values = Object.fromEntries(wanted.map(w => [w.name, r.values[w.name]]));
+      child.stdout.pipe(redactor(values)).pipe(process.stdout);
+      child.stderr.pipe(redactor(values)).pipe(process.stderr);
+    }
     child.on('error', e => fail(`could not start ${cmd}: ${e.message}`));
-    child.on('exit', code => process.exit(code ?? 1));
+    // 'close' comes after the output is through the filter; then let it reach the terminal before exiting.
+    child.on('close', code => process.stdout.write('', () => process.stderr.write('', () => process.exit(code ?? 1))));
   } else if (command === 'version' || command === '--version') {
     console.log(VERSION);
   } else {

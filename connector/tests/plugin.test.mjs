@@ -137,14 +137,21 @@ test('`vinac start` after an update replaces an older running service, and leave
   }
 });
 
-test('agent tools start the service in the background; it outlives them and `stop` ends it', { timeout: 30_000 }, async () => {
+test('agent tools start the service in the background; it outlives them and `stop` ends it', { timeout: 90_000 }, async () => {
   const home = tempHome('bg');
-  const port = await freePortPair();
-  const first = new AgentApi({ home, port, name: 'Background test' });
-  try {
+  // Other test files run in parallel and may take the port this one just found free
+  // (the background service then exits with EADDRINUSE): retry on a new port.
+  let port, first;
+  for (let attempt = 0; ; attempt++) {
+    port = await freePortPair();
+    first = new AgentApi({ home, port, name: 'Background test' });
     // A busy machine can be slow to start a process: allow more time than the default.
     first.startBackground = first.startBackground.bind(first, 20_000);
-    assert.equal(await first.connect(), 'started in the background');
+    const how = await first.connect();
+    if (how === 'started in the background' || attempt >= 2) { assert.equal(how, 'started in the background'); break; }
+    await first.daemon?.stop();   // fell back to running in this process (port taken): try again
+  }
+  try {
     assert.equal(first.daemon, undefined, 'not running inside the agent process');
 
     const second = new AgentApi({ home, port });

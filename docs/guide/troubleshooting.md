@@ -7,7 +7,13 @@ Start with `vinac doctor` (in the tester package: double-click **Check VINAC Lin
 **"Could not reach … VINAC Link must be running there"**
 The other computer's service isn't running or can't be reached. Start VINAC Link there; check
 both are on the same network (or Tailscale); allow Node.js on private networks; office/hotel Wi-Fi
-may block device-to-device traffic (use Tailscale).
+may block device-to-device traffic (use Tailscale). Messages and requests wait and go out by
+themselves once it's reachable (up to 24 hours).
+
+**A Mac shows its paired devices as offline, though they are on**
+macOS blocks apps from the local network until you allow it: **System Settings → Privacy & Security
+→ Local Network** → turn on VINAC Link, then quit and reopen it. Also check **Network → Firewall →
+Options** allows incoming connections for VINAC Link.
 
 **"… does not know the intent … yet"**
 The other device has an older intent catalog. Update VINAC Link there, or send plain text.

@@ -114,3 +114,15 @@ want.
 
 When a Claude Code session starts with unread items or approvals waiting, the agent gets a one-line
 note with the counts (never the content).
+
+## When the other device is off
+
+A message or request for a device that can't be reached right now **waits on this device** (in the
+encrypted message history) and is sent automatically as soon as that device is reachable again, oldest
+first, for up to 24 hours. The page shows *Waiting to send* with **Cancel**; the agent's inac_send
+result says queued: true. After 24 hours it is marked *Not delivered*. Files are not queued: send
+them again when the device is back.
+
+On a Mac, if devices never come online, check **System Settings → Privacy & Security → Local
+Network**: VINAC Link must be allowed (macOS asks the first time). The error message says so when
+macOS blocks it.

@@ -170,6 +170,8 @@ test('the person can send from the page; empty, oversized and unknown recipients
     await B.stop();
     await ui(A, 'POST', '/ui/ping');
     await waitFor(async () => (await state(A)).peers[0].online === false);
-    assert.equal((await api(A, 'POST', '/api/send', { text: 'anyone?' })).status, 502);
+    const waits = await api(A, 'POST', '/api/send', { text: 'anyone?' });
+    assert.equal(waits.status, 200);
+    assert.deepEqual([waits.body.sent, waits.body.queued], [false, true], 'an offline device: the message waits in the outbox');
   } finally { await A.stop(); await B.stop(); }
 });

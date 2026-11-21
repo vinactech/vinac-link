@@ -229,3 +229,19 @@ test('Windows DPAPI wraps and unwraps the key', { skip: process.platform !== 'wi
   assert.ok(w.stored && !w.stored.includes(secret.toString('base64')));
   assert.deepEqual(unprotect('dpapi', 'test', w.stored), secret);
 });
+
+test('pairing by code: "Show a code here" announces quietly (no sound on the page) and pairs by typed code', async () => {
+  const A = await startDevice('quiet-a'), B = await startDevice('quiet-b');
+  try {
+    const p = (await ui(A, 'POST', '/ui/announce', { quiet: true })).body.pairing;
+    assert.equal(p.quiet, true, 'the page plays nothing for a quiet announce');
+    assert.ok(p.beaconCode, 'the code is shown to the person');
+    assert.equal((await ui(B, 'POST', '/ui/heard', { code: p.beaconCode })).status, 200);
+    await waitFor(async () => (await state(A)).pairing?.state === 'comparing' && (await state(B)).pairing?.state === 'comparing');
+    const [a, b] = [(await state(A)).pairing.showCode, (await state(B)).pairing.showCode];
+    await ui(A, 'POST', '/ui/confirm', { code: b }); await ui(B, 'POST', '/ui/confirm', { code: a });
+    await waitFor(async () => (await state(A)).pairing?.state === 'paired' && (await state(B)).pairing?.state === 'paired', 4000);
+    assert.equal((await state(A)).peers[0].via, 'code');
+    assert.equal((await ui(A, 'POST', '/ui/announce')).body.pairing.quiet, false, 'a normal announce still plays the sound');
+  } finally { await A.stop(); await B.stop(); }
+});
