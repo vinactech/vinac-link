@@ -14,6 +14,8 @@ if (!['win32', 'darwin'].includes(process.platform)) process.env.VINAC_KEYSTORE 
 process.env.VINAC_NO_BROWSER = '1';
 process.env.VINAC_LAN_HOST = '127.0.0.1';
 const { Daemon } = await import('../src/daemon.js');
+const { MemoryBus } = await import('../src/discovery.js');
+const network = new MemoryBus(); // the two demo devices find each other here, never on the real network
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const OUT = path.join(ROOT, 'site', 'media');
@@ -28,7 +30,7 @@ const BROWSERS = [
 // ---- two demo devices, paired, with demo messages --------------------------------
 const home = name => fs.mkdtempSync(path.join(os.tmpdir(), `vinac-shot-${name}-`));
 async function start(name) {
-  const d = await new Daemon({ home: home(name.replace(/\W/g, '')), name, port: 0, host: '127.0.0.1', lanHost: '127.0.0.1', altHosts: [], log: () => {} }).start();
+  const d = await new Daemon({ home: home(name.replace(/\W/g, '')), name, port: 0, host: '127.0.0.1', lanHost: '127.0.0.1', altHosts: [], discovery: network.join(), log: () => {} }).start();
   d.tailscale = null; // never show this computer's real Tailscale address in a public screenshot
   return d;
 }
@@ -79,8 +81,11 @@ try {
   };
   // Guide: the first screen, before any pairing
   await snap(pc, 'tour-welcome.jpg');
-  await snap(pc, 'tour-pair.jpg', `document.getElementById('newPairBtn').click()`);
-  // Pairing, stopped at the code swap for a picture
+  // Pair a device, with the Mac's Pair screen open too, so the Mac shows up under "On this network"
+  await ui(mac, 'POST', '/ui/discover');
+  await snap(pc, 'tour-pair.jpg', `document.getElementById('newPairBtn').click()`, 4200);
+  await ui(mac, 'POST', '/ui/cancel').catch(() => {});
+  // Pairing, stopped at "Check the code" for a picture
   const p = (await ui(pc, 'POST', '/ui/announce')).pairing;
   await ui(mac, 'POST', '/ui/heard', { code: p.beaconCode });
   const both = async () => { const [a, b] = [await ui(pc, 'GET', '/ui/state'), await ui(mac, 'GET', '/ui/state')]; return a.pairing?.state === 'comparing' && b.pairing?.state === 'comparing' && [a, b]; };
@@ -110,6 +115,12 @@ try {
   await snap(pc, 'tour-thread.jpg', `document.querySelector('.convo')?.click()`, 1200);
   await snap(pc, 'tour-secrets.jpg', `document.getElementById('secretsNav').click(); await new Promise(r => setTimeout(r, 500)); document.querySelector('.convo')?.click(); await new Promise(r => setTimeout(r, 600)); document.getElementById('secretBtn').click(); document.getElementById('secretName').value = 'OPENAI_API_KEY'; document.getElementById('secretValue').value = 'sk-demo-not-a-real-key'; document.querySelector('input[name=how][value=wifi]').click();`, 900);
   await snap(pc, 'tour-help.jpg', `document.getElementById('helpBtn').click()`);
+  // Keys without being in sync (taken last: the request also waits on the firewall page).
+  // Demo values only, never real keys.
+  await ui(pc, 'POST', '/ui/secrets/add', { name: 'STRIPE_TEST_KEY', value: 'sk_test_demo_not_a_real_key' });
+  await ui(mac, 'POST', '/api/send', { to: 'PC', intent: 'person.secret.request', args: { name: 'STRIPE_TEST_KEY', reason: 'npm start needs it for the shop build' } }, true);
+  await ui(mac, 'POST', '/ui/secret/wifi', { to: 'PC', name: 'OPENAI_API_KEY', value: 'sk-demo-not-a-real-key' });
+  await snap(pc, 'tour-keys.jpg', `document.getElementById('secretsNav').click()`, 1200);
   close();
   console.log(`screenshots in ${OUT}:\n  ${shots.join('\n  ')}`);
 } finally {

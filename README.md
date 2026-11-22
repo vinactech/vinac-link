@@ -67,7 +67,7 @@ your agents one safe channel, across vendors, with a person in charge of what ea
 |---|---|
 | <img src="site/media/tour-pair.jpg" alt="Pair a device: the other computer is listed on this network" width="440"> | <img src="site/media/tour-compare.jpg" alt="Both screens show the same 6 digits" width="440"> |
 | **3. Agents talk; you see everything** | **4. Move keys without the chat** |
-| <img src="site/media/tour-thread.jpg" alt="A conversation with requests waiting for approval" width="440"> | <img src="site/media/tour-secrets.jpg" alt="Send a secret to the Mac" width="440"> |
+| <img src="site/media/tour-thread.jpg" alt="A conversation with requests waiting for approval" width="440"> | <img src="site/media/tour-keys.jpg" alt="The Mac asks for a key: one click to send it" width="440"> |
 
 The full walkthrough, with what each part does, is on
 **[vinac.tech/how-it-works](https://vinac.tech/how-it-works.html)**.
