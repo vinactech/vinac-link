@@ -1,7 +1,8 @@
 // VINAC Link pairing beacon: the 25 bytes one device plays as sound so a nearby
 // device can find it and start pairing. Works in the browser and in Node.
 //
-//   0      magic 0xB1 (beacon format 1)
+//   0      magic 0xB1 (beacon format 1), or 0xB2 for an invite (a code the person made to be redeemed
+//          with `vinac join`; the inviting device confirms by itself, so it is never played or broadcast)
 //   1-4    IPv4 address of the announcing device on the local network
 //   5-6    its pairing port (big-endian)
 //   7-14   pairing secret: random, used once, mixed into the pairing keys
@@ -13,6 +14,7 @@
 // to confirm that both screens show the same 6 digits.
 
 export const BEACON_MAGIC = 0xb1;
+export const INVITE_MAGIC = 0xb2;
 export const BEACON_BYTES = 25;
 export const BEACON_TONES = Object.freeze([17100, 17700, 18300, 19500]);
 export const BEACON_BPS = 100;
@@ -27,13 +29,13 @@ export function crc16(bytes) {
   return crc;
 }
 
-export function encodeBeacon({ ip, port, secret, fingerprint }) {
+export function encodeBeacon({ ip, port, secret, fingerprint, invite = false }) {
   const parts = String(ip).split('.').map(Number);
   if (parts.length !== 4 || parts.some(n => !Number.isInteger(n) || n < 0 || n > 255)) throw new Error('BEACON_BAD_IP');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new Error('BEACON_BAD_PORT');
   if (secret?.length !== 8 || fingerprint?.length !== 8) throw new Error('BEACON_BAD_FIELDS');
   const b = new Uint8Array(BEACON_BYTES);
-  b[0] = BEACON_MAGIC;
+  b[0] = invite ? INVITE_MAGIC : BEACON_MAGIC;
   b.set(parts, 1);
   b[5] = port >> 8; b[6] = port & 255;
   b.set(secret, 7);
@@ -45,7 +47,7 @@ export function encodeBeacon({ ip, port, secret, fingerprint }) {
 
 export function decodeBeacon(bytes) {
   if (!bytes || bytes.length !== BEACON_BYTES) return { ok: false, reason: 'BEACON_LENGTH' };
-  if (bytes[0] !== BEACON_MAGIC) return { ok: false, reason: 'BEACON_MAGIC' };
+  if (bytes[0] !== BEACON_MAGIC && bytes[0] !== INVITE_MAGIC) return { ok: false, reason: 'BEACON_MAGIC' };
   if (crc16(bytes.subarray(0, 23)) !== ((bytes[23] << 8) | bytes[24])) return { ok: false, reason: 'BEACON_CRC' };
   return {
     ok: true,
@@ -53,6 +55,7 @@ export function decodeBeacon(bytes) {
     port: (bytes[5] << 8) | bytes[6],
     secret: bytes.slice(7, 15),
     fingerprint: bytes.slice(15, 23),
+    invite: bytes[0] === INVITE_MAGIC,
   };
 }
 

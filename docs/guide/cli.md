@@ -21,7 +21,8 @@ folder (`./vinac` on macOS and Linux), or `node connector/bin/vinac.mjs <command
 | `git fetch ID` | Checks a received bundle and adds its branches as `vinac/<device>/<branch>`. Nothing is checked out or merged. `--repo DIR`. |
 | `group` | `group list`, `group set NAME "PC 1,PC 2"`, `group remove NAME`. Send to a group by its name. |
 | `audit` | The latest entries of the audit log (`--last N`, `--json`). `--verify` checks the whole chain. |
-| `run` | `run --secret NAME[=ENV_VAR] ... -- COMMAND ARGS`: starts the command with secrets in its environment after the person approves on the page. |
+| `run` | `run --secret NAME[=ENV_VAR] ... -- COMMAND ARGS`: starts the command with secrets in its environment after the person approves on the page. Values the program prints show as `[hidden: NAME]`; `--show-output` for a raw terminal. |
+| `join` | `join <invite>`: pairs with the device whose person made that invite (*Pair a device › Invite a device*). One use, 10 minutes; an agent may run it with an invite the person gave it. Ordinary pairing codes are refused. |
 | `version` | Prints the version. |
 
 Options for most commands: `--home DIR` (default `~/.vinac`), `--port N` (default 47800).

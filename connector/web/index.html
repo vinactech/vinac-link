@@ -189,12 +189,16 @@
           <div class="vault-actions">
             <button class="ghost small-btn" id="addSecretBtn">Add</button>
             <button class="ghost small-btn" id="sendSecretBtn">Send</button>
-            <button class="primary small-btn" id="receiveBtn">Receive</button>
+            <button class="ghost small-btn" id="receiveBtn" title="Listen for a secret sent by sound">Receive by sound</button>
           </div>
         </header>
         <div class="pair-body">
           <div class="vault-lock" id="vaultLock"></div>
           <input type="search" id="secretSearch" placeholder="Find a secret by name or device" aria-label="Find a secret" autocomplete="off">
+          <div id="askBox" hidden>
+            <h3 class="fw-h">Asked for by your devices</h3>
+            <ul class="secret-list" id="askList"></ul>
+          </div>
           <div id="useBox" hidden>
             <h3 class="fw-h">Programs asking to use a secret</h3>
             <ul class="secret-list" id="useList"></ul>
@@ -238,39 +242,64 @@
           <button class="icon back" id="pairBackBtn" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
           </button>
-          <div class="head-text"><b>Pair a device</b><small>A person confirms on both devices</small></div>
+          <div class="head-text"><b>Pair a device</b><small>Pick it, compare 6 digits, Allow on both</small></div>
         </header>
         <div class="pair-body">
           <section class="card" id="pairCard" aria-live="polite">
             <div data-view="idle">
               <h2>Pair a device</h2>
-              <p class="hint">Choose a way for the two devices to find each other. Either way, you then swap 6 digits on both screens, so only you can finish pairing.</p>
-              <div class="pair-way">
-                <p class="way-head"><b>With a code</b><span class="tag rec">Recommended</span></p>
-                <p class="hint small">Works on the same network or over Tailscale. No speaker or microphone needed.</p>
-                <div class="choices">
-                  <button class="choice" id="showCodeBtn"><b>Show a code here</b><span>Type it on the other device</span></button>
-                  <button class="choice" id="enterCodeBtn"><b>Enter a code</b><span>Shown on the other device</span></button>
-                </div>
-                <form class="coderow" id="idleCodeForm" hidden>
-                  <input id="idleCodeInput" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-…" aria-label="Pairing code from the other device">
-                  <button class="primary">Pair</button>
-                </form>
+              <p class="hint">Open <b>Pair a device</b> on the other computer too. It appears below. Then check that both screens show the same 6 digits and press Allow on both.</p>
+              <div class="nearby" id="nearbyBox">
+                <p class="way-head"><b>On this network</b><span class="tag rec">Recommended</span></p>
+                <ul class="nearby-list" id="nearbyList"></ul>
+                <p class="nearby-empty" id="nearbyEmpty"><i class="pulse"></i>Looking for devices… Open Pair a device on the other computer.</p>
               </div>
               <div class="pair-way">
-                <p class="way-head"><b>By sound</b><span class="tag beta">Beta</span></p>
-                <p class="hint small">No typing: one device plays a short sound, the other hears it. Devices within a few metres, speaker and microphone on.</p>
-                <div class="choices">
-                  <button class="choice" id="announceBtn"><b>Play the sound</b><span>About 6 seconds, repeats</span></button>
-                  <button class="choice" id="listenBtn"><b>Listen for it</b><span>Uses the microphone</span></button>
+                <p class="way-head"><b>Invite a device</b></p>
+                <p class="hint small">For a computer on another network (Tailscale), or to let its agent finish the setup: make a one-time invite and run <code>vinac join</code> with it there.</p>
+                <div class="invite-row">
+                  <label for="inviteMode" class="hint small">It starts in</label>
+                  <select id="inviteMode"><option value="restricted">Restricted mode</option><option value="standard">Standard mode</option><option value="auto">Auto mode</option></select>
+                  <button class="ghost small-btn" id="inviteBtn">Make an invite</button>
                 </div>
+                <label class="hint small" id="inviteTsRow" hidden><input type="checkbox" id="inviteTs"> Over Tailscale (the other computer is on another network)</label>
               </div>
-              <p class="hint small" id="tailscaleRow" hidden>Device on another network? Both devices on Tailscale:
-                <button type="button" class="linkish" id="announceTsBtn">announce over Tailscale</button>, then type the code shown on the other device.</p>
+              <details class="pair-more" id="pairMore">
+                <summary>More ways to pair: with a code, or by sound (beta)</summary>
+                <div class="pair-way">
+                  <p class="way-head"><b>With a code</b></p>
+                  <p class="hint small">If the devices don't see each other. No speaker or microphone needed.</p>
+                  <div class="choices">
+                    <button class="choice" id="showCodeBtn"><b>Show a code here</b><span>Type it on the other device</span></button>
+                    <button class="choice" id="enterCodeBtn"><b>Enter a code</b><span>Or an invite from the other device</span></button>
+                  </div>
+                  <form class="coderow" id="idleCodeForm" hidden>
+                    <input id="idleCodeInput" autocomplete="off" spellcheck="false" placeholder="XXXXX-XXXXX-…" aria-label="Pairing code or invite from the other device">
+                    <button class="primary">Pair</button>
+                  </form>
+                </div>
+                <div class="pair-way">
+                  <p class="way-head"><b>By sound</b><span class="tag beta">Beta</span></p>
+                  <p class="hint small">One device plays a short sound, the other hears it. Devices within a few metres, speaker and microphone on.</p>
+                  <div class="choices">
+                    <button class="choice" id="announceBtn"><b>Play the sound</b><span>About 6 seconds, repeats</span></button>
+                    <button class="choice" id="listenBtn"><b>Listen for it</b><span>Uses the microphone</span></button>
+                  </div>
+                </div>
+                <p class="hint small" id="tailscaleRow" hidden>Device on another network? Both devices on Tailscale:
+                  <button type="button" class="linkish" id="announceTsBtn">announce over Tailscale</button>, then type the code shown on the other device.</p>
+              </details>
               <div class="result" id="result" hidden></div>
               <button class="primary wide" id="openNewBtn" hidden>Open the conversation</button>
             </div>
 
+            <div data-view="invite">
+              <h2>Invite ready</h2>
+              <p class="hint">On the other computer, run this (or give it to the agent there). It works once, for 10 minutes. The new device starts in <b id="inviteModeText">Restricted</b> mode; change it later on the Firewall page.</p>
+              <div class="invite-cmd"><code id="inviteCmd"></code><button class="ghost small-btn" id="inviteCopy">Copy</button></div>
+              <p class="hint small">No terminal there? Paste just the code under <b>Pair a device › More ways › Enter a code</b>: <code id="inviteCode"></code></p>
+              <div class="status"><i class="pulse"></i><span>Waiting for the other device…</span></div>
+            </div>
             <div data-view="announcing">
               <h2 id="announceTitle">Announcing</h2>
               <div class="status"><i class="pulse"></i><span id="announceText">Playing the pairing sound…</span></div>
@@ -300,22 +329,25 @@
             </div>
 
             <div data-view="comparing">
-              <h2>Swap the codes</h2>
-              <p class="hint center">Type this code on <b id="peerName">the other device</b>:</p>
+              <h2>Check the code</h2>
+              <p class="hint center">Does <b id="peerName">the other device</b> show the same 6 digits?</p>
               <p class="digits" id="digits">--- ---</p>
               <p class="fp center">Its key: <span id="peerFp"></span></p>
-              <form class="codeconfirm" id="compareActions" autocomplete="off">
-                <label for="otherCode">Code shown on the other device</label>
-                <input id="otherCode" inputmode="numeric" maxlength="7" placeholder="000 000" spellcheck="false">
-                <div class="actions">
-                  <button class="primary" id="confirmBtn">Confirm</button>
-                  <button type="button" class="ghost" id="rejectBtn">Cancel pairing</button>
-                </div>
-                <p class="hint small" id="attemptsLeft"></p>
-              </form>
-              <div class="status center" id="waitingThere" hidden><i class="pulse"></i><span>Confirmed here. Now type this device’s code on the other one…</span></div>
+              <div class="actions center-actions" id="matchActions">
+                <button class="primary" id="matchBtn">Same code: Allow</button>
+                <button type="button" class="ghost" id="rejectBtn">Different: cancel</button>
+              </div>
+              <div class="status center" id="waitingThere" hidden><i class="pulse"></i><span>Allowed here. Now press Allow on the other device…</span></div>
+              <details class="fallback" id="olderBox">
+                <summary>The other device asks you to type a code instead?</summary>
+                <p class="hint small">It runs an older VINAC Link. Type <b id="myCode">--- ---</b> there, and the code it shows here:</p>
+                <form class="codeconfirm" id="compareActions" autocomplete="off">
+                  <input id="otherCode" inputmode="numeric" maxlength="7" placeholder="000 000" spellcheck="false" aria-label="Code shown on the other device">
+                  <button class="ghost" id="confirmBtn">Confirm</button>
+                  <p class="hint small" id="attemptsLeft"></p>
+                </form>
+              </details>
             </div>
-
             <div class="footrow" id="cancelRow" hidden>
               <span class="hint small" id="timeLeft"></span>
               <button class="link" id="cancelBtn">Cancel</button>
@@ -327,7 +359,7 @@
             <select id="speaker"><option value="">System default</option></select>
           </section>
 
-          <p class="foot">Each device shows its own code and never the one it expects, so confirming takes someone who can see both screens.</p>
+          <p class="foot">Pairing needs a person on both devices: each checks that both screens show the same 6 digits and presses Allow. If the codes differ, press cancel: something else answered.</p>
         </div>
       </section>
     </main>
@@ -386,7 +418,7 @@
         <div id="speakerRow">
           <label for="secretSpeaker">Speaker</label>
           <select id="secretSpeaker"><option value="">System default</option></select>
-          <p class="hint small">On the other device, open Secrets and press <b>Receive</b> first.</p>
+          <p class="hint small">By sound, the other device must be listening: open Secrets there and press <b>Receive</b> first. By Wi-Fi it arrives as an offer its person accepts (or at once if it asked for it, or is in Auto mode).</p>
         </div>
         <button class="primary wide" id="secretSend">Send</button>
       </form>

@@ -106,9 +106,15 @@ function render(s) {
 
   if (selected && !peerById(selected)) selected = null;
 
-  const pairing = !!(p && VIEW_OF[p.state]);
+  // A pairing in progress keeps the pairing screen open; merely waiting to be picked doesn't.
+  const pairing = !!(p && VIEW_OF[p.state] && !isWaitingToBePicked(p));
   const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall'
     : selected && !wantOverview ? 'thread' : s.peers.length ? 'overview' : 'empty';
+  // Left the pairing screen: stop telling the network this device waits to be picked.
+  if (main !== 'pair' && isWaitingToBePicked(p) && !render.stopping) {
+    render.stopping = true;
+    api('POST', '/ui/cancel').catch(() => {}).finally(() => { render.stopping = false; });
+  }
   app.dataset.main = main;
   app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || ((main === 'thread' || main === 'overview') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
@@ -385,10 +391,11 @@ function renderUses() {
 
 function renderSecrets(force = false) {
   const q = ($('secretSearch').value || '').trim().toLowerCase();
-  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock);
+  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock) + JSON.stringify(state.secretRequests || []);
   if (key === secretsKey && !force) return;
   secretsKey = key;
   renderVaultLock();
+  renderSecretRequests();
   renderUses();
   const list = $('secretList'); list.replaceChildren();
   $('secretSearch').hidden = state.secrets.length < 4 && !q;
@@ -403,8 +410,9 @@ function renderSecrets(force = false) {
     const li = document.createElement('li'); li.className = 'secret';
     const name = text('b', s.name);
     if (s.pending) { const t = text('span', 'Replacement waiting'); t.className = 'pendingtag'; name.append(t); }
+    if (s.offered) { const t = text('span', 'Offered: accept?'); t.className = 'pendingtag'; name.append(t); }
     const origin = s.own ? `Added on this device · ${when(s.receivedAt)}` : `From ${s.from.name} · ${when(s.receivedAt)} · by ${s.via === 'wifi' ? 'Wi-Fi' : 'sound'}`;
-    const meta = text('small', `${origin} · ${KEYSTORE_SHORT[s.keystore] || s.keystore}${s.lastUsedAt ? ` · last used ${when(s.lastUsedAt)}` : ''}${s.pending ? ' · approve to replace the current one' : ''}`);
+    const meta = text('small', `${origin} · ${KEYSTORE_SHORT[s.keystore] || s.keystore}${s.lastUsedAt ? ` · last used ${when(s.lastUsedAt)}` : ''}${s.pending ? ' · approve to replace the current one' : ''}${s.offered ? ' · nothing can use it until you accept it' : ''}`);
     const row = document.createElement('div'); row.className = 'row';
     const showing = shownSecret?.id === s.id;
     const reveal = button(showing ? 'Hide' : 'Reveal', async () => {
@@ -430,14 +438,39 @@ function renderSecrets(force = false) {
       if (showing) hideSecret();
       act('POST', '/ui/secrets/delete', { id: s.id });
     });
-    const buttons = [reveal, copy, del];
+    let buttons = [reveal, copy, del];
     if (!s.pending) buttons.splice(2, 0, button('Send…', () => openSecretModal('stored', { item: s })));
     if (s.pending) buttons.unshift(button('Approve', () => act('POST', '/ui/secrets/approve', { id: s.id })));
+    // Offered by another device: nothing can use it until the person accepts it.
+    if (s.offered) buttons = [button('Accept', () => act('POST', '/ui/secrets/accept', { id: s.id })), button('Decline', () => act('POST', '/ui/secrets/decline', { id: s.id }))];
     for (const b of buttons) b.className = 'ghost';
-    if (s.pending) buttons[0].className = 'primary small-btn';
+    if (s.pending || s.offered) buttons[0].className = 'primary small-btn';
     row.append(...buttons);
     li.append(name, row, meta);
     if (showing) { const v = text('code', shownSecret.value); v.className = 'value'; li.append(v); }
+    list.append(li);
+  }
+}
+
+// Paired devices asking for a secret by name (person.secret.request): one click sends it from the vault.
+function renderSecretRequests() {
+  const box = $('askBox'); const list = $('askList'); const reqs = state?.secretRequests || [];
+  box.hidden = !reqs.length; list.replaceChildren();
+  for (const r of reqs) {
+    const li = document.createElement('li'); li.className = 'secret';
+    li.append(text('b', r.name));
+    const row = document.createElement('div'); row.className = 'row';
+    const answer = async (dismiss) => {
+      try {
+        const s = await api('POST', '/ui/secret-requests/answer', { id: r.id, ...(dismiss ? { dismiss: true } : {}) });
+        render(s);
+        if (!dismiss) toast(s.answer?.offered ? `Sent ${r.name} to ${r.peer.name}; its person accepts it there.` : `Sent ${r.name} to ${r.peer.name}. It is in its key store now.`);
+      } catch (e) { toast(e.message); }
+    };
+    if (r.have) { const send = button('Send', () => answer(false)); send.className = 'primary small-btn'; row.append(send); }
+    else { const add = button('Add it', () => openSecretModal('add', { name: r.name })); add.className = 'primary small-btn'; row.append(add); }
+    const no = button('Dismiss', () => answer(true)); no.className = 'ghost'; row.append(no);
+    li.append(row, text('small', `${r.peer.name} asks for it${r.reason ? `: "${r.reason}"` : ''} · ${new Date(r.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}${r.have ? '' : ' · not on this device yet: add it, then Send'}`));
     list.append(li);
   }
 }
@@ -1054,14 +1087,48 @@ function confirmRemove(name) {
 
 // ---- pairing ----------------------------------------------------------------
 
+// "Pair a device" open: this device waits to be picked by others (no sound, nothing to type) and lists
+// the devices that wait too. The last result stays on screen while it waits again.
+const isWaitingToBePicked = p => !!(p && p.discover && p.state === 'announcing');
+let lastResult = null, discoverAsked = 0;
+function ensureDiscover() {
+  if (Date.now() - discoverAsked < 3000) return;
+  discoverAsked = Date.now();
+  api('POST', '/ui/discover').then(() => refresh.once()).catch(() => {});
+}
+function renderNearby() {
+  const list = $('nearbyList'); const items = state?.nearby || [];
+  list.replaceChildren();
+  $('nearbyEmpty').hidden = items.length > 0;
+  for (const n of items) {
+    const li = document.createElement('li');
+    const who = document.createElement('div'); who.className = 'nb-who';
+    who.append(text('b', n.name), text('small', n.paired ? `Already paired · ${n.fingerprint}` : n.fingerprint));
+    const go = button(n.paired ? 'Pair again' : 'Pair', () => act('POST', '/ui/nearby/pair', { id: n.id }));
+    go.className = n.paired ? 'ghost small-btn' : 'primary small-btn';
+    li.append(who, go); list.append(li);
+  }
+}
+
 function renderPairing(p) {
-  const view = (p && VIEW_OF[p.state]) || 'idle';
+  const view = !p ? 'idle' : isWaitingToBePicked(p) ? 'idle' : p.state === 'announcing' && p.invite ? 'invite' : VIEW_OF[p.state] || 'idle';
   $('tailscaleRow').hidden = !state?.device?.tailscale;
+  $('inviteTsRow').hidden = !state?.device?.tailscale;
   card.dataset.viewNow = view;
   $('cancelRow').hidden = view === 'idle';
   $('timeLeft').textContent = p && p.secondsLeft ? `Times out in ${Math.floor(p.secondsLeft / 60)}:${String(p.secondsLeft % 60).padStart(2, '0')}` : '';
-  $('speakerCard').hidden = !(view === 'idle' || (view === 'announcing' && !p?.quiet));
+  $('speakerCard').hidden = !((view === 'idle' && $('pairMore').open) || (view === 'announcing' && !p?.quiet));
   if (view !== 'idle') $('idleCodeForm').hidden = true;
+  if (view === 'idle') {
+    renderNearby();
+    // Keep waiting to be picked while the screen is open (also after a pairing finished or timed out).
+    if (app.dataset.main === 'pair' && (!p || ['paired', 'failed', 'cancelled', 'expired'].includes(p.state))) ensureDiscover();
+  }
+  if (view === 'invite') {
+    $('inviteCmd').textContent = `vinac join ${p.beaconCode || ''}`;
+    $('inviteCode').textContent = p.beaconCode || '';
+    $('inviteModeText').textContent = { restricted: 'Restricted', standard: 'Standard', auto: 'Auto' }[p.invite.mode] || p.invite.mode;
+  }
 
   if (view === 'announcing') {
     $('beaconCode').textContent = p.beaconCode || '';
@@ -1076,31 +1143,38 @@ function renderPairing(p) {
   }
   if (view === 'connecting') $('connectText').textContent = p.message;
   if (view === 'comparing') {
-    $('digits').textContent = p.showCode ? `${p.showCode.slice(0, 3)} ${p.showCode.slice(3)}` : '--- ---';
+    const six = c => (c ? `${c.slice(0, 3)} ${c.slice(3)}` : '--- ---');
+    $('digits').textContent = six(p.matchCode || p.showCode);
+    $('myCode').textContent = six(p.showCode);
     $('peerName').textContent = p.peer?.name || 'the other device';
     $('peerFp').textContent = p.peer?.fingerprint || '';
-    $('compareActions').hidden = p.confirmedHere;
+    $('matchActions').hidden = p.confirmedHere;
+    $('olderBox').hidden = p.confirmedHere || !!p.join || !!p.invite;
     $('waitingThere').hidden = !p.confirmedHere;
     $('attemptsLeft').textContent = p.attemptsLeft < 3 ? `${p.attemptsLeft} ${p.attemptsLeft === 1 ? 'try' : 'tries'} left.` : 'A wrong code 3 times cancels the pairing.';
   } else $('otherCode').value = '';
 
   const result = $('result');
   const done = p && ['paired', 'failed', 'cancelled', 'expired'].includes(p.state);
-  result.hidden = !done;
-  $('openNewBtn').hidden = !(done && p.state === 'paired');
-  if (done) {
-    result.className = `result ${p.state === 'paired' ? 'ok' : 'bad'}`;
-    result.textContent = p.state === 'paired' ? `Paired with ${p.peer?.name}. Both devices now trust each other.` : p.message;
-    if (p.state === 'paired' && lastPaired !== p.peer?.fingerprint) { if (lastPaired !== null || !firstLoad) toast(`Paired with ${p.peer?.name}`); lastPaired = p.peer?.fingerprint; }
+  // A discovery wait that ran out or was replaced is not news; a real pairing's result is.
+  if (done && !(p.discover && p.state !== 'paired')) lastResult = { state: p.state, message: p.message, peer: p.peer };
+  if (!wantPair && !done) lastResult = null;
+  const shown = done && !(p.discover && p.state !== 'paired') ? lastResult : (view === 'idle' ? lastResult : null);
+  result.hidden = !shown;
+  $('openNewBtn').hidden = !(shown && shown.state === 'paired');
+  if (shown) {
+    result.className = `result ${shown.state === 'paired' ? 'ok' : 'bad'}`;
+    result.textContent = shown.state === 'paired' ? `Paired with ${shown.peer?.name}. Both devices now trust each other.` : shown.message;
   }
+  if (done && p.state === 'paired' && lastPaired !== p.peer?.fingerprint) { if (lastPaired !== null || !firstLoad) toast(`Paired with ${p.peer?.name}`); lastPaired = p.peer?.fingerprint; }
 }
 
 $('openNewBtn').onclick = () => {
-  const fp = state?.pairing?.peer?.fingerprint;
+  const fp = lastResult?.peer?.fingerprint || state?.pairing?.peer?.fingerprint;
   const peer = state?.peers.find(x => x.fingerprint === fp);
-  if (peer) select(peer.id);
+  if (peer) { lastResult = null; select(peer.id); }
 };
-function openPair() { wantPair = true; wantSecrets = false; wantFirewall = false; mobileMain = true; render(state); }
+function openPair() { wantPair = true; wantSecrets = false; wantFirewall = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
 $('newPairBtn').onclick = openPair;
 $('sidePairBtn').onclick = openPair;
 $('ovPairBtn').onclick = openPair;
@@ -1270,7 +1344,7 @@ function syncSecretPeer() {
   $('secretTo').textContent = p ? p.name : 'the other device';
   if (secretMode !== 'add') $('secretTitle').textContent = secretMode === 'stored' ? `Send ${storedItem.name}${p ? ` to ${p.name}` : ''}` : `Send a secret${p ? ` to ${p.name}` : ''}`;
 }
-function openSecretModal(mode, { item = null, fromConversation = false } = {}) {
+function openSecretModal(mode, { item = null, fromConversation = false, name = '' } = {}) {
   const sending = mode === 'send' || mode === 'stored';
   const peers = secretPeers();
   if (sending && !peers.length) return toast('Pair a device first: secrets go only to paired devices.');
@@ -1286,7 +1360,7 @@ function openSecretModal(mode, { item = null, fromConversation = false } = {}) {
     $('peerRow').hidden = !sending; $('howBox').hidden = !sending; $('speakerRow').hidden = !sending;
     $('valueRow').hidden = mode === 'stored'; $('storedNote').hidden = mode !== 'stored';
     $('secretName').readOnly = mode === 'stored';
-    $('secretName').value = item ? item.name : ''; $('secretValue').value = ''; $('secretValue').type = 'password'; $('secretShow').textContent = 'Show';
+    $('secretName').value = item ? item.name : name; $('secretValue').value = ''; $('secretValue').type = 'password'; $('secretShow').textContent = 'Show';
     if (sending) {
       $('secretPeer').replaceChildren(...peers.map(p => new Option(p.name, p.id)));
       const pre = fromConversation ? selected : (peers.find(p => p.id === selected) || peers[0]).id;
@@ -1379,9 +1453,11 @@ $('secretForm').onsubmit = async e => {
 
   if (how === 'wifi') {
     try {
-      if (stored) await api('POST', '/ui/secrets/send', { id: storedItem.id, to: peer.id });
-      else await api('POST', '/ui/secret/wifi', { to: peer.id, name, value });
-      secretFinish('ok', `Sent ${name} to ${peer.name} over Wi-Fi. It is in its key store now.`); refresh.once();
+      const r = stored ? await api('POST', '/ui/secrets/send', { id: storedItem.id, to: peer.id }) : await api('POST', '/ui/secret/wifi', { to: peer.id, name, value });
+      secretFinish('ok', r.offered
+        ? `Sent ${name} to ${peer.name}. Its person accepts it there (Secrets › Accept); until then nothing can use it.`
+        : `Sent ${name} to ${peer.name} over Wi-Fi. It is in its key store now.`);
+      refresh.once();
     } catch (err) { secretFinish('bad', err.message); }
     return;
   }
@@ -1419,6 +1495,18 @@ $('compareActions').onsubmit = async e => {
   try { render(await api('POST', '/ui/confirm', { code })); $('otherCode').value = ''; } catch (err) { toast(err.message); refresh.once(); }
 };
 $('rejectBtn').onclick = () => act('POST', '/ui/cancel');
+$('matchBtn').onclick = async () => {
+  try { render(await api('POST', '/ui/confirm', { match: true })); } catch (err) { toast(err.message); refresh.once(); }
+};
+$('inviteBtn').onclick = async () => {
+  try { render(await api('POST', '/ui/invite', { mode: $('inviteMode').value, ...($('inviteTs').checked ? { over: 'tailscale' } : {}) })); }
+  catch (err) { toast(err.message); }
+};
+$('inviteCopy').onclick = async () => {
+  try { await navigator.clipboard.writeText($('inviteCmd').textContent); toast('Copied. Run it on the other computer, or give it to the agent there.'); }
+  catch { toast('Select the command and copy it.'); }
+};
+$('pairMore').addEventListener('toggle', () => render(state));
 $('cancelBtn').onclick = () => act('POST', '/ui/cancel');
 $('codeForm').onsubmit = e => { e.preventDefault(); const code = $('codeInput').value.trim(); if (code) { stopListening(); act('POST', '/ui/heard', { code }); } };
 

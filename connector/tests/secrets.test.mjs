@@ -55,20 +55,88 @@ test('a secret travels by (synthesized) sound, lands in the key store, and agent
   } finally { await A.stop(); await B.stop(); }
 });
 
-test('HIGH fix: nothing is accepted unless the person pressed "Receive a secret"', async () => {
+test('HIGH fix: nothing is usable unless the person accepts it: by sound only while receiving; by Wi-Fi it waits as an offer', async () => {
   const A = await startDevice('a'), B = await startDevice('b');
   try {
     await pair(A, B);
-    const hex = (await ui(A, 'POST', '/ui/secret/seal', { to: 'b', name: 'X', value: 'y' })).body.hex;
+    const hex = (await ui(A, 'POST', '/ui/secret/seal', { to: 'b', name: 'X', value: 'y-sound' })).body.hex;
     const bySound = await ui(B, 'POST', '/ui/secret/heard', { hex });
     assert.equal(bySound.status, 409); assert.match(bySound.body.error, /NOT_RECEIVING/);
-    const byWifi = await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'X', value: 'y' });
-    assert.equal(byWifi.status, 409); assert.match(byWifi.body.error, /press "Receive"/);
     assert.equal((await secretsOf(B)).length, 0);
+
+    // Wi-Fi without Receive: stored as an offer, which nothing can use or reveal.
+    const byWifi = await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'X', value: 'y-offer' });
+    assert.equal(byWifi.status, 200, JSON.stringify(byWifi.body));
+    assert.equal(byWifi.body.offered, true);
+    const offer = (await secretsOf(B)).find(s => s.name === 'X');
+    assert.equal(offer.offered, true);
+    assert.equal((await ui(B, 'POST', '/ui/secrets/reveal', { id: offer.id })).status, 409);
+    assert.equal((await api(B, 'POST', '/api/secret-use', { names: ['X'], command: ['node', 'x.js'] })).status, 404, 'an offer is not usable');
+    assert.notEqual((await api(B, 'POST', '/ui/secrets/accept', { id: offer.id })).status, 200, 'the agent cannot accept it');
+    // The person accepts it: now it is a normal secret.
+    assert.equal((await ui(B, 'POST', '/ui/secrets/accept', { id: offer.id })).status, 200);
+    assert.equal((await ui(B, 'POST', '/ui/secrets/reveal', { id: offer.id })).body.value, 'y-offer');
+    // Decline deletes an offer.
+    await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'W', value: 'w' });
+    const w = (await secretsOf(B)).find(s => s.name === 'W');
+    assert.equal((await ui(B, 'POST', '/ui/secrets/decline', { id: w.id })).status, 200);
+    assert.equal((await secretsOf(B)).some(s => s.name === 'W'), false);
+    // With Receive pressed, a Wi-Fi secret is accepted at once (as before).
     await receive(B);
-    assert.equal((await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'X', value: 'y' })).status, 200);
-    await ui(B, 'POST', '/ui/secret/receive', { on: false });
-    assert.equal((await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'Z', value: 'y' })).status, 409, 'closing the window closes it');
+    const r = await ui(A, 'POST', '/ui/secret/wifi', { to: 'b', name: 'Z', value: 'z' });
+    assert.equal(r.body.offered, false);
+    assert.equal((await secretsOf(B)).find(s => s.name === 'Z').offered, false);
+  } finally { await A.stop(); await B.stop(); }
+});
+
+test('offers: a device in Auto mode is accepted at once; a device can offer at most 5 at a time; an offer never replaces silently', async () => {
+  const A = await startDevice('offer-a'), B = await startDevice('offer-b');
+  try {
+    await pair(A, B);
+    const peerA = B.store.peers()[0].id;
+    for (let i = 0; i < 5; i++) assert.equal((await ui(A, 'POST', '/ui/secret/wifi', { to: 'offer-b', name: `K${i}`, value: 'v' })).status, 200);
+    const sixth = await ui(A, 'POST', '/ui/secret/wifi', { to: 'offer-b', name: 'K5', value: 'v' });
+    assert.notEqual(sixth.status, 200, 'the 6th waiting offer is refused');
+    assert.match(sixth.body.error, /waiting to be accepted/);
+    // Auto mode for A on B: accepted at once.
+    await ui(B, 'POST', '/ui/firewall/mode', { scope: peerA, mode: 'auto' });
+    const auto = await ui(A, 'POST', '/ui/secret/wifi', { to: 'offer-b', name: 'AUTO_KEY', value: 'a1' });
+    assert.equal(auto.body.offered, false);
+    // ...but a new value for a name it already has still waits for approval.
+    const again = await ui(A, 'POST', '/ui/secret/wifi', { to: 'offer-b', name: 'AUTO_KEY', value: 'a2' });
+    assert.equal(again.body.pending, true);
+  } finally { await A.stop(); await B.stop(); }
+});
+
+test('requests: a device asks for a secret by name; the person here sends it with one click, and it is accepted there', async () => {
+  const A = await startDevice('req-a'), B = await startDevice('req-b');
+  try {
+    await pair(A, B);
+    await ui(A, 'POST', '/ui/secrets/add', { name: 'STRIPE_TEST_KEY', value: 'sk_test_req_1' });
+    // B's agent asks A's person for it.
+    const ask = await api(B, 'POST', '/api/send', { to: 'req-a', intent: 'person.secret.request', args: { name: 'STRIPE_TEST_KEY', reason: 'the shop build needs it' } });
+    assert.equal(ask.status, 200, JSON.stringify(ask.body));
+    const reqs = (await state(A)).secretRequests;
+    assert.equal(reqs.length, 1);
+    assert.deepEqual([reqs[0].name, reqs[0].have, reqs[0].peer.name], ['STRIPE_TEST_KEY', true, 'req-b']);
+    assert.match(reqs[0].reason, /shop build/);
+    // Agents can't answer it.
+    assert.notEqual((await api(A, 'POST', '/ui/secret-requests/answer', { id: reqs[0].id })).status, 200);
+    // One click on A: sent, and accepted on B because B asked (no Receive, no Accept).
+    const sent = await ui(A, 'POST', '/ui/secret-requests/answer', { id: reqs[0].id });
+    assert.equal(sent.status, 200, JSON.stringify(sent.body));
+    assert.equal(sent.body.answer.offered, false);
+    const got = (await secretsOf(B)).find(s => s.name === 'STRIPE_TEST_KEY');
+    assert.equal(got.offered, false);
+    assert.equal((await ui(B, 'POST', '/ui/secrets/reveal', { id: got.id })).body.value, 'sk_test_req_1');
+    assert.equal((await state(A)).secretRequests.length, 0, 'answered requests leave the list');
+    // A request for a name A doesn't have says so; dismiss removes it.
+    await api(B, 'POST', '/api/send', { to: 'req-a', intent: 'person.secret.request', args: { name: 'MISSING_KEY' } });
+    const r2 = (await state(A)).secretRequests[0];
+    assert.equal(r2.have, false);
+    assert.equal((await ui(A, 'POST', '/ui/secret-requests/answer', { id: r2.id })).status, 404);
+    assert.equal((await ui(A, 'POST', '/ui/secret-requests/answer', { id: r2.id, dismiss: true })).status, 200);
+    assert.equal((await state(A)).secretRequests.length, 0);
   } finally { await A.stop(); await B.stop(); }
 });
 
@@ -172,9 +240,8 @@ test('vault: the person adds a secret here, sends a stored one by Wi-Fi or sound
     assert.notEqual((await api(A, 'POST', '/ui/secrets/send', { id: mine.id, to: B.meId })).status, 200);
     assert.ok(!JSON.stringify((await api(A, 'GET', '/api/secrets')).body).includes('sk_test_fake'));
 
-    // Send the stored one by Wi-Fi: B must be receiving.
+    // Send the stored one by Wi-Fi (B is receiving, so it is accepted at once).
     const peerB = A.store.peers()[0].id;
-    assert.equal((await ui(A, 'POST', '/ui/secrets/send', { id: mine.id, to: peerB })).status, 409, 'B is not receiving');
     await receive(B);
     const sent = await ui(A, 'POST', '/ui/secrets/send', { id: mine.id, to: peerB });
     assert.equal(sent.status, 200, JSON.stringify(sent.body));

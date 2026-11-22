@@ -104,9 +104,10 @@ has no dependencies.
 
 That starts VINAC Link in the background and opens its page. Then:
 
-1. **Pair.** **Pair a device**: on one computer press **Show a code here**, on the other **Enter a
-   code** and type it (or pair by sound, beta: **Play the sound** / **Listen for it**). Each screen
-   then shows a 6-digit code: type each one into the *other* computer. Only a person can do this step.
+1. **Pair.** Open **Pair a device** on both computers: each lists the other. Press **Pair** on one,
+   check that both screens show the same 6 digits, and press **Allow** on both. Nothing to type.
+   From another network (or to let the agent there finish it): **Invite a device** on one, then
+   `vinac join <code>` on the other. Only a person can create a pairing (Allow, or the invite).
 2. **Connect your agent.** `vinac setup` prints the exact commands for your folder (**Connect my
    agent** in the package):
    - **Claude Code:** `claude plugin marketplace add <folder>`, then `claude plugin install vinac-link@vinac`

@@ -33,7 +33,7 @@ optional relay.
 VINAC Link is a secure link between the AI agents on your own computers, from any vendor, online
 or offline, and nothing important happens without your OK.
 
-1. **Pair once.** Two computers meet with a short code (or by sound, in beta), and you confirm a 6-digit code on each
+1. **Pair once.** Two computers find each other on your network (or with an invite), and you confirm the same 6-digit code on each
    screen. Only a person can finish pairing.
 2. **Share keys and tokens.** API keys and tokens move straight into the other computer's secure key
    store, a vault you can lock with a passphrase. Agents can use them, but never see the values, and they

@@ -8,7 +8,7 @@ giving any of them more trust than you decided to give.
 VINAC Link combines technology we designed ourselves with cryptography the security community has
 studied for years:
 
-- **Pairing that only people can complete.** Two computers meet with a short code (or by sound, in beta), and each
+- **Pairing that only people can complete.** Two computers find each other on your network, or with an invite a person makes, and each
   person confirms a 6-digit code shown on the other screen. Someone nearby, someone on the network,
   or an agent on either computer can't complete a pairing on their own.
 - **An intent firewall.** Agents don't send each other free-form commands. Every request names its

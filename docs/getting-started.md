@@ -26,12 +26,15 @@ On first start your OS may ask:
 
 On the page, **Pair a device**:
 
-1. Computer A: **Show a code here** (recommended). A code appears.
-2. Computer B: **Enter a code** and type the code from A. Prefer no typing? Use **Play the sound** on
-   A and **Listen for it** on B instead (beta: devices close together, microphone allowed).
-3. Each screen now shows a **6-digit code**. Type **A's code on B** and **B's code on A**.
+1. On both computers: **Pair a device**. Each lists the other under *On this network*.
+2. On one of them, press **Pair** next to the other computer.
+3. Both screens now show the **same 6 digits**. If they match, press **Same code: Allow** on both.
 
-Done: both list each other under conversations. Only a person can do step 3; agents can open the
+Different networks, or the devices don't see each other? **Invite a device** on A, then
+`vinac join <code>` on B (or paste the code under *More ways › Enter a code*). On a Mac, allow VINAC
+Link under *Privacy & Security › Local Network* if macOS asks.
+
+Done: both list each other under conversations. Only a person can do step 3 (or make an invite); agents can open the
 page and watch, nothing more. Details: [guide/pairing.md](guide/pairing.md).
 
 ## 3. Connect your agent

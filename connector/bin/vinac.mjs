@@ -220,6 +220,15 @@ Next: pair another computer on the page, then connect your agent:
     child.on('error', e => fail(`could not start ${cmd}: ${e.message}`));
     // 'close' comes after the output is through the filter; then let it reach the terminal before exiting.
     child.on('close', code => process.stdout.write('', () => process.stderr.write('', () => process.exit(code ?? 1))));
+  } else if (command === 'join') {
+    // An invite made by a person on another device ("Invite a device" on its page). Redeeming it pairs
+    // this device with that one; the code works once, for 10 minutes.
+    const code = opt._.join('');
+    if (!code) fail('usage: vinac join <invite code>   (make one on the other device: Pair a device > Invite a device)');
+    const api = await connected();
+    const r = await api.call('POST', '/api/join', { code }, 40_000);
+    console.log(`Paired with ${r.peer.name} (${r.peer.fingerprint}). Your agents can now message each other through VINAC Link.`);
+    await api.daemon?.stop();
   } else if (command === 'version' || command === '--version') {
     console.log(VERSION);
   } else {
@@ -240,6 +249,7 @@ Usage: vinac <command>        (or: npx vinac-link <command>, or: node connector/
   group       group list | group set NAME "PC 1,PC 2" | group remove NAME   (then send "to": NAME)
   audit       the log of what happened (--verify checks it was not edited)
   run         run --secret NAME -- COMMAND  runs a program with a secret in its environment, after you approve on the page
+  join        join <invite>  pairs with the device whose person made that invite (Pair a device > Invite a device)
 Options: --home DIR  --port N  --name NAME`);
   }
 } catch (e) {

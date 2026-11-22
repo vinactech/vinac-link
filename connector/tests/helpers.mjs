@@ -2,16 +2,21 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { Daemon } from '../src/daemon.js';
+import { MemoryBus } from '../src/discovery.js';
 
 process.env.VINAC_KEYSTORE ??= 'file';
 process.env.VINAC_NO_BROWSER = '1';
 process.env.VINAC_LAN_HOST = '127.0.0.1'; // tests never listen on the real network
+process.env.VINAC_DISCOVERY = 'off';      // ...nor send discovery packets on it (services the CLI starts inherit this)
 
 export const tempHome = label => fs.mkdtempSync(path.join(os.tmpdir(), `vinac-${label}-`));
 
+/** Devices in one test process find each other on this in-memory "network" while pairing. */
+export const network = new MemoryBus();
+
 /** `extra.maxProtocol: 2` plays a device on an older version (no Noise). */
 export async function startDevice(name, home = tempHome(name), extra = {}) {
-  const d = await new Daemon({ home, name, port: 0, host: '127.0.0.1', lanHost: '127.0.0.1', log: () => {}, ...extra }).start();
+  const d = await new Daemon({ home, name, port: 0, host: '127.0.0.1', lanHost: '127.0.0.1', log: () => {}, discovery: network.join(), ...extra }).start();
   d.homeDir = home;
   return d;
 }

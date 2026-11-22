@@ -33,6 +33,7 @@ import { SECRET_MAGIC, SECRET_HEADER, SECRET_MAX_NAME, SECRET_MAX_VALUE, SECRET_
 import { codedLength } from '../../lab/js/fec.js';
 import { detectKeystore, protect, unprotect, forget } from './keystore.js';
 import { Vault, sealTo, openWith, checkPassphrase } from './vault.js';
+import { UdpDiscovery, nearbyPacket, readNearbyPacket, NEARBY_TTL_MS } from './discovery.js';
 import { encodeBeacon, decodeBeacon, beaconToCode, codeToBeacon, fromHex, toHex, BEACON_BPS } from '../web/beacon.js';
 import { createHash } from 'node:crypto';
 import { LOGOS_VERSION, isIntent, catalog, riskOf, ARG_SHAPES } from './logos.js';
@@ -48,6 +49,7 @@ const LAB_DIR = path.resolve(here, '../../lab');
 const APP_VERSION = env('TEST_VERSION') || JSON.parse(fs.readFileSync(path.resolve(here, '../package.json'), 'utf8')).version;
 export const DEFAULT_PORT = 47800;
 const PAIR_TTL_MS = 3 * 60_000;
+const INVITE_TTL_MS = 10 * 60_000;                    // an invite, or waiting to be picked from a list
 const POLL_MS = 1000;
 const TERMINAL = new Set(['paired', 'failed', 'cancelled', 'expired']);
 
@@ -56,7 +58,7 @@ const STATE_TEXT = {
   listening: 'Listening for a pairing sound.',
   exchanging: 'Another device answered. Exchanging keys…',
   connecting: 'Heard a device. Connecting…',
-  comparing: 'Type the code from the other device here, and this device’s code there.',
+  comparing: 'Check that both screens show the same 6 digits, then press Allow on both.',
   paired: 'Paired.',
   failed: 'Pairing failed.',
   cancelled: 'Pairing was cancelled.',
@@ -74,9 +76,11 @@ const REPLAY_KEEP_MS = 2 * CLOCK_SKEW_MS + 60_000;   // ids are remembered for t
 const MAX_WAIT_S = 60;
 const PEER_CHECK_MS = 15_000;
 const ASK_TTL_MS = 3 * 24 * 60 * 60_000;            // a request nobody decided on expires after 3 days
-const MAX_WAITING_PER_PEER = 25;
-const OUTBOX_TTL_MS = 24 * 60 * 60_000;          // a message for an offline device waits this long
-const MAX_QUEUED = 200;                           // messages waiting to be sent, all devices                    // more than this waiting from one device: block the rest
+const MAX_WAITING_PER_PEER = 25;                    // more than this waiting from one device: block the rest
+const OUTBOX_TTL_MS = 24 * 60 * 60_000;             // a message for an offline device waits this long
+const MAX_QUEUED = 200;                              // messages waiting to be sent, all devices
+const MAX_OFFERS_PER_PEER = 5;                       // secrets offered by one device, waiting for Accept
+const SECRET_ASK_MS = 60 * 60_000;                   // a secret this device asked for is accepted for an hour
 const SESSION_TTL_MS = 60 * 60_000;                   // fresh session keys at least hourly
 const SESSION_MAX_USES = 500;
 const MAX_IN_SESSIONS = 256;
@@ -183,8 +187,15 @@ const version = v => { if (v !== PROTOCOL_VERSION) throw httpError(400, `UNSUPPO
 
 export class Daemon {
   // maxProtocol: 3 (Noise, docs/NOISE.md) with v2 kept for older devices; 2 only in tests, to play an older device.
-  constructor({ home, name, port: p = DEFAULT_PORT, uiPort, host = null, altHosts = null, lanHost = env('LAN_HOST') || '0.0.0.0', maxProtocol = PROTOCOL_V3, log = (...a) => console.error('[vinac]', ...a) } = {}) {
+  // discovery: finding devices on the network while pairing (UdpDiscovery by default; a MemoryBus
+  // member in tests; false or VINAC_DISCOVERY=off to switch it off).
+  constructor({ home, name, port: p = DEFAULT_PORT, uiPort, host = null, altHosts = null, lanHost = env('LAN_HOST') || '0.0.0.0', maxProtocol = PROTOCOL_V3, discovery, log = (...a) => console.error('[vinac]', ...a) } = {}) {
     this.store = new Store(home);
+    this.discovery = discovery && typeof discovery === 'object' ? discovery
+      : discovery === false || env('DISCOVERY') === 'off' ? null : new UdpDiscovery({ log });
+    this.nearby = new Map();       // beacon fingerprint (hex) -> a device that is waiting to be picked
+    this.finished = new Map();     // rendezvous id -> a pairing this device announced and finished (2 minutes)
+    this.secretAsks = new Map();   // "peerId|NAME" -> until (ms): secrets this device asked for are accepted
     this.maxProtocol = maxProtocol;
     this.name = name; this.port = p; this.uiPort = uiPort ?? (p ? p + 1 : 0); this.hostOverride = host; this.lanHost = lanHost; this.log = log;
     this.altHosts = altHosts; // other addresses to offer (default: this machine's Tailscale address)
@@ -233,7 +244,51 @@ export class Daemon {
     this.log(`device "${this.me.name}" ${this.me.fpText} (${this.me.keystore}) · network ${this.address}:${this.port} · page ${this.uiUrl}`);
     if (this.me.keystore === 'file') this.log('WARNING: development mode, keys are in a plain file (VINAC_KEYSTORE=file).');
     this.checkPeers();
+    if (this.discovery) {
+      try { this.discovery.start((buf, from) => this.onNearby(buf, from)); } catch (e) { this.log(`discovery off: ${e.message}`); }
+      this.nearbyTimer = setInterval(() => this.announceNearby(), 1500);
+      this.nearbyTimer.unref?.();
+    }
     return this;
+  }
+
+  // ---- finding devices on the network while pairing (see discovery.js) -------
+
+  /** While this device waits to be picked (an announce that isn't an invite), tell the network. */
+  announceNearby() {
+    const p = this.current();
+    if (!p || p.role !== 'announce' || p.state !== 'announcing' || p.invite || !p.beacon) return;
+    this.discovery?.send(nearbyPacket({ name: this.me.name, beacon: p.beacon, proto: this.maxProtocol }));
+  }
+
+  onNearby(buf, from) {
+    const n = readNearbyPacket(buf);
+    if (!n || n.fp === this.meId) return;
+    n.name = cleanName(n.name) || 'Unnamed device';
+    n.from = typeof from === 'string' ? plainIp(from) : n.ip;
+    n.at = Date.now();
+    this.nearby.set(n.fp, n);
+    if (this.nearby.size > 64) this.nearby.delete(this.nearby.keys().next().value);
+  }
+
+  /** Devices seen in the last few seconds, for the "Pair a device" screen. */
+  nearbyView() {
+    const now = Date.now();
+    const peers = this.store.peers();
+    const out = [];
+    for (const [fp, n] of this.nearby) {
+      if (now - n.at > NEARBY_TTL_MS) { this.nearby.delete(fp); continue; }
+      const known = peers.find(x => x.id === fp);
+      out.push({ id: fp, name: n.name, fingerprint: formatFingerprint(Buffer.from(fp, 'hex')), paired: !!known, ...(known ? { pairedAs: known.name } : {}) });
+    }
+    return out.sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  /** The person picked a device from the list: pair with it, as if its code had been typed. */
+  pairNearby(id) {
+    const n = this.nearby.get(String(id));
+    if (!n || Date.now() - n.at > NEARBY_TTL_MS) throw httpError(404, 'That device is no longer waiting. Ask its person to open Pair a device again.');
+    return this.heard({ hex: n.beacon, via: 'network', ip: n.from });
   }
 
   /** Every 15 s, asks each paired device to prove it is there (for the page's online dots). */
@@ -263,6 +318,8 @@ export class Daemon {
     this.stopPolling();
     this.auto.stop();
     clearTimeout(this.peerTimer);
+    clearInterval(this.nearbyTimer);
+    this.discovery?.stop();
     for (const w of this.waiters) w();
     for (const w of this.eventWaiters) w();
     await Promise.all([this.lan, this.ui].filter(Boolean).map(s => new Promise(r => { s.closeAllConnections?.(); s.close(() => r()); })));
@@ -319,14 +376,17 @@ export class Daemon {
     if (!p) return null;
     const v = {
       role: p.role, state: p.state, message: p.error || STATE_TEXT[p.state], via: p.via, quiet: !!p.quiet,
+      discover: !!p.discover, ...(p.invite ? { invite: { mode: p.invite.mode } } : {}), ...(p.join ? { join: true } : {}),
       peer: p.peer ? { name: p.peer.name, fingerprint: p.peer.idPub ? formatFingerprint(fingerprint(p.peer.idPub)) : null } : null,
       confirmedHere: !!p.localConfirmed, confirmedThere: !!p.remoteConfirmed, attemptsLeft: CODE_ATTEMPTS - (p.attempts || 0),
       secondsLeft: TERMINAL.has(p.state) ? 0 : Math.max(0, Math.round((p.expiresAt - Date.now()) / 1000)),
     };
-    // For the person only: this device's own code (to type on the other one)
-    // and the beacon. The code this device expects is never shown anywhere.
+    // For the person only, never through agent tools:
+    //  matchCode: the 6 digits both screens show (the announcing device's code), to compare and Allow;
+    //  showCode: this device's own code, to type on an older VINAC Link that asks for one;
+    //  the beacon (sound / typed code / invite).
     if (forHuman) {
-      if (p.showCode && p.state === 'comparing') v.showCode = p.showCode;
+      if (p.showCode && p.state === 'comparing') { v.showCode = p.showCode; v.matchCode = p.role === 'announce' ? p.showCode : p.expectCode; }
       if (p.beacon && p.state === 'announcing') { v.beaconHex = toHex(p.beacon); v.beaconCode = beaconToCode(p.beacon); }
     }
     return v;
@@ -344,6 +404,10 @@ export class Daemon {
   setState(p, state, error = null) {
     p.state = state;
     if (error) p.error = error;
+    if (state === 'paired' && p.role === 'announce') {
+      this.finished.set(p.id, p);
+      setTimeout(() => this.finished.delete(p.id), 2 * 60_000).unref?.();
+    }
     if (TERMINAL.has(state)) { this.stopPolling(); p.eph = null; p.hs = null; if (state !== 'paired') { p.key = null; p.showCode = null; p.expectCode = null; } }
     this.log(`pairing (${p.role}) → ${state}${error ? `: ${error}` : ''}`);
   }
@@ -386,8 +450,10 @@ export class Daemon {
     this.peerKeys.set(id, Buffer.from(p.key));
     this.outSessions.delete(id);
     p.expectCode = null; p.showCode = null;
+    // A device that joined with an invite starts in the mode the person chose for the invite.
+    if (p.invite) { try { this.fw.setMode(id, p.invite.mode, list.map(x => x.id)); } catch (e) { this.log(`invite mode not set: ${e.message}`); } }
     this.setState(p, 'paired');
-    this.audit.add('pair', { peer: { id, name: p.peer.name }, via: p.via });
+    this.audit.add('pair', { peer: { id, name: p.peer.name }, via: p.via, ...(p.invite ? { mode: p.invite.mode } : {}) });
   }
 
   cancel(reason = 'Cancelled on this device') {
@@ -401,16 +467,41 @@ export class Daemon {
 
   /** `over: 'tailscale'` puts the Tailscale address in the beacon, for a device on another network.
    *  `quiet`: the person chose to pair by typed code, so the page shows the code and plays no sound. */
-  startAnnounce({ over, quiet } = {}) {
+  startAnnounce({ over, quiet, discover, invite } = {}) {
     const ip = over === 'tailscale' ? this.tailscale : this.address;
     if (!ip) throw httpError(409, over === 'tailscale' ? 'Tailscale is not running on this device.' : 'This device has no local network address, so others cannot reach it.');
     const secret = randomBytes(8);
-    const beacon = encodeBeacon({ ip, port: this.port, secret, fingerprint: this.me.fp });
-    return this.newPairing('announce', { state: 'announcing', id: rendezvousId(secret).toString('hex'), secret, beacon, via: 'sound', quiet: !!quiet });
+    const beacon = encodeBeacon({ ip, port: this.port, secret, fingerprint: this.me.fp, invite: !!invite });
+    const p = this.newPairing('announce', { state: 'announcing', id: rendezvousId(secret).toString('hex'), secret, beacon, via: invite ? 'invite' : discover ? 'network' : 'sound', quiet: !!(quiet || discover || invite), discover: !!discover, ...(invite ? { invite } : {}) });
+    if (invite || discover) p.expiresAt = Date.now() + INVITE_TTL_MS;
+    if (discover) this.announceNearby();
+    return p;
+  }
+
+  /** "Pair a device" is open: wait to be picked from other devices' lists (no sound, no code to type). */
+  startDiscover() {
+    const p = this.current();
+    // Never replace something already going on (a pairing, a code or sound being shown, an invite).
+    if (p && !TERMINAL.has(p.state)) return p;
+    return this.startAnnounce({ discover: true });
+  }
+
+  /** An invite: a one-time code (10 minutes) the person hands to another device, or to its agent
+   *  (`vinac join <code>`). Whoever uses it first is paired without comparing codes, so the person
+   *  creates the trust by making the invite. The new device starts in `mode` (Restricted by default). */
+  createInvite({ mode, over } = {}) {
+    const m = ['restricted', 'standard', 'auto'].includes(mode) ? mode : 'restricted';
+    const p = this.startAnnounce({ invite: { mode: m }, over: over === 'tailscale' ? 'tailscale' : undefined });
+    this.audit.add('invite.created', { mode: m });
+    const code = beaconToCode(p.beacon);
+    return { code, command: `vinac join ${code}`, mode: m, expiresAt: new Date(p.expiresAt).toISOString() };
   }
 
   announcing(rid, states, req) {
-    const p = this.current();
+    let p = this.current();
+    // A pairing this device just finished may already be replaced here (the page starts waiting to be
+    // picked again at once); the other device can still collect its confirmation for two minutes.
+    if (!p || p.id !== rid) p = this.finished.get(rid);
     if (!p || p.role !== 'announce' || p.id !== rid || !states.includes(p.state)) throw httpError(404, 'NO_SUCH_PAIRING');
     if (p.peerAddr && req.socket.remoteAddress !== p.peerAddr) throw httpError(403, 'WRONG_PEER');
     return p;
@@ -428,7 +519,7 @@ export class Daemon {
     p.peerPort = port(body.port);
     p.peerAddress = hostPort(plainIp(p.peerAddr), p.peerPort);
     p.peerAlt = altAddressList(body.alt); // candidates only; used after the device proves itself there
-    if (body.via === 'code') p.via = 'code'; // the listener typed the code instead of hearing the sound
+    if (!p.invite && ['code', 'network', 'sound'].includes(body.via)) p.via = body.via; // how the listener found this device
     p.eph = newEphemeral();
     p.nA = randomBytes(16);
     p.expiresAt = Math.max(p.expiresAt, Date.now() + 2 * 60_000);
@@ -449,7 +540,7 @@ export class Daemon {
     p.peerPort = port(first.port);
     p.peerAddress = hostPort(plainIp(p.peerAddr), p.peerPort);
     p.peerAlt = altAddressList(first.alt);
-    if (first.via === 'code') p.via = 'code';
+    if (!p.invite && ['code', 'network', 'sound'].includes(first.via)) p.via = first.via;
     p.hs = hs;
     p.nA = randomBytes(16);
     p.expiresAt = Math.max(p.expiresAt, Date.now() + 2 * 60_000);
@@ -470,6 +561,7 @@ export class Daemon {
     p.peer.idPub = idB;
     const sig = b64u(sign(this.me.privateKey, t));
     this.settle3(p, t, p.hs);
+    this.autoConfirm(p);
     return { sig };
   }
 
@@ -483,6 +575,7 @@ export class Daemon {
     if (!verify(p.peer.idPub, t, bin(body.sig, 64))) { this.fail(p, 'The other device’s signature did not check out.'); throw httpError(400, 'BAD_SIGNATURE'); }
     const sig = b64u(sign(this.me.privateKey, t));
     this.settle(p, t, sharedSecret(p.eph.privateKey, p.peerEph));
+    this.autoConfirm(p);
     return { sig };
   }
 
@@ -511,20 +604,24 @@ export class Daemon {
     return this.newPairing('listen', { state: 'listening' });
   }
 
-  heard({ hex, code }) {
+  /** `via`/`ip`: picked from the nearby list (the address the packet came from wins). `join`: an invite. */
+  heard({ hex, code, via, ip, join = false }) {
     const bytes = typeof hex === 'string' ? fromHex(hex) : codeToBeacon(typeof code === 'string' ? code : '');
     const b = bytes ? decodeBeacon(bytes) : { ok: false };
-    if (!b.ok) throw httpError(400, code ? 'That code is not valid. Check it and try again.' : 'Damaged pairing sound.');
-    if (Buffer.from(b.fingerprint).equals(this.me.fp)) throw httpError(409, 'That pairing sound came from this device.');
+    if (!b.ok) throw httpError(400, code ? (join ? 'That invite is not valid. Copy the whole code and try again.' : 'That code is not valid. Check it and try again.') : 'Damaged pairing sound.');
+    if (Buffer.from(b.fingerprint).equals(this.me.fp)) throw httpError(409, b.invite ? 'That invite was made on this device. Use it on the other one.' : 'That pairing sound came from this device.');
+    if (join && !b.invite) throw httpError(400, 'That is a pairing code, not an invite. Compare the 6 digits on both screens instead, or make an invite with Invite a device.');
+    if (b.invite && hex) throw httpError(400, 'Invites are never played as sound.');
+    join = join || b.invite; // an invite typed into Enter a code works the same way
     let p = this.current();
     // The same sound heard again (the announcing device repeats it, and every open VINAC Link page
     // listens): keep the pairing already in progress instead of replacing it.
     if (p && p.role === 'listen' && p.state !== 'listening' && !TERMINAL.has(p.state) && p.secret && Buffer.from(b.secret).equals(p.secret)) return p;
     if (!p || p.role !== 'listen' || p.state !== 'listening') p = this.startListen();
     Object.assign(p, {
-      via: hex ? 'sound' : 'code', secret: Buffer.from(b.secret), beaconFp: Buffer.from(b.fingerprint),
-      id: rendezvousId(Buffer.from(b.secret)).toString('hex'), target: `http://${b.ip}:${b.port}`, beaconPort: b.port,
-      peerAddress: hostPort(b.ip, b.port),
+      via: join ? 'invite' : via === 'network' ? 'network' : hex ? 'sound' : 'code', secret: Buffer.from(b.secret), beaconFp: Buffer.from(b.fingerprint),
+      id: rendezvousId(Buffer.from(b.secret)).toString('hex'), target: `http://${ip || b.ip}:${b.port}`, beaconPort: b.port,
+      peerAddress: hostPort(ip || b.ip, b.port), join: !!join,
     });
     this.setState(p, 'connecting');
     this.runListener(p).catch(e => this.fail(p, friendlyNetError(e, p.target)));
@@ -566,6 +663,7 @@ export class Daemon {
     if (typeof r2.sig !== 'string' || !verify(idA, t, fromB64u(r2.sig))) return this.fail(p, 'The other device’s signature did not check out.');
     this.settle3(p, t, hs);
     this.poll(p);
+    await this.autoConfirm(p);
   }
 
   async runListener2(p) {
@@ -586,6 +684,7 @@ export class Daemon {
     if (!verify(idA, t, bin(r2.sig, 64))) return this.fail(p, 'The other device’s signature did not check out.');
     this.settle(p, t, sharedSecret(p.eph.privateKey, eA));
     this.poll(p);
+    await this.autoConfirm(p);
   }
 
   poll(p) {
@@ -610,24 +709,49 @@ export class Daemon {
 
   // ---- the person's confirmation -------------------------------------------
 
-  /** Confirms with the code the person read on the other device. */
-  async confirm(code) {
+  /** The person confirms: `match` (they saw the same 6 digits on both screens and pressed Allow),
+   *  or `code`, the digits an older VINAC Link shows and asks to have typed. Only the page calls this. */
+  async confirm({ code, match } = {}) {
     const p = this.current();
     if (!p || p.state !== 'comparing') throw httpError(409, 'Nothing to confirm.');
     if (p.localConfirmed) return;
-    const typed = String(code ?? '').replace(/\D/g, '');
-    if (typed.length !== 6) throw httpError(400, 'Type the 6 digits shown on the other device.');
-    if (!codesEqual(typed, p.expectCode)) {
-      p.attempts = (p.attempts || 0) + 1;
-      if (p.attempts >= CODE_ATTEMPTS) { this.cancel('Too many wrong codes. Start pairing again on both devices.'); throw httpError(400, 'Too many wrong codes. Pairing was cancelled.'); }
-      throw httpError(400, `That code does not match. ${CODE_ATTEMPTS - p.attempts} ${CODE_ATTEMPTS - p.attempts === 1 ? 'try' : 'tries'} left.`);
+    if (match !== true) {
+      const typed = String(code ?? '').replace(/\D/g, '');
+      if (typed.length !== 6) throw httpError(400, 'Type the 6 digits shown on the other device.');
+      if (!codesEqual(typed, p.expectCode)) {
+        p.attempts = (p.attempts || 0) + 1;
+        if (p.attempts >= CODE_ATTEMPTS) { this.cancel('Too many wrong codes. Start pairing again on both devices.'); throw httpError(400, 'Too many wrong codes. Pairing was cancelled.'); }
+        throw httpError(400, `That code does not match. ${CODE_ATTEMPTS - p.attempts} ${CODE_ATTEMPTS - p.attempts === 1 ? 'try' : 'tries'} left.`);
+      }
     }
+    await this.sendConfirm(p);
+  }
+
+  async sendConfirm(p) {
     p.localConfirmed = true;
     if (p.role === 'listen') {
       try { await postJson(`${p.target}/pair/confirm`, { rid: p.id, tag: b64u(this.ctag(p, 'listen')) }); }
       catch (e) { p.localConfirmed = false; throw httpError(502, friendlyNetError(e, p.target)); }
     }
     this.finishIfBothConfirmed(p);
+  }
+
+  /** Invites need no comparing: the person on the inviting device made the invite, and the joining
+   *  device used it on purpose (`vinac join`). Both sides then confirm by themselves. */
+  async autoConfirm(p) {
+    if (!p || this.pair !== p || p.state !== 'comparing' || p.localConfirmed) return;
+    if (!((p.role === 'announce' && p.invite) || (p.role === 'listen' && p.join))) return;
+    try { await this.sendConfirm(p); } catch (e) { this.fail(p, e.message); }
+  }
+
+  /** `vinac join <invite>`: pair with the device that made the invite, and wait for the result. */
+  async join(code, { timeoutMs = 30_000 } = {}) {
+    const p = this.heard({ code: String(code ?? ''), join: true });
+    for (const until = Date.now() + timeoutMs; Date.now() < until && this.pair === p && !TERMINAL.has(p.state);) await new Promise(r => setTimeout(r, 200));
+    if (p.state === 'paired') return { paired: true, peer: { name: p.peer.name, fingerprint: formatFingerprint(fingerprint(p.peer.idPub)) } };
+    throw httpError(p.state === 'comparing' ? 409 : 502, p.state === 'comparing'
+      ? 'That code is a pairing code, not an invite: compare the 6 digits on both screens and press Allow on the VINAC Link page.'
+      : (p.error || 'Pairing did not finish. Make a new invite and try again.'));
   }
 
   /** Removes a pairing here and, if it can, tells the other device to remove it too. */
@@ -1042,6 +1166,8 @@ export class Daemon {
     if (body.length > MAX_TEXT) throw httpError(413, `Messages are limited to ${MAX_TEXT} characters.`);
     if (replyTo != null && replyTo !== '' && !MSG_ID.test(String(replyTo))) throw httpError(400, 'replyTo must be the id of a received message.');
     this.pairKeyOf(peer);
+    // Asking that device for a secret: when its person sends it within the hour, it is accepted here without a click.
+    if (intent === 'person.secret.request' && typeof reqArgs?.name === 'string') this.secretAsks.set(`${peer.id}|${reqArgs.name}`, Date.now() + SECRET_ASK_MS);
     const inner = { id: b64u(randomBytes(12)), text: body, sentAt: new Date().toISOString(), replyTo: replyTo || null, by, ...(intent ? { intent, args: sendArgs } : {}), ...(auto ? { auto: true } : {}) };
     try {
       await this.sendSealed(peer, 'msg', '/msg', inner.id, JSON.stringify(inner));
@@ -1179,7 +1305,7 @@ export class Daemon {
     if (!Array.isArray(command) || !command.length || command.length > 100) throw httpError(400, 'Give the command to run.');
     const items = this.store.secrets().items;
     const wanted = names.map(n => String(n));
-    for (const n of wanted) if (!items.some(s => s.name === n && !s.pending)) throw httpError(404, `No secret called "${n}" on this device (see vinac_secrets).`);
+    for (const n of wanted) if (!items.some(s => s.name === n && !s.pending && !s.offered)) throw httpError(404, `No usable secret called "${n}" on this device (see vinac_secrets; an offered one must be accepted on the page first).`);
     for (const [k, u] of this.secretUses) if (u.expires < Date.now()) this.secretUses.delete(k);
     if ([...this.secretUses.values()].filter(u => u.status === 'pending').length >= 5) throw httpError(429, 'Too many runs are waiting for approval.');
     const id = randomBytes(8).toString('hex');
@@ -1209,7 +1335,7 @@ export class Daemon {
     const values = {};
     const now = new Date().toISOString();
     for (const n of u.names) {
-      const s = store.items.filter(x => x.name === n && !x.pending).at(-1);
+      const s = store.items.filter(x => x.name === n && !x.pending && !x.offered).at(-1);
       if (s) { values[n] = this.readValue(s).toString('utf8'); s.lastUsedAt = now; }
     }
     this.store.saveSecrets(store);
@@ -1407,9 +1533,12 @@ export class Daemon {
   receiving() { return Date.now() < this.receiveUntil; }
   setReceiving(on) { this.receiveUntil = on ? Date.now() + RECEIVE_WINDOW_MS : 0; }
 
-  /** Opens a secret frame heard by sound or received over Wi-Fi, and stores (or stages) it. */
+  /** Opens a secret frame heard by sound or received over Wi-Fi, and stores it. It is accepted at once
+   *  when the person pressed Receive, when this device asked for that name in the last hour, or when
+   *  that device is in Auto mode; otherwise it is kept as an offer that waits for Accept on this page
+   *  and can't be used before. By sound it only arrives while the person listens. */
   receiveSecret(bytes, via) {
-    if (!this.receiving()) throw httpError(409, 'NOT_RECEIVING: the person on that device must press "Receive a secret" first.');
+    if (via === 'sound' && !this.receiving()) throw httpError(409, 'NOT_RECEIVING: the person on that device must press "Receive a secret" first.');
     const b = Buffer.from(bytes);
     if (!secretFrameLooksValid(b)) throw httpError(400, 'That did not sound like a complete VINAC Link secret. Try again.');
     if (!b.subarray(5, 9).equals(this.me.fp.subarray(0, 4))) throw httpError(403, 'That secret was sealed for a different device.');
@@ -1433,25 +1562,35 @@ export class Daemon {
       const from = { id: peer.id, name: peer.name };
       if (!this.store.rememberOnce(`s|${peer.id}|${id}`, sentAt + REPLAY_KEEP_MS)) return { duplicate: true, id, name, from };
       if (!this.peerSecretLimiter.allow(peer.id)) throw httpError(429, 'Too many secrets from that device; wait a minute.');
+      const askKey = `${peer.id}|${name}`;
+      const asked = (this.secretAsks.get(askKey) || 0) > Date.now();
+      const accept = this.receiving() || asked || this.fw.modeOf(peer.id) === 'auto';
       const s = this.store.secrets();
       if (s.items.length >= MAX_SECRETS) throw httpError(507, `This device already holds ${MAX_SECRETS} secrets. Delete some first.`);
+      if (!accept && s.items.filter(x => x.offered && x.from.id === peer.id).length >= MAX_OFFERS_PER_PEER) throw httpError(429, 'Too many secrets from that device are waiting to be accepted.');
       const label = `agentlink.secret.${id}`;
       const w = this.wrapValue(label, plain.subarray(13 + nl)); // fails closed; sealed to the vault when it has a passphrase
-      const existing = s.items.find(x => x.from.id === peer.id && x.name === name && !x.pending);
-      // An earlier unapproved replacement for the same name is superseded.
-      for (const old of s.items.filter(x => x.from.id === peer.id && x.name === name && x.pending)) forget(old.keystore, old.keyLabel);
-      s.items = s.items.filter(x => !(x.from.id === peer.id && x.name === name && x.pending));
+      const existing = s.items.find(x => x.from.id === peer.id && x.name === name && !x.pending && !x.offered);
+      // An earlier copy of the same name from that device that still waits (replacement or offer) is superseded.
+      const waiting = x => x.from.id === peer.id && x.name === name && (x.pending || x.offered);
+      for (const old of s.items.filter(waiting)) forget(old.keystore, old.keyLabel);
+      s.items = s.items.filter(x => !waiting(x));
       const item = { id, name, from, receivedAt: new Date().toISOString(), sentAt: new Date(sentAt).toISOString(), via, keystore: w.kind, keyLabel: label, wrapped: w.stored, ...(w.vault ? { vault: true } : {}) };
-      if (existing) Object.assign(item, { pending: true, replaces: existing.id });
+      if (!accept) Object.assign(item, { offered: true, ...(existing ? { replaces: existing.id } : {}) });
+      else if (existing && asked) { forget(existing.keystore, existing.keyLabel); s.items = s.items.filter(x => x.id !== existing.id); } // it asked: the new value replaces the old
+      else if (existing) Object.assign(item, { pending: true, replaces: existing.id });
+      if (asked) this.secretAsks.delete(askKey);
       s.items.push(item);
       this.store.saveSecrets(s);
-      this.logNote({ id: `s-${id}`, dir: 'in', peer, read: false, by: 'person', text: existing
+      this.logNote({ id: `s-${id}`, dir: 'in', peer, read: false, by: 'person', text: item.offered
+        ? `Secret "${name}" offered by ${peer.name}. It waits for the person to accept it on this device; until then nothing can use it.`
+        : item.pending
         ? `Secret "${name}" received by ${via === 'sound' ? 'sound' : 'Wi-Fi'} to replace the one you have. It is waiting for the person to approve the replacement on this device.`
         : `Secret "${name}" received by ${via === 'sound' ? 'sound' : 'Wi-Fi'}. Its value is stored in this device's key store; agent tools never return it.` });
-      this.log(`secret "${name}" ← ${peer.name} by ${via}${existing ? ' (waiting for approval to replace)' : ''}`);
-      this.audit.add('secret.in', { peer, name, via, ...(existing ? { replacement: true } : {}) });
+      this.log(`secret "${name}" ← ${peer.name} by ${via}${item.offered ? ' (offered: waiting for Accept)' : item.pending ? ' (waiting for approval to replace)' : ''}`);
+      this.audit.add('secret.in', { peer, name, via, ...(item.pending ? { replacement: true } : {}), ...(item.offered ? { offered: true } : {}), ...(asked ? { asked: true } : {}) });
       if (via === 'sound') this.ackSecret(peer, id, sha256('frame', b).toString('hex')).catch(() => {}); // over Wi-Fi the receipt does this
-      return { duplicate: false, id, name, from, keystore: w.kind, pending: !!existing };
+      return { duplicate: false, id, name, from, keystore: w.kind, pending: !!item.pending, offered: !!item.offered };
     } finally { plain.fill(0); }
   }
 
@@ -1487,18 +1626,18 @@ export class Daemon {
     }
     out.acked = true;
     this.audit.add('secret.out', { peer, name, via: 'Wi-Fi' });
-    this.logNote({ id: `s-${id}`, dir: 'out', peer, by: 'person', text: `Secret "${name}" delivered to ${peer.name} by Wi-Fi${r.pending ? ' (waiting for approval to replace the existing one)' : ''}.` });
-    return { sent: true, delivered: true, id, name, pending: !!r.pending };
+    this.logNote({ id: `s-${id}`, dir: 'out', peer, by: 'person', text: `Secret "${name}" delivered to ${peer.name} by Wi-Fi${r.offered ? '; waiting for its person to accept it' : r.pending ? ' (waiting for approval to replace the existing one)' : ''}.` });
+    return { sent: true, delivered: true, id, name, pending: !!r.pending, offered: !!r.offered };
   }
 
   lanSecret(body, req) {
     const { plain, receipt } = this.receiveSealed(body, req, 'secret');
     const r = this.receiveSecret(plain, 'wifi');
-    return { ok: true, duplicate: r.duplicate, pending: !!r.pending, receipt: receipt(r.id) };
+    return { ok: true, duplicate: r.duplicate, pending: !!r.pending, offered: !!r.offered, receipt: receipt(r.id) };
   }
 
   secretsView() {
-    return this.store.secrets().items.map(s => ({ id: s.id, name: s.name, from: s.from, receivedAt: s.receivedAt, via: s.via, keystore: s.keystore, pending: !!s.pending, own: !!s.own, lastUsedAt: s.lastUsedAt || null }));
+    return this.store.secrets().items.map(s => ({ id: s.id, name: s.name, from: s.from, receivedAt: s.receivedAt, via: s.via, keystore: s.keystore, pending: !!s.pending, offered: !!s.offered, own: !!s.own, lastUsedAt: s.lastUsedAt || null }));
   }
 
   // ---- the vault lock: values sealed to a key only the person's passphrase opens ----
@@ -1596,6 +1735,7 @@ export class Daemon {
   storedValue(id) {
     const { item } = this.findSecret(String(id));
     if (item.pending) throw httpError(409, 'Approve or reject this replacement first.');
+    if (item.offered) throw httpError(409, 'Accept this secret first.');
     return { name: item.name, value: this.readValue(item).toString('utf8') };
   }
 
@@ -1608,6 +1748,7 @@ export class Daemon {
 
   revealSecret(id) {
     const { item } = this.findSecret(String(id));
+    if (item.offered) throw httpError(409, 'Accept this secret first.');
     this.audit.add('secret.revealed', { name: item.name, from: item.from, by: 'person on the page' });
     return { id: item.id, name: item.name, value: this.readValue(item).toString('utf8') };
   }
@@ -1626,7 +1767,52 @@ export class Daemon {
     forget(item.keystore, item.keyLabel);
     s.items = s.items.filter(x => x.id !== item.id);
     this.store.saveSecrets(s);
-    this.audit.add('secret.deleted', { name: item.name, from: item.from });
+    this.audit.add(item.offered ? 'secret.declined' : 'secret.deleted', { name: item.name, from: item.from });
+  }
+
+  /** The person accepts a secret another device offered. It replaces that device's earlier copy, if any. */
+  acceptSecret(id) {
+    const { s, item } = this.findSecret(String(id));
+    if (!item.offered) return;
+    for (const old of s.items.filter(x => x.id === item.replaces)) forget(old.keystore, old.keyLabel);
+    s.items = s.items.filter(x => x.id !== item.replaces);
+    delete item.offered; delete item.replaces;
+    this.store.saveSecrets(s);
+    this.audit.add('secret.accepted', { name: item.name, from: item.from });
+  }
+
+  // ---- requests for secrets (person.secret.request): one click to send -----------
+
+  /** Paired devices asking this person for a secret by name, newest first (the last day, not answered). */
+  secretRequestsView() {
+    const items = this.store.secrets().items;
+    const since = Date.now() - 24 * 60 * 60_000;
+    return this.store.messages()
+      .filter(m => m.dir === 'in' && m.intent === 'person.secret.request' && !m.secretRequest && typeof m.args?.name === 'string'
+        && Date.parse(m.receivedAt) > since && !['blocked', 'rejected', 'expired'].includes(m.firewall?.status))
+      .slice(-20).reverse()
+      .map(m => ({ id: m.id, peer: m.peer, name: m.args.name, reason: typeof m.args.reason === 'string' ? m.args.reason.slice(0, 300) : '', at: m.receivedAt,
+        have: items.some(x => x.name === m.args.name && !x.pending && !x.offered) }));
+  }
+
+  /** Sends the secret a device asked for (from this device's vault), or dismisses the request. */
+  async answerSecretRequest(msgId, { dismiss = false } = {}) {
+    const list = this.store.messages();
+    const m = list.find(x => x.id === String(msgId) && x.dir === 'in' && x.intent === 'person.secret.request' && !x.secretRequest);
+    if (!m) throw httpError(404, 'That request is no longer waiting.');
+    let result = null;
+    if (!dismiss) {
+      const items = this.store.secrets().items.filter(x => x.name === m.args.name && !x.pending && !x.offered);
+      const item = items.find(x => x.own) || items.at(-1);
+      if (!item) throw httpError(404, `There is no ${m.args.name} on this device. Add it with Add, then press Send.`);
+      const { name, value } = this.storedValue(item.id);
+      result = await this.sendSecretWifi({ to: m.peer.id, name, value });
+    }
+    const now = this.store.messages();
+    const rec = now.find(x => x.id === m.id);
+    if (rec) { rec.secretRequest = dismiss ? 'dismissed' : 'sent'; this.store.saveMessages(now); }
+    this.audit.add(dismiss ? 'secret.request.dismissed' : 'secret.request.answered', { peer: m.peer, name: m.args.name });
+    return result || { dismissed: true };
   }
 
   secretAirtime(bytes) {
@@ -1677,7 +1863,8 @@ export class Daemon {
     const state = extra => ({
       device: this.device(), pairing: this.pairingView({ forHuman: true }), peers: this.peers(), conversations: this.conversations(),
       secrets: this.secretsView(), receiving: this.receiving() ? Math.round((this.receiveUntil - Date.now()) / 1000) : 0,
-      waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), vaultLock: this.vault.view(), ...extra,
+      waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), vaultLock: this.vault.view(),
+      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), ...extra,
     });
     if (req.method === 'POST' && url.pathname === '/ui/send-file') {
       // The person attaches a file in a conversation (raw bytes; name and device in the query).
@@ -1717,14 +1904,22 @@ export class Daemon {
         return sendJson(res, 200, { id, name, to: peer.name, hex: toHex(frame), bytes: frame.length, seconds: this.secretAirtime(frame.length) });
       }
       case 'POST /ui/secrets/approve': this.approveSecret(body.id); break;
+      case 'POST /ui/secrets/accept': this.acceptSecret(body.id); break;
+      case 'POST /ui/secrets/decline': this.deleteSecret(body.id); break;
+      case 'POST /ui/secret-requests/answer':
+        return sendJson(res, 200, state({ answer: await this.answerSecretRequest(body.id, { dismiss: body.dismiss === true }) }));
       case 'POST /ui/secrets/delete': this.deleteSecret(body.id); break;
       case 'GET /ui/messages': return sendJson(res, 200, { messages: this.thread(String(url.searchParams.get('peer') || '')) });
       case 'POST /ui/send': return sendJson(res, 200, state({ sent: await this.send(body, 'person') }));
       case 'POST /ui/ping': this.checkPeers(); break;
       case 'POST /ui/announce': this.startAnnounce({ over: body.over === 'tailscale' ? 'tailscale' : undefined, quiet: body.quiet === true }); break;
       case 'POST /ui/listen': this.startListen(); break;
-      case 'POST /ui/heard': this.heard(body); break;
-      case 'POST /ui/confirm': await this.confirm(body.code); break;
+      case 'POST /ui/heard': this.heard({ hex: body.hex, code: body.code }); break;
+      case 'POST /ui/confirm': await this.confirm({ code: body.code, match: body.match === true }); break;
+      case 'POST /ui/discover': this.startDiscover(); break;
+      case 'POST /ui/nearby/pair': this.pairNearby(body.id); break;
+      case 'POST /ui/invite': return sendJson(res, 200, state({ invite: this.createInvite({ mode: body.mode, over: body.over }) }));
+      case 'POST /ui/join': this.heard({ code: String(body.code ?? ''), join: true }); break;
       case 'POST /ui/cancel': this.cancel(); break;
       case 'POST /ui/unpair': return sendJson(res, 200, state({ unpaired: await this.unpair(String(body.id)) }));
       // Firewall: only the page (the person) can read or change rules and decide requests.
@@ -1824,6 +2019,10 @@ export class Daemon {
       }
       case 'POST /api/unpair':
         return sendJson(res, 200, await this.unpair(String(body.id)));
+      // `vinac join <invite>`: an agent may redeem an invite that a person made on the other device.
+      // It can't make invites or confirm any other pairing.
+      case 'POST /api/join':
+        return sendJson(res, 200, await this.join(body.code));
       default: throw httpError(404, 'Not found');
     }
   }

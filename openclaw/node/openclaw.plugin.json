@@ -2,7 +2,7 @@
   "id": "vinac-link-node",
   "name": "VINAC Link (node)",
   "description": "VINAC Link commands on the computer that runs VINAC Link: messages, requests and status for paired devices.",
-  "version": "0.9.1",
+  "version": "0.10.0",
   "activation": { "onStartup": true },
   "enabledByDefault": false,
   "configSchema": {

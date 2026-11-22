@@ -3,12 +3,22 @@
 Send an API key or token from one computer to the other **without it passing through any chat,
 agent or tool output**.
 
-1. On the **receiving** computer: page → **Secrets** → **Receive**. It accepts secrets for
-   3 minutes, by sound or Wi-Fi.
-2. On the **sending** computer: **Secrets** → **Send** (or the key button in a conversation) →
-   pick the device, a name (like `OPENAI_API_KEY`) and the value → **Sound** (~15 s, devices close
-   together) or **Wi-Fi**.
-3. The receiver stores it in the OS key store and confirms. The sender shows *received*.
+1. On the **sending** computer: **Secrets** → **Send** (or the key button in a conversation) →
+   pick the device, a name (like `OPENAI_API_KEY`) and the value → **Wi-Fi**.
+2. On the **receiving** computer it arrives as an **offer**: *Offered: accept?* with **Accept** /
+   **Decline**. Nothing can use it before you accept. It is accepted at once when that computer
+   asked for it (below), or when the sending device is in **Auto** mode there.
+3. **By sound** (beta, no network needed): the receiving computer first presses **Receive by
+   sound** (it listens for 3 minutes), then the sender chooses **Sound** (~15 s, devices close
+   together).
+
+## Asking for a key
+
+When a program on one computer needs a key the other has, its agent asks for it (intent
+`person.secret.request`, for example "STRIPE_KEY: npm start needs it"). The other computer's
+Secrets page shows **Asked for by your devices · STRIPE_KEY · Send**: one click sends it from the
+vault, and because the asking computer asked, it is accepted there without another click (for an
+hour). **Dismiss** removes the request; if the key isn't there yet, **Add it** first.
 
 ## The vault
 

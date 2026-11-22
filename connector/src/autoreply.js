@@ -89,12 +89,26 @@ export function inQuietHours(q, now = new Date()) {
   return a === b ? false : a < b ? m >= a && m < b : m >= a || m < b;
 }
 
-/** Finds a program by path or on PATH (Windows: .exe/.com only; .cmd needs a shell, which is not used). */
+/** Folders where agent programs usually live, beyond PATH. An app started from the Dock, Finder or a
+ *  login item gets a short PATH (on macOS just /usr/bin:/bin:/usr/sbin:/sbin), so `claude` or `codex`
+ *  installed by their installers, Homebrew or npm would not be found there. */
+export function extraProgramDirs(home = process.env.HOME || process.env.USERPROFILE || '', platform = process.platform) {
+  if (!home) return [];
+  if (platform === 'win32') {
+    const appData = process.env.APPDATA || path.join(home, 'AppData', 'Roaming');
+    return [path.join(home, '.local', 'bin'), path.join(appData, 'npm'), path.join(home, '.bun', 'bin'), path.join(home, '.volta', 'bin')];
+  }
+  return [path.join(home, '.local', 'bin'), path.join(home, '.claude', 'local'), path.join(home, '.npm-global', 'bin'), path.join(home, '.bun', 'bin'),
+    path.join(home, '.volta', 'bin'), '/opt/homebrew/bin', '/usr/local/bin', '/home/linuxbrew/.linuxbrew/bin'];
+}
+
+/** Finds a program by path, on PATH, or in the usual install folders (Windows: .exe/.com only; .cmd needs a shell, which is not used). */
 export function findProgram(program) {
   if (!program) return null;
   if (/[\\/]/.test(program)) return fs.existsSync(program) && fs.statSync(program).isFile() ? program : null;
   const exts = process.platform === 'win32' ? (path.extname(program) ? [''] : ['.exe', '.com']) : [''];
-  for (const dir of String(process.env.PATH || '').split(path.delimiter).filter(Boolean)) {
+  const dirs = [...String(process.env.PATH || '').split(path.delimiter).filter(Boolean), ...extraProgramDirs()];
+  for (const dir of dirs) {
     for (const e of exts) { const p = path.join(dir, program + e); try { if (fs.statSync(p).isFile()) return p; } catch { /* next */ } }
   }
   return null;
