@@ -88,8 +88,11 @@
         <circle class="sg-packet" r="5"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#sg-path"/></animateMotion></circle>
         <circle class="sg-packet" r="5"><animateMotion dur="3.2s" begin="-1.6s" repeatCount="indefinite"><mpath href="#sg-path-back"/></animateMotion></circle>
 
-        <!-- 1: pair once (sound) -->
-        <path class="sg-wave" d="M432 232a26 26 0 0 1 0 36M446 222a40 40 0 0 1 0 56M460 212a54 54 0 0 1 0 76"/>
+        <!-- 1: pair once (same 6 digits on both screens, Allow) -->
+        <rect class="sg-code" x="414" y="230" width="86" height="40" rx="12"/>
+        <text class="sg-code-text" x="457" y="256" text-anchor="middle">482 913</text>
+        <circle class="sg-check-bg" cx="499" cy="231" r="11"/>
+        <path class="sg-check" d="M494 231l4 4 7-7"/>
         <circle class="sg-num" cx="452" cy="178" r="16"/><text class="sg-num-text" x="452" y="184" text-anchor="middle">1</text>
         <text class="sg-step" x="452" y="318" text-anchor="middle">Pair once</text>
 
@@ -154,10 +157,10 @@
               <div class="pd-waves"><span></span><span></span><span></span></div>
               <div class="pd"><svg viewBox="0 0 24 24"><rect x="4" y="5" width="16" height="10" rx="1.5"/><path d="M2 18h20"/></svg>Mac</div>
             </div>
-            <p class="dc-label">Type this on the Mac</p>
+            <div class="dc-near"><span class="dc-dot"></span><div><b>Mac</b><small>On this network</small></div><span class="dc-pill">Pair</span></div>
+            <p class="dc-label">Same on both screens?</p>
             <p class="code-big">482 913</p>
-            <p class="dc-label">Code shown on the Mac</p>
-            <div class="code-input"><span>7</span><span>0</span><span>5</span><span>2</span><span>6</span><span class="caret"></span></div>
+            <div class="dc-actions"><span class="dc-allow">Same code: Allow</span><span class="dc-cancel">Different: cancel</span></div>
           </div>
         </div>
       </div>
@@ -182,7 +185,7 @@
         <div class="panel-copy">
           <h3>Keys and tokens move between computers, never through the chat</h3>
           <p>Keep your API keys and tokens in a vault on each computer, and send one to another computer with one click, or ask another computer for the key a program needs. It goes straight into that computer's secure key store once its person accepts it. Your agent can use it in a program you approve, but only ever sees its name.</p>
-          <ul class="ticks"><li>Stored by Windows, macOS or Linux's own key store</li><li>Only accepted while you choose to receive one</li><li>Each use needs your OK on the VINAC Link page</li></ul>
+          <ul class="ticks"><li>Stored by Windows, macOS or Linux's own key store</li><li>Arrives as an offer you accept, or at once when that computer asked for it</li><li>Each use needs your OK on the VINAC Link page</li></ul>
           <a class="link" href="/docs/guide/secrets.html">Moving secrets →</a>
         </div>
         <div class="panel-visual">
@@ -234,12 +237,12 @@
     <ol class="story">
       <li><span class="st-tag avail">Available</span><h3>Pair the two computers</h3><p>Each lists the other. Compare 6 digits, press Allow on both. Once.</p></li>
       <li><span class="st-tag avail">Available</span><h3>Agents talk and hand off work</h3><p>Questions, reviews, task hand-offs, files and git branches, encrypted, on your network or over Tailscale. Your firewall checks every request.</p></li>
-      <li><span class="st-tag avail">Available</span><h3>Move the keys the project needs</h3><p>Send them from the vault on your PC straight into the Mac's key store, one approval each. The agent only ever sees their names.</p></li>
+      <li><span class="st-tag avail">Available</span><h3>Move the keys the project needs</h3><p>The Mac asks for the key it needs; one click on the PC sends it from the vault straight into the Mac's key store. The agent only ever sees its name.</p></li>
       <li><span class="st-tag avail">Available</span><h3>Run the build with them</h3><p><code>vinac run --secret STRIPE_KEY -- npm start</code>. You approve the exact command; the program gets the value, the agent doesn't.</p></li>
       <li><span class="st-tag next">Next</span><h3>One-step project hand-off</h3><p>VINAC Link reads <code>.env.example</code>, shows which keys are missing on the Mac, and sends them all with one approval.</p></li>
     </ol>
     <div class="status-row">
-      <div><span class="st-tag avail">Available</span><p>Code pairing · messages and requests, sent later if a device is off · intent firewall with Restricted / Standard / Auto modes · secrets vault with a passphrase lock · files and git · approved runs · offline on Wi-Fi, hotspot or cable · Tailscale</p></div>
+      <div><span class="st-tag avail">Available</span><p>Pairing with one Allow on each computer, or an invite · one-click key requests · messages and requests, sent later if a device is off · intent firewall with Restricted / Standard / Auto modes · secrets vault with a passphrase lock · files and git · approved runs · offline on Wi-Fi, hotspot or cable · Tailscale</p></div>
       <div><span class="st-tag beta">Beta</span><p>Pairing and moving keys by sound: works today, no network needed, still being tested on more speakers and microphones</p></div>
       <div><span class="st-tag next">Next</span><p>One-step project hand-off · independent security audit · a relay for computers on different networks</p></div>
     </div>
@@ -249,8 +252,8 @@
 <section class="section" id="demo">
   <div class="wrap narrow center">
     <p class="kicker">Demo</p>
-    <h2>See it in 90 seconds</h2>
-    <p class="sub">The whole idea, start to finish: pair once, share keys and tokens, and send requests your rules check, with you in the loop.</p>
+    <h2>See it in under 2 minutes</h2>
+    <p class="sub">The real app, start to finish: install, pair with one Allow, let agents ask each other, approve what matters, and move keys without the chat.</p>
     {{demo}}
   </div>
 </section>
@@ -380,7 +383,40 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
   </div>
 </section>
 
-<section class="section alt" id="contact">
+<section class="section alt" id="news">
+  <div class="wrap news">
+    <div class="card news-card">
+      <p class="kicker">Newsletter</p>
+      <h2>Stay in the loop</h2>
+      <p class="sub">New releases, the security audit, the phone vault and the relay: a short email a few times a year. No tracking in our emails.</p>
+      <form class="signup-form" action="/subscribe.php" method="post" data-ok="Thank you. You're on the list; we write a few times a year.">
+        <div class="signup-row">
+          <label class="sr-only" for="signup-email">Email</label>
+          <input id="signup-email" name="email" type="email" autocomplete="email" maxlength="200" placeholder="you@example.com" required>
+          <button class="btn primary" type="submit">Subscribe</button>
+        </div>
+        <label class="consent"><input name="consent" type="checkbox" value="yes" required> Yes, email me VINAC Link news and releases (a few times a year). I can unsubscribe at any time.</label>
+        <div class="trap" aria-hidden="true"><label>Leave this empty<input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+        <input type="hidden" name="t" value="">
+        <p class="form-status" role="status" aria-live="polite"></p>
+        <p class="fine">From Mexley Marketing Inc., Ontario, Canada. We use your address only for this newsletter (<a href="/privacy.html">privacy policy</a>). Or follow new versions with GitHub's <b>Watch › Releases</b>.</p>
+      </form>
+    </div>
+    <div class="card support-card" id="support">
+      <p class="kicker">Support the project</p>
+      <h2>Help keep it free</h2>
+      <p class="sub">VINAC Link is free and open source, and stays free on your own computers. Support pays for the independent security audit, signed installers and the next features.</p>
+      <ul class="ticks"><li>A one-time or monthly contribution through PayPal</li><li>Or star the project on GitHub and tell a friend</li></ul>
+      <div class="support-cta">
+        <a class="btn primary" href="{{paypal}}" rel="noopener">Support with PayPal</a>
+        <a class="btn ghost" href="https://github.com/vinactech/vinac-link" rel="noopener">Star on GitHub</a>
+      </div>
+      <p class="fine">Contributions go to Mexley Marketing Inc., which builds VINAC Link. They support the project; they are not tax-deductible donations.</p>
+    </div>
+  </div>
+</section>
+
+<section class="section" id="contact">
   <div class="wrap contact">
     <div class="contact-copy">
       <p class="kicker">Contact</p>
@@ -406,6 +442,7 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
           <option value="Partnership">Partnership</option>
           <option value="Press">Press</option>
           <option value="Security">Security</option>
+          <option value="Supporting the project" data-topic="support">Supporting the project</option>
         </select>
       </label>
       <label>Message<textarea name="message" rows="6" maxlength="5000" required></textarea></label>

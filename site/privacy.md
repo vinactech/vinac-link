@@ -41,6 +41,21 @@ ready, and delete it on request or when the waitlist closes.
 To stop spam, the form keeps a scrambled (hashed) version of the sender's internet address for up to
 one hour, only to limit how many messages can be sent.
 
+## The newsletter
+
+If you subscribe, we keep your email address, when you subscribed and the consent you gave, and
+use them only to send you VINAC Link news a few times a year. We add you only when you tick the
+consent box yourself. Every newsletter has a way to unsubscribe, and you can also write to
+hello@vinac.tech; we then remove your address. If we move the list to a newsletter service, that
+service processes it on our behalf only. The signup form uses the same spam protection as the
+contact form.
+
+## Supporting the project
+
+The Support button takes you to PayPal. PayPal processes the payment under its own privacy policy;
+we receive your name, email address and the amount, and use them only for our records and to
+thank you.
+
 We keep messages for as long as needed to help you and for our normal business records, and then
 delete them.
 

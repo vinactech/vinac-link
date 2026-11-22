@@ -60,6 +60,18 @@ test('site: builds every page with no leftover placeholders, no outside requests
   assert.match(home, /name="website"/, 'hidden trap field');
   const php = fs.readFileSync(path.join(out, 'contact.php'), 'utf8');
   for (const guard of ['MAX_PER_HOUR', 'MIN_SECONDS', "$_POST['website']", 'FILTER_VALIDATE_EMAIL', 'HTTP_ORIGIN', '[\\x00-\\x1F\\x7F]']) assert.ok(php.includes(guard), `contact.php keeps ${guard}`);
+  // The newsletter form: our own script, an unticked consent box (CASL), the same guards, and
+  // nothing ever sent to the address that was typed in (so it can't be used to spam people).
+  assert.match(home, /<form class="signup-form" action="\/subscribe\.php" method="post"/);
+  assert.match(home, /name="consent" type="checkbox" value="yes" required>/);
+  assert.doesNotMatch(home, /name="consent"[^>]*checked/);
+  const sub = fs.readFileSync(path.join(out, 'subscribe.php'), 'utf8');
+  for (const guard of ['MAX_PER_HOUR', 'MIN_SECONDS', "$_POST['website']", "$_POST['consent']", 'FILTER_VALIDATE_EMAIL', 'HTTP_ORIGIN', '[\\x00-\\x1F\\x7F]', 'dirname(__DIR__)']) assert.ok(sub.includes(guard), `subscribe.php keeps ${guard}`);
+  assert.equal((sub.match(/\bmail\((?!\))/g) || []).length, 1, 'one mail(), to us only');
+  assert.match(sub, /mail\(TO,/);
+  // The demo is the voiced walkthrough; the old explainer stays out of the site.
+  assert.match(home, /<source src="\/media\/walkthrough\.mp4"/);
+  assert.ok(!fs.existsSync(path.join(out, 'media', 'demo.mp4')));
   for (const f of ['.htaccess', '_headers']) {
     const h = fs.readFileSync(path.join(out, f), 'utf8');
     assert.match(h, /form-action 'self'/, `${f}: the form may post to this site`);

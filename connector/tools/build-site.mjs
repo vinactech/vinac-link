@@ -122,11 +122,13 @@ const header = active => `<header class="top">
 // Social profiles (the GitHub repository may still be private; the link is ready for launch).
 const LINKEDIN = 'https://www.linkedin.com/company/vinac-link';
 const GITHUB = 'https://github.com/vinactech/vinac-link';
+// Support link: PayPal.Me of Mexley Marketing Inc. (also in .github/FUNDING.yml).
+const PAYPAL = 'https://paypal.me/vinactech';
 const footer = `<footer class="foot">
   <div class="wrap foot-in">
     <div class="foot-brand">${ICON}<div><strong>VINAC Link™</strong><span>Verified Intent Network for Agent Communication</span></div></div>
     <nav class="foot-links" aria-label="Footer">
-      <a href="/docs/">Docs</a><a href="/security.html">Security</a><a href="/about.html">About</a><a href="/roadmap.html">Roadmap</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/license.html">License</a><a href="/#contact">Contact</a>
+      <a href="/docs/">Docs</a><a href="/security.html">Security</a><a href="/about.html">About</a><a href="/roadmap.html">Roadmap</a><a href="/privacy.html">Privacy</a><a href="/terms.html">Terms</a><a href="/license.html">License</a><a href="/#contact">Contact</a><a href="/#news">Newsletter</a><a href="/#support">Support us</a>
     </nav>
     <nav class="foot-social" aria-label="Follow VINAC Link">
       <a href="${LINKEDIN}" rel="noopener" aria-label="VINAC Link on LinkedIn"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20.45 20.45h-3.55v-5.57c0-1.33-.03-3.04-1.86-3.04-1.85 0-2.13 1.45-2.13 2.94v5.67H9.35V9h3.41v1.56h.05c.48-.9 1.64-1.85 3.37-1.85 3.6 0 4.27 2.37 4.27 5.46v6.28ZM5.34 7.43a2.06 2.06 0 1 1 0-4.13 2.06 2.06 0 0 1 0 4.13ZM7.12 20.45H3.56V9h3.56v11.45ZM22.22 0H1.77C.79 0 0 .77 0 1.73v20.54C0 23.23.79 24 1.77 24h20.45c.98 0 1.78-.77 1.78-1.73V1.73C24 .77 23.2 0 22.22 0Z"/></svg>LinkedIn</a>
@@ -222,7 +224,7 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   installer('linux', `VINAC-Link-${version}-linux-x64.tar.gz`, 'Extract it, then run <b>sh install.sh</b>. It adds VINAC Link to your app menu.', 'Unzip, then run <b>sh start-linux.sh</b> (needs Node.js 22+)');
 
   // 2. Static assets
-  for (const f of ['styles.css', 'site.js', 'theme.js', 'field.js', '_headers', '.htaccess', 'robots.txt', 'contact.php']) fs.copyFileSync(path.join(SITE, f), path.join(OUT, f));
+  for (const f of ['styles.css', 'site.js', 'theme.js', 'field.js', '_headers', '.htaccess', 'robots.txt', 'contact.php', 'subscribe.php']) fs.copyFileSync(path.join(SITE, f), path.join(OUT, f));
   // One-line install scripts (curl … | sh, irm … | iex), stamped with this version.
   for (const f of ['install.sh', 'install.ps1']) fs.writeFileSync(path.join(OUT, f), fs.readFileSync(path.join(SITE, f), 'utf8').replaceAll('{{version}}', version));
   if (fs.existsSync(path.join(SITE, 'media'))) fs.cpSync(path.join(SITE, 'media'), path.join(OUT, 'media'), { recursive: true });
@@ -232,7 +234,10 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   fs.copyFileSync(path.join(SITE, 'brand', 'favicon-32.png'), path.join(OUT, 'favicon.png'));
   fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(OUT, 'LICENSE.txt'));
   fs.copyFileSync(path.join(ROOT, 'NOTICE'), path.join(OUT, 'NOTICE.txt'));
-  const demoFile = ['demo.mp4', 'demo.webm'].find(f => fs.existsSync(path.join(SITE, 'media', f)));
+  // The home page demo is the voiced product walkthrough. The animated explainer (demo.mp4,
+  // poster.jpg) is a social-media clip now and stays out of the site.
+  for (const f of ['demo.mp4', 'poster.jpg']) fs.rmSync(path.join(OUT, 'media', f), { force: true });
+  const demoFile = ['walkthrough.mp4'].find(f => fs.existsSync(path.join(SITE, 'media', f)));
 
   if (fs.existsSync(path.join(SITE, 'logos'))) fs.cpSync(path.join(SITE, 'logos'), path.join(OUT, 'logos'), { recursive: true, filter: f => !f.endsWith('.md') });
 
@@ -242,13 +247,14 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
 
   // 3. Home page
   const demo = demoFile
-    ? `<video class="demo-video" controls preload="metadata" playsinline${fs.existsSync(path.join(SITE, 'media', 'poster.jpg')) ? ' poster="/media/poster.jpg"' : ''}><source src="/media/${demoFile}" type="video/${demoFile.split('.').pop()}">Your browser can't play this video. <a href="/media/${demoFile}">Download it</a>.</video>`
+    ? `<video class="demo-video" controls preload="metadata" playsinline${fs.existsSync(path.join(SITE, 'media', 'walkthrough-poster.jpg')) ? ' poster="/media/walkthrough-poster.jpg"' : ''}><source src="/media/${demoFile}" type="video/${demoFile.split('.').pop()}">Your browser can't play this video. <a href="/media/${demoFile}">Download it</a>.</video>`
     : `<div class="demo-soon">${ICON_BIG}<p><strong>Video coming soon.</strong> Until then, the <a href="/docs/getting-started.html">quick start</a> takes about five minutes on two computers.</p></div>`;
   const home = fs.readFileSync(path.join(SITE, 'index.html'), 'utf8')
     .replaceAll('{{head}}', head({ title: 'VINAC Link · A secure link between your AI agents', description: 'The secure link between AI agents on your own computers: Claude Code, Codex and local models, from any vendor, online or offline. Your firewall decides what each agent receives. No cloud, no account.', url: '/', scripts: ['field.js'] }))
     .replaceAll('{{header}}', header('home'))
     .replaceAll('{{footer}}', footer)
     .replaceAll('{{demo}}', demo)
+    .replaceAll('{{paypal}}', PAYPAL)
     .replace(/\{\{(win|mac|linux)_(href|step|size)\}\}/g, (_, os, k) => dl[os][k])
     .replaceAll('{{works}}', works)
     .replaceAll('{{version}}', version)

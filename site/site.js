@@ -44,10 +44,9 @@ document.addEventListener('keydown', e => {
 });
 window.matchMedia('(min-width: 1001px)').addEventListener('change', e => { if (e.matches) setMenu(false); });
 
-// Contact form: sends to /contact.php on this site (no outside service). Without this script
-// the form still posts normally and the server answers with a simple page.
-const contactForm = document.querySelector('.contact-form');
-if (contactForm) {
+// Contact and newsletter forms: send to /contact.php or /subscribe.php on this site (no outside
+// service). Without this script the forms still post normally and the server answers with a page.
+for (const contactForm of document.querySelectorAll('.contact-form, .signup-form')) {
   const started = contactForm.querySelector('input[name="t"]');
   if (started) started.value = String(Math.floor(Date.now() / 1000));
   // Links like /?topic=relay#contact pre-select a topic.
@@ -61,7 +60,7 @@ if (contactForm) {
     if (!contactForm.reportValidity()) return;
     button.disabled = true;
     status.className = 'form-status';
-    status.textContent = 'Sending…';
+    status.textContent = contactForm.classList.contains('signup-form') ? 'Subscribing…' : 'Sending…';
     try {
       const r = await fetch(contactForm.action, { method: 'POST', body: new FormData(contactForm), headers: { accept: 'application/json' } });
       const j = await r.json().catch(() => ({}));
@@ -69,7 +68,7 @@ if (contactForm) {
       contactForm.reset();
       if (started) started.value = String(Math.floor(Date.now() / 1000));
       status.className = 'form-status ok';
-      status.textContent = 'Thank you. Your message is on its way, and we will reply by email.';
+      status.textContent = contactForm.dataset.ok || 'Thank you. Your message is on its way, and we will reply by email.';
     } catch (err) {
       status.className = 'form-status bad';
       status.textContent = `${err.message} You can also write to hello@vinac.tech.`;

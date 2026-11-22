@@ -197,21 +197,27 @@ function scene3(t) { // 20-34: pair once
   g.save(); g.globalAlpha = v;
   const paired = ease(prog(t, 30.2, 30.9));
   duo(t, { glow: paired });
-  if (t > 21.2 && t < 26) waves(pcX(t) + 160, macX(t) - 160, 400, t - 21.2, vis(t, 21.4, 26, 0.5));
-  // codes: each screen shows its own code; the person types the other one
+  // the two computers find each other on the local network
+  if (t > 21.2 && t < 26) {
+    const a = vis(t, 21.4, 26, 0.5);
+    waves(pcX(t) + 160, macX(t) - 160, 400, t - 21.2, a);
+    g.save(); g.globalAlpha *= a; text('They find each other on your network', 960, 480, { size: 24, weight: 600, color: C.faint }); g.restore();
+  }
+  // both screens show the same 6 digits; a person presses Allow on each
   const codesA = vis(t, 25.6, 34.4, 0.5);
   if (codesA > 0) {
     g.save(); g.globalAlpha *= codesA;
-    const typedPc = Math.floor(clamp((t - 26.6) / 1.5) * 6), typedMac = Math.floor(clamp((t - 28.2) / 1.5) * 6);
-    [[560, '482 913', '705 268', typedPc], [1360, '705 268', '482 913', typedMac]].forEach(([x, own, other, typed]) => {
-      text('This computer’s code', x, 640, { size: 22, weight: 600, color: C.faint });
-      text(own, x, 684, { size: 46, weight: 700, font: MONO, color: '#b9a8ff' });
-      const digits = other.replace(' ', '');
-      for (let i = 0; i < 6; i++) {
-        const bx = x - 150 + i * 52 + (i > 2 ? 12 : 0);
-        rr(bx, 730, 44, 56, 10); g.fillStyle = '#18181f'; g.fill(); g.lineWidth = 2; g.strokeStyle = i === typed ? C.a : C.line; g.stroke();
-        if (i < typed) text(digits[i], bx + 22, 759, { size: 28, weight: 700, font: MONO });
-      }
+    [[560, 27.8], [1360, 29.2]].forEach(([x, pressAt]) => {
+      text('Same on both screens?', x, 640, { size: 22, weight: 600, color: C.faint });
+      text('482 913', x, 690, { size: 52, weight: 700, font: MONO, color: '#b9a8ff' });
+      const pressed = t >= pressAt;
+      const push = t >= pressAt && t < pressAt + 0.25 ? 0.96 : 1;
+      g.save(); g.translate(x, 762); g.scale(push, push);
+      rr(-120, -28, 240, 56, 28);
+      g.fillStyle = pressed ? '#10261a' : grad(-120, 0, 120, 0); g.fill();
+      if (pressed) { g.lineWidth = 2; g.strokeStyle = C.ok; g.stroke(); }
+      text(pressed ? '✓ Allowed' : 'Allow', 0, 1, { size: 26, weight: 700, color: pressed ? C.ok : '#ffffff' });
+      g.restore();
     });
     g.restore();
   }
@@ -223,7 +229,7 @@ function scene3(t) { // 20-34: pair once
     g.restore();
   }
   g.restore();
-  caption(t, 21, 34, 'Pair once, by sound or a short code', 'Only a person can finish pairing.', 1);
+  caption(t, 21, 34, 'Pair once: same 6 digits, Allow on both', 'Nothing to type. Only a person can finish pairing.', 1);
 }
 
 function scene4(t) { // 34-48: share keys and tokens
