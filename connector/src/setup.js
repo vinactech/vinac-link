@@ -119,7 +119,7 @@ OpenClaw: two small plugins (node host + gateway); see ${path.join(root, 'opencl
 
 Auto-reply with a local model (no internet): on the page, Firewall -> Auto-reply -> Engine: Local model.
 
-Then ask your agent: "pair with my other computer" (you swap the 6-digit codes on the page).
+Then ask your agent: "pair with my other computer" (you check the 6 digits and press Allow on both pages).
 Check everything any time: node ${q(bin)} doctor`;
 }
 

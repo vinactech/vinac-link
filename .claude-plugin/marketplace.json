@@ -6,7 +6,7 @@
     {
       "name": "vinac-link",
       "source": "./",
-      "description": "Pair computers by sound or code; agents exchange encrypted messages, requests and small files through a firewall you control.",
+      "description": "Pair nearby computers with one Allow on each; agents exchange encrypted messages, requests and small files through a firewall you control.",
       "category": "productivity",
       "tags": ["agents", "pairing", "messaging", "firewall", "mcp"]
     }

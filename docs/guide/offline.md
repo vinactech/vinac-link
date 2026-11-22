@@ -8,7 +8,7 @@ internet connection.
 
 | | Without internet |
 |---|---|
-| Pairing (sound or typed code, the 6-digit code swap) | ✓ |
+| Pairing (nearby devices, invite, typed code or sound; compare and Allow) | ✓ |
 | Messages, requests, the firewall, approvals | ✓ |
 | Files up to 64 MB, git branches | ✓ |
 | Secrets by sound or Wi-Fi, `vinac run` | ✓ |

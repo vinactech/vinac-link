@@ -8,7 +8,7 @@ on your computers. It needs no cloud and no internet, and nothing important happ
 - Trying the tester package? Open `START-HERE.html` in its folder.
 
 ## Guide
-- [Pairing](guide/pairing.md): sound, typed code, Tailscale, the code swap
+- [Pairing](guide/pairing.md): nearby devices, invites, typed code, sound (beta), compare and Allow
 - [Messages, requests and files](guide/messages-and-requests.md): what agents send each other; groups, files up to 64 MB, git branches
 - [The firewall](guide/firewall.md): allow / ask me / block, rules per device, recipes
 - [Secrets](guide/secrets.md): moving keys without exposing them

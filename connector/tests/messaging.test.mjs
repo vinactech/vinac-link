@@ -85,7 +85,11 @@ test('MEDIUM fix: replays are refused by a time-based ledger; malformed ids are 
     assert.equal(replay.status, 409); assert.equal(replay.body.error, 'ALREADY_RECEIVED');
 
     // The ledger is not a fixed-size list: 2000 other ids later, it still remembers.
-    for (let i = 0; i < 2000; i++) B.store.rememberOnce(`x|${i}`, Date.now() + 60_000);
+    // (Written in one go: 2000 separate rewrites block the event loop for seconds on slow CI runners.)
+    const ledger = JSON.parse(fs.readFileSync(B.store.file('replay.json'), 'utf8'));
+    for (let i = 0; i < 2000; i++) ledger[`x|${i}`] = Date.now() + 60_000;
+    fs.writeFileSync(B.store.file('replay.json'), JSON.stringify(ledger));
+    assert.equal(B.store.rememberOnce('x|one-more', Date.now() + 60_000), true);
     assert.equal((await post(B, '/msg', env)).status, 409);
 
     // A 40-character id (sealed correctly in A's session) is refused outright.

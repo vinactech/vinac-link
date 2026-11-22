@@ -26,7 +26,7 @@ body:
     attributes:
       label: VINAC Link version
       description: Shown under Help & about in the app, or `vinac version`.
-      placeholder: 0.8.0
+      placeholder: 0.10.0
     validations:
       required: true
   - type: dropdown

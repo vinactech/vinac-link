@@ -42,7 +42,7 @@ export const PAGES = [
 ];
 // Pages with the plain layout: source in site/, URL, title, description, active nav item.
 export const PLAIN = [
-  ['tour.html', '/how-it-works.html', 'How it works', 'VINAC Link step by step, with real screens: install, pair by sound or code, connect your agent, set your firewall and move keys without the chat.', 'how'],
+  ['tour.html', '/how-it-works.html', 'How it works', 'VINAC Link step by step, with real screens: install, pair with one Allow on each computer, connect your agent, set your firewall and move keys without the chat.', 'how'],
   ['about.md', '/about.html', 'About', 'Why we built VINAC Link: AI agents on several computers, some offline, and no safe way to share keys and requests between them.', 'about'],
   // An .html source is a ready-made page body (the roadmap timeline), wrapped without Markdown.
   ['roadmap.html', '/roadmap.html', 'Roadmap', 'How VINAC Link started in July 2026, what works today, what comes next, and where we are going.', 'roadmap'],

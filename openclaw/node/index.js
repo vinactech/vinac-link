@@ -19,7 +19,7 @@ const DESCRIPTIONS = {
   'vinac.intents': 'The intents a request can name, with their risk level.',
   'vinac.secrets': 'Names of secrets received from paired devices (never values).',
   'vinac.pair_status': 'State of the pairing in progress.',
-  'vinac.pair_request': 'Open the VINAC Link page so the person can pair a device (they swap the codes).',
+  'vinac.pair_request': 'Open the VINAC Link page so the person can pair a device (they check the 6 digits and press Allow on both).',
   'vinac.send': 'Send a message, or a request with an intent, to a paired device.',
   'vinac.inbox': 'New messages and requests the firewall let through, from paired devices.',
   'vinac.file': 'Read a file a paired device shared (only if the firewall let it through).',

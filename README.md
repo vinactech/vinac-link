@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-4f6bff"></a>
-  <img alt="Version 0.8.0" src="https://img.shields.io/badge/version-0.8.0-9a5cf0">
+  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-9a5cf0">
   <img alt="Windows, macOS, Linux" src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20macOS%20%7C%20Linux-555">
   <img alt="No runtime dependencies" src="https://img.shields.io/badge/dependencies-0-3ddc84">
   <img alt="Node.js 22+" src="https://img.shields.io/badge/node-22%2B-555">
@@ -31,8 +31,8 @@
 
 Claude Code, Codex, OpenClaw and local models (LM Studio, Ollama, Goose, Open WebUI) on all your
 computers can ask each other for answers, reviews, files and API keys, **directly between your own
-machines, with no account and no cloud in between**. Pair two computers once, by sound or a short
-code. Every request says what it wants, and **your firewall** decides: let it through, ask you
+machines, with no account and no cloud in between**. Pair two computers once: pick the other one
+from the list and press Allow on both. Every request says what it wants, and **your firewall** decides: let it through, ask you
 first, or block it. Keys and tokens move from one key store to the other, so agents can use them
 but never see them, and they never appear in a chat.
 
@@ -63,9 +63,9 @@ your agents one safe channel, across vendors, with a person in charge of what ea
 
 ## How it works
 
-| 1. Pair by sound or a code | 2. A person confirms both screens |
+| 1. Pick the other computer | 2. Same 6 digits? Allow on both |
 |---|---|
-| <img src="site/media/tour-pair.jpg" alt="Pair a device: announce or listen" width="440"> | <img src="site/media/tour-compare.jpg" alt="Swap the 6-digit codes" width="440"> |
+| <img src="site/media/tour-pair.jpg" alt="Pair a device: the other computer is listed on this network" width="440"> | <img src="site/media/tour-compare.jpg" alt="Both screens show the same 6 digits" width="440"> |
 | **3. Agents talk; you see everything** | **4. Move keys without the chat** |
 | <img src="site/media/tour-thread.jpg" alt="A conversation with requests waiting for approval" width="440"> | <img src="site/media/tour-secrets.jpg" alt="Send a secret to the Mac" width="440"> |
 
@@ -154,13 +154,14 @@ rules or approve; no agent tool can. Agents are only told *how many* items wait 
   `vinac git send` / `vinac git fetch` move branches as git bundles, landing as
   `vinac/<device>/<branch>`, never merged for you.
 - **Groups:** send to `all`, to a named group, or to `"PC 1, PC 2"`.
-- **Secrets:** send an API key from one computer to the other by sound (~15 s) or Wi-Fi. It lands in
-  the OS key store; agent tools see the name, never the value. `vinac run --secret KEY -- npm start`
+- **Secrets:** send an API key from one computer to the other over Wi-Fi (or by sound, beta). It
+  arrives as an offer you accept, or at once when that computer asked for it, and lands in the OS
+  key store; agent tools see the name, never the value. `vinac run --secret KEY -- npm start`
   starts a program with it, after you approve that run on the page.
 - **Audit log:** a hash-chained record of pairings, messages, approvals, files and secret use
   (never contents); `vinac audit --verify` shows whether anything was edited.
 - **Other networks:** if both computers run [Tailscale](https://tailscale.com), VINAC Link reaches the
-  other one over it when the local network doesn't, and you can pair over it with a typed code.
+  other one over it when the local network doesn't, and you can pair over it with an invite.
   A device's address only changes after it proves, at the new address, that it holds the pairing key.
 - **Background service:** starts the first time an agent uses it and keeps running, so the other
   computer can reach yours. `vinac doctor` checks everything; `vinac stop` stops it.
@@ -181,9 +182,10 @@ rules or approve; no agent tool can. Agents are only told *how many* items wait 
                                                 VINAC Link service on the other computer
 ```
 
-- **Pairing:** a 6-second near-ultrasound beacon (17–19.5 kHz, 4-FSK, Reed-Solomon) or a typed code
-  carries the address and a one-time secret; a **Noise XX** handshake, signed by both identities;
-  each person types the other screen's 6-digit code. Details: [docs/NOISE.md](docs/NOISE.md).
+- **Pairing:** a 25-byte beacon (address, one-time secret, key fingerprint) reaches the other device
+  by local-network discovery, an invite, a typed code or a 6-second near-ultrasound sound (beta);
+  then a **Noise XX** handshake, signed by both identities. Both screens show the same 6-digit code
+  and each person presses Allow (an invite stands in for that). Details: [docs/NOISE.md](docs/NOISE.md).
 - **Messages:** short-lived **Noise KK** sessions with fresh keys (forward secrecy), AES-256-GCM,
   signed receipts, replay protection, encrypted history on disk. Devices on older versions keep
   working over v2 until they update.
@@ -209,7 +211,7 @@ monitor: `vinac watch`. Command line: [docs/guide/cli.md](docs/guide/cli.md).
 ## Development
 
 ```
-cd connector && npm test        # 102 tests, 127.0.0.1 only, no sound played
+cd connector && npm test        # 109 tests, 127.0.0.1 only, no sound played
 node connector/bin/vinac.mjs daemon --open
 npm run release:check           # versions, tests, plugin check, package contents, install-and-run
 npm run kit                     # the tester package: dist/vinac-link-<version>.zip + SHA256SUMS.txt
