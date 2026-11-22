@@ -2,9 +2,11 @@
 # VINAC Link: connect an AI agent app (macOS). Adds the Claude Code plugin if you say yes;
 # for other apps it prints what to paste.
 cd "$(dirname "$0")" || exit 1
-for d in "node/bin" "node/$(uname -m | sed s/x86_64/x64/)/bin"; do [ -x "$PWD/$d/node" ] && PATH="$PWD/$d:$PATH"; done
-for p in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin" "$HOME/.claude/local"; do [ -d "$p" ] && PATH="$p:$PATH"; done
-node connector/bin/vinac.mjs setup
+. "$PWD/mac-runtime.sh" || exit 1
+vinac_runtime "$PWD" || { printf '%s\n' "$VINAC_RUNTIME_ERROR"; read -r -p "Press Return to close." _; exit 1; }
+# Where the Claude Code CLI usually lives (it isn't on a double-clicked script's PATH).
+for p in /opt/homebrew/bin /usr/local/bin "$HOME/.local/bin" "$HOME/.claude/local"; do [ -d "$p" ] && PATH="$PATH:$p"; done
+"$VINAC_NODE" connector/bin/vinac.mjs setup
 echo
 if command -v claude >/dev/null 2>&1; then
   read -r -p "Add VINAC Link to Claude Code now? [y/N] " yn

@@ -250,14 +250,10 @@ function buildMac(files) {
 </dict>
 </plist>
 `) });
-  out.push({ name: `${app}/MacOS/VINAC Link`, mode: 0o755, data: Buffer.from(`#!/bin/bash
-# Starts VINAC Link in the background and opens its page; the service keeps running after this exits.
-R="$(cd "$(dirname "$0")/../Resources" && pwd)"
-ARCH="$(uname -m)"; [ "$ARCH" = "x86_64" ] && ARCH=x64
-if ! "$R/node/$ARCH/bin/node" "$R/connector/bin/vinac.mjs" start; then
-  osascript -e 'display alert "VINAC Link could not start" message "Open VINAC Link.app > Show Package Contents > Contents > Resources and double-click Check VINAC Link.command, or write to hello@vinac.tech."'
-fi
-`) });
+  // 0.10.1: the launcher uses only the included runtime (Apple silicon picks arm64 even from a
+  // Rosetta shell) and keeps a private startup log with "Show startup log" on failure. The shared
+  // helper, kit/mac-runtime.sh, lands in Resources with the other kit files.
+  out.push({ name: `${app}/MacOS/VINAC Link`, mode: 0o755, data: fs.readFileSync(path.join(HERE, 'mac-launcher.sh')) });
   out.push({ name: 'make-dmg.sh', mode: 0o755, data: Buffer.from(`#!/bin/bash
 # Run this on a Mac (in Terminal: sh make-dmg.sh) to make VINAC-Link-${V}.dmg next to it.
 # This signs the app ad hoc (not notarized), so on other Macs people must allow it once in

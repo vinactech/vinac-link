@@ -1,7 +1,7 @@
 #!/bin/bash
 # VINAC Link: stop the background service (macOS).
-cd "$(dirname "$0")" || exit 1
-for d in "node/bin" "node/$(uname -m | sed s/x86_64/x64/)/bin"; do [ -x "$PWD/$d/node" ] && PATH="$PWD/$d:$PATH"; done
-for p in /opt/homebrew/bin /usr/local/bin; do [ -x "$p/node" ] && PATH="$p:$PATH"; done
-node connector/bin/vinac.mjs stop
+D="$(cd "$(dirname "$0")" && pwd)" || exit 1
+. "$D/mac-runtime.sh" || exit 1
+VINAC_RESOURCES="$D"
+if vinac_runtime "$D"; then "$VINAC_NODE" "$D/connector/bin/vinac.mjs" stop "$@"; else printf '%s\n' "$VINAC_RUNTIME_ERROR" >&2; fi
 read -r -p "Press Return to close." _

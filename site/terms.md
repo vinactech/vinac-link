@@ -1,6 +1,6 @@
 # Terms of Use
 
-*Effective November 20, 2026*
+*Effective November 22, 2026*
 
 These terms apply to the website vinac.tech, the downloads offered on it, and any communication with
 Mexley Marketing Inc. ("we", "us") about VINAC Link. By using the website or downloading VINAC Link,
@@ -52,7 +52,8 @@ When using the website or the software, you agree not to:
 - break the law, or infringe anyone's rights;
 - attack, overload, scan for weaknesses in, or try to gain unauthorized access to the website or our
   systems, except good-faith security research reported to us as described below;
-- send spam, malware or abusive messages through the contact form;
+- send spam, malware or abusive messages through the contact form, or sign up anyone else's email
+  address for the newsletter;
 - use VINAC Link to access computers, accounts or data that you are not authorized to use.
 
 ## 5. Security research
@@ -81,18 +82,32 @@ of the website or the software, or your violation of these terms or of anyone's 
 VINAC Link can work with third-party AI agents, models and tools. We don't control them and are not
 responsible for them; your use of them is governed by their own terms.
 
-## 9. Changes
+## 9. Newsletter
+
+The newsletter is free and optional. You can unsubscribe at any time from any newsletter email or
+by writing to hello@vinac.tech. How we handle your address is described in our
+[privacy policy](/privacy.html).
+
+## 10. Supporting the project
+
+Contributions through PayPal are voluntary and go to Mexley Marketing Inc., which builds VINAC Link.
+They are not donations to a charity and are not tax-deductible. A contribution doesn't buy goods,
+services, support, priority or any say over the project, and the software stays free under its
+license either way. Contributions are generally not refundable, except where the law or PayPal's
+own policies require; if you contributed by mistake, write to hello@vinac.tech and we'll look at it.
+
+## 11. Changes
 
 We may update the website, the software and these terms. If we change these terms, we will post the
 new version here with a new effective date. Continuing to use the website after that means you accept
 the updated terms.
 
-## 10. Governing law
+## 12. Governing law
 
 These terms are governed by the laws of the Province of Ontario and the federal laws of Canada that
 apply there. Any dispute will be handled by the courts of Ontario, unless the law where you live
 gives you the right to bring it elsewhere.
 
-## 11. Contact
+## 13. Contact
 
 Mexley Marketing Inc. · Ontario, Canada · **hello@vinac.tech**

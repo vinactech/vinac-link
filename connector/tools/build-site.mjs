@@ -124,7 +124,29 @@ const LINKEDIN = 'https://www.linkedin.com/company/vinac-link';
 const GITHUB = 'https://github.com/vinactech/vinac-link';
 // Support link: PayPal.Me of Mexley Marketing Inc. (also in .github/FUNDING.yml).
 const PAYPAL = 'https://paypal.me/vinactech';
-const footer = `<footer class="foot">
+// Always-visible bar at the bottom of every page: GitHub, support with PayPal, newsletter signup.
+const GH_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 0c4.42 0 8 3.58 8 8a8.01 8.01 0 0 1-5.45 7.59c-.4.08-.55-.17-.55-.38 0-.27.01-1.13.01-2.2 0-.75-.25-1.23-.54-1.48 1.78-.2 3.65-.88 3.65-3.95 0-.88-.31-1.59-.82-2.15.08-.2.36-1.02-.08-2.12 0 0-.67-.22-2.2.82-.64-.18-1.32-.27-2-.27-.68 0-1.36.09-2 .27-1.53-1.03-2.2-.82-2.2-.82-.44 1.1-.16 1.92-.08 2.12-.51.56-.82 1.28-.82 2.15 0 3.06 1.86 3.75 3.64 3.95-.23.2-.44.55-.51 1.07-.46.21-1.61.55-2.33-.66-.15-.24-.6-.83-1.23-.82-.67.01-.27.38.01.53.34.19.73.9.82 1.13.16.45.68 1.31 2.69.94 0 .67.01 1.3.01 1.49 0 .21-.15.45-.55.38A8 8 0 0 1 0 8c0-4.42 3.58-8 8-8Z"/></svg>';
+const HEART_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-7.5-4.6-9.6-9.2C.9 8.4 3 4.5 6.7 4.5c2.1 0 3.6 1.2 4.3 2.6.7-1.4 2.2-2.6 4.3-2.6 3.7 0 5.8 3.9 4.3 7.3C19.5 16.4 12 21 12 21Z"/></svg>';
+const MAIL_ICON = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2.5"/><path d="m4 7 8 6 8-6"/></svg>';
+const supportBar = `<aside class="sbar" aria-label="Support VINAC Link and get news">
+  <div class="sbar-in">
+    <a class="sbar-link" href="${GITHUB}" rel="noopener">${GH_ICON}<span>Star on GitHub</span></a>
+    <a class="sbar-link sbar-pay" href="${PAYPAL}" rel="noopener">${HEART_ICON}<span>Support us with PayPal</span></a>
+    <form class="signup-form bar-form" action="/subscribe.php" method="post" data-ok="Thanks! You're on the list.">
+      <span class="bar-mail">${MAIL_ICON}<span>Newsletter</span></span>
+      <label class="sr-only" for="bar-email">Email for the newsletter</label>
+      <input id="bar-email" name="email" type="email" autocomplete="email" maxlength="200" placeholder="you@example.com" required>
+      <label class="bar-consent"><input name="consent" type="checkbox" value="yes" required> Email me news, a few times a year (unsubscribe any time)</label>
+      <div class="trap" aria-hidden="true"><label>Leave this empty<input name="website" type="text" tabindex="-1" autocomplete="off"></label></div>
+      <input type="hidden" name="t" value="">
+      <button class="btn small primary" type="submit">Subscribe</button>
+      <p class="form-status bar-status" role="status" aria-live="polite"></p>
+    </form>
+    <a class="btn small primary bar-sub-mobile" href="/#news">${MAIL_ICON}<span>Subscribe</span></a>
+  </div>
+</aside>`;
+const footer = `${supportBar}
+<footer class="foot">
   <div class="wrap foot-in">
     <div class="foot-brand">${ICON}<div><strong>VINAC Link™</strong><span>Verified Intent Network for Agent Communication</span></div></div>
     <nav class="foot-links" aria-label="Footer">

@@ -1,25 +1,15 @@
 #!/bin/bash
 # VINAC Link: start the service and open its page (macOS; double-click).
-cd "$(dirname "$0")" || exit 1
-for d in "node/bin" "node/$(uname -m | sed s/x86_64/x64/)/bin"; do [ -x "$PWD/$d/node" ] && PATH="$PWD/$d:$PATH"; done
-if ! command -v node >/dev/null 2>&1; then
-  for p in /opt/homebrew/bin /usr/local/bin; do [ -x "$p/node" ] && PATH="$p:$PATH"; done
-fi
-if ! command -v node >/dev/null 2>&1; then
-  echo "Node.js is not installed. Install the LTS version from https://nodejs.org (or: brew install node),"
-  echo "then double-click this file again."
-  read -r -p "Press Return to close." _; exit 1
-fi
-if ! node -e "process.exit(Number(process.versions.node.split('.')[0]) >= 22 ? 0 : 1)"; then
-  echo "Your Node.js is too old. VINAC Link needs Node.js 22 or newer: https://nodejs.org"
-  read -r -p "Press Return to close." _; exit 1
-fi
-if node connector/bin/vinac.mjs start; then
+D="$(cd "$(dirname "$0")" && pwd)" || exit 1
+. "$D/mac-runtime.sh" || exit 1
+VINAC_RESOURCES="$D"
+vinac_start "$@"
+status=$?
+if [ "$status" -eq 0 ]; then
   echo
-  echo "If macOS asks whether node may accept incoming connections, choose Allow."
-  echo "Next: pair with your other computer on the page that just opened (see START-HERE.html)."
-  echo "You can close this window; VINAC Link keeps running in the background."
-else
-  echo "VINAC Link could not start. Double-click 'Check VINAC Link.command' and send the result to whoever gave you this."
+  echo "If macOS asks whether VINAC Link may find devices on your local network, choose Allow."
+  echo "Next: open Pair a device on the page that just opened (see START-HERE.html)."
+  echo "VINAC Link is running. You can close this window; it keeps running in the background."
 fi
 read -r -p "Press Return to close." _
+exit "$status"

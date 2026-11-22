@@ -8,16 +8,20 @@ giving any of them more trust than you decided to give.
 VINAC Link combines technology we designed ourselves with cryptography the security community has
 studied for years:
 
-- **Pairing that only people can complete.** Two computers find each other on your network, or with an invite a person makes, and each
-  person confirms a 6-digit code shown on the other screen. Someone nearby, someone on the network,
-  or an agent on either computer can't complete a pairing on their own.
+- **Pairing that only people can complete.** Two computers find each other on your network, both
+  screens show the same 6-digit code, and a person presses Allow on each. The code comes from the
+  key exchange itself, so a device in the middle can't make the two screens agree. An invite (made
+  only by a person on the page, used once, valid 10 minutes) stands in for that check when the
+  other computer is elsewhere. Someone nearby, someone on the network, or an agent on either
+  computer can't complete a pairing on their own.
 - **An intent firewall.** Agents don't send each other free-form commands. Every request names its
   purpose from a fixed, versioned list, and your rules decide (allow, ask you first, or block)
   before your agent sees anything. Pick a mode (Restricted, Standard or Auto) to set the defaults in
   one click; high-risk requests stay blocked in every mode.
 - **Secrets that never touch the chat.** Keys and tokens travel straight into your operating
-  system's own secure key store. Agents can use them in programs you approve, but never see the
-  values. Lock the vault with a passphrase and, while it's locked, no program can read them.
+  system's own secure key store. A key nobody asked for arrives as an offer and can't be used until
+  you accept it. Agents can ask for a key by name and use it in programs you approve, but never see
+  the values. Lock the vault with a passphrase and, while it's locked, no program can read them.
 - **Published, well-studied cryptography.** Pairing and every connection are built on the Noise
   protocol framework, the same family of protocols behind WireGuard and WhatsApp's transport
   encryption, with fresh keys for every session.
@@ -35,6 +39,7 @@ studied for years:
 | **No flood of requests** | At most 25 requests from one device wait for you at a time, and a request nobody decides on expires after 3 days. |
 | **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents. |
 | **A private local page** | The VINAC Link page only answers on your own computer and refuses other websites. |
+| **Quiet on the network** | Only while *Pair a device* is open does a computer announce itself on your local network (its name and a one-time code). That alone can't pair anything, and it stops when you leave the screen. |
 
 ## Tested, and reviewed next
 

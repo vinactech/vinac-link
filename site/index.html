@@ -41,83 +41,166 @@
   <div class="wrap">
     <p class="kicker center">How it works</p>
     <h2 class="center">Pair once. Then share safely.</h2>
-    <figure class="schematic">
-      <svg viewBox="0 0 1200 560" role="img" aria-labelledby="schem-title schem-desc">
+    <figure class="schematic stage3d">
+      <svg viewBox="0 0 1200 600" role="img" aria-labelledby="schem-title schem-desc">
         <title id="schem-title">How VINAC Link works</title>
-        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once: each lists the other, and a person presses Allow on both. Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline.</desc>
+        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once: both screens show the same 6 digits, and a person presses Allow on both. Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline.</desc>
         <defs>
-          <linearGradient id="sg-link" gradientUnits="userSpaceOnUse" x1="420" x2="780" y1="250" y2="250"><stop offset="0" class="sg-a"/><stop offset="1" class="sg-b"/></linearGradient>
-          <linearGradient id="sg-chip" x1="0" x2="1" y1="0" y2="1"><stop offset="0" class="sg-a"/><stop offset="1" class="sg-b"/></linearGradient>
-          <filter id="sg-glow" x="-20%" y="-200%" width="140%" height="500%"><feGaussianBlur stdDeviation="8"/></filter>
-          <path id="sg-path" d="M420 250 H780"/>
-          <path id="sg-path-back" d="M780 250 H420"/>
+          <linearGradient id="h3-chip" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#5b74ff"/><stop offset="1" stop-color="#a16bf2"/></linearGradient>
+          <linearGradient id="h3-link" gradientUnits="userSpaceOnUse" x1="405" x2="795" y1="0" y2="0"><stop offset="0" stop-color="#5b74ff"/><stop offset=".55" stop-color="#8a7dff"/><stop offset="1" stop-color="#b06cf2"/></linearGradient>
+          <linearGradient id="h3-lid-pc" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#3b3c49"/><stop offset="1" stop-color="#17181f"/></linearGradient>
+          <linearGradient id="h3-deck-pc" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#4b4c5a"/><stop offset="1" stop-color="#202129"/></linearGradient>
+          <linearGradient id="h3-lid-mac" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#eceef3"/><stop offset="1" stop-color="#9ea2ad"/></linearGradient>
+          <linearGradient id="h3-deck-mac" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#f1f2f6"/><stop offset="1" stop-color="#a9adb8"/></linearGradient>
+          <linearGradient id="h3-screen" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#0d1230"/><stop offset=".6" stop-color="#121947"/><stop offset="1" stop-color="#1b1452"/></linearGradient>
+          <linearGradient id="h3-glass" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#8c9bff" stop-opacity=".32"/><stop offset="1" stop-color="#8c9bff" stop-opacity=".06"/></linearGradient>
+          <linearGradient id="h3-cloud" x1="0" x2="0" y1="0" y2="1"><stop offset="0" stop-color="#2d3470"/><stop offset="1" stop-color="#141733"/></linearGradient>
+          <radialGradient id="h3-floor-fade" cx=".5" cy=".35" r=".6"><stop offset="0" stop-color="#fff"/><stop offset="1" stop-color="#fff" stop-opacity="0"/></radialGradient>
+          <mask id="h3-floor-mask"><rect x="0" y="300" width="1200" height="300" fill="url(#h3-floor-fade)"/></mask>
+          <pattern id="h3-keys" width="13" height="6" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="10" height="3.6" rx="1" fill="#ffffff" fill-opacity=".09"/></pattern>
+          <pattern id="h3-keys-mac" width="13" height="6" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="10" height="3.6" rx="1" fill="#1b1c24" fill-opacity=".55"/></pattern>
+          <filter id="h3-blur-lg" x="-50%" y="-50%" width="200%" height="200%"><feGaussianBlur stdDeviation="22"/></filter>
+          <filter id="h3-blur-md" x="-50%" y="-200%" width="200%" height="500%"><feGaussianBlur stdDeviation="8"/></filter>
+          <filter id="h3-blur-sm" x="-100%" y="-100%" width="300%" height="300%"><feGaussianBlur stdDeviation="3"/></filter>
+          <path id="h3-path" d="M405 247 H795"/>
+          <path id="h3-path-back" d="M795 247 H405"/>
         </defs>
 
+        <!-- floor: a perspective grid fading into the dark -->
+        <g class="h3-floor" mask="url(#h3-floor-mask)">
+          <path d="M0 330H1200M0 362H1200M0 404H1200M0 458H1200M0 526H1200M0 598H1200"/>
+          <path d="M600 120L-600 600M600 120L-300 600M600 120L0 600M600 120L300 600M600 120L450 600M600 120L600 600M600 120L750 600M600 120L900 600M600 120L1200 600M600 120L1500 600M600 120L1800 600" clip-path="inset(300px 0 0 0)"/>
+        </g>
+
         <!-- online: cloud AI, optional -->
-        <g class="sg-cloud">
-          <path class="sg-dash" d="M560 92 C470 110 330 120 290 168 M640 92 C730 110 870 120 910 168"/>
-          <path class="sg-cloud-shape" d="M562 96h78a26 26 0 0 0 2-52 38 38 0 0 0-72-6 24 24 0 0 0-8 58Z"/>
-          <text class="sg-small" x="600" y="128" text-anchor="middle">Cloud AI · online, optional</text>
+        <g class="h3-cloud">
+          <path class="h3-flow-dash" d="M548 96 C430 104 300 116 250 150 M652 96 C770 104 900 116 950 150"/>
+          <path d="M556 102h90a30 30 0 0 0 3-60 44 44 0 0 0-83-7 28 28 0 0 0-10 67Z" fill="#5b74ff" opacity=".35" filter="url(#h3-blur-md)"/>
+          <path d="M556 102h90a30 30 0 0 0 3-60 44 44 0 0 0-83-7 28 28 0 0 0-10 67Z" fill="url(#h3-cloud)" stroke="#8c9bff" stroke-width="2.5" stroke-linejoin="round"/>
+          <path d="M572 54a30 30 0 0 1 30-14" fill="none" stroke="#ffffff" stroke-opacity=".35" stroke-width="2.5" stroke-linecap="round"/>
+          <text class="h3-small" x="600" y="132" text-anchor="middle">Cloud AI · online, optional</text>
         </g>
 
-        <!-- the two computers -->
-        <g class="sg-pc">
-          <rect class="sg-screen" x="130" y="170" width="290" height="166" rx="16"/>
-          <rect class="sg-base" x="100" y="342" width="350" height="14" rx="7"/>
-          <rect x="235" y="200" width="80" height="40" rx="20" fill="url(#sg-chip)"/>
-          <text class="sg-chip-text" x="275" y="226" text-anchor="middle">AI</text>
-          <rect class="sg-vault" x="200" y="266" width="150" height="40" rx="12"/>
-          <path class="sg-lock" d="M222 284v-5a7 7 0 0 1 14 0v5M218 284h22v14h-22z"/>
-          <text class="sg-tiny" x="250" y="292">Key store</text>
-          <text class="sg-label" x="275" y="390" text-anchor="middle">PC</text>
-        </g>
-        <g class="sg-mac">
-          <rect class="sg-screen" x="780" y="170" width="290" height="166" rx="16"/>
-          <rect class="sg-base" x="750" y="342" width="350" height="14" rx="7"/>
-          <rect x="885" y="200" width="80" height="40" rx="20" fill="url(#sg-chip)"/>
-          <text class="sg-chip-text" x="925" y="226" text-anchor="middle">AI</text>
-          <rect class="sg-vault" x="850" y="266" width="150" height="40" rx="12"/>
-          <path class="sg-lock" d="M872 284v-5a7 7 0 0 1 14 0v5M868 284h22v14h-22z"/>
-          <text class="sg-tiny" x="900" y="292">Key store</text>
-          <text class="sg-label" x="925" y="390" text-anchor="middle">Mac</text>
+        <!-- PC -->
+        <g transform="translate(95 150)">
+          <ellipse cx="155" cy="252" rx="215" ry="16" fill="#000" opacity=".6" filter="url(#h3-blur-md)"/>
+          <rect class="h3-breathe" x="14" y="12" width="282" height="170" rx="16" fill="#5b74ff" filter="url(#h3-blur-lg)"/>
+          <rect x="0" y="0" width="310" height="196" rx="16" fill="url(#h3-lid-pc)" stroke="#ffffff" stroke-opacity=".08"/>
+          <rect x="6" y="1" width="298" height="2" rx="1" fill="#ffffff" fill-opacity=".18"/>
+          <circle cx="155" cy="7" r="2.2" fill="#07070b"/>
+          <rect x="12" y="14" width="286" height="170" rx="9" fill="url(#h3-screen)"/>
+          <circle cx="28" cy="30" r="3.5" fill="#ff5f57"/><circle cx="40" cy="30" r="3.5" fill="#febc2e"/><circle cx="52" cy="30" r="3.5" fill="#28c840"/>
+          <text class="h3-ui-title" x="66" y="34">VINAC Link</text>
+          <rect x="103" y="52" width="104" height="36" rx="18" fill="url(#h3-chip)"/>
+          <text class="h3-ui-chip" x="155" y="75" text-anchor="middle">AI agent</text>
+          <rect x="63" y="104" width="184" height="38" rx="11" fill="#ffffff" fill-opacity=".05" stroke="#ffffff" stroke-opacity=".12"/>
+          <path d="M82 121v-5a7 7 0 0 1 14 0v5M79 121h20v14h-20z" fill="none" stroke="#3ddc84" stroke-width="2.6" stroke-linejoin="round"/>
+          <text class="h3-ui" x="108" y="128">Key store</text>
+          <circle class="h3-blink" cx="232" cy="123" r="4" fill="#3ddc84"/>
+          <rect x="63" y="152" width="184" height="20" rx="10" fill="#3ddc84" fill-opacity=".12"/>
+          <text class="h3-ui-ok" x="155" y="166" text-anchor="middle">Paired with Mac</text>
+          <path d="M12 14h150L64 184H12z" fill="#ffffff" fill-opacity=".035"/>
+          <rect x="-6" y="194" width="322" height="5" rx="2" fill="#0a0a0e"/>
+          <path d="M-6 199H316L352 236H-42Z" fill="url(#h3-deck-pc)"/>
+          <path d="M18 204H292L310 221H0Z" fill="url(#h3-keys)"/>
+          <path d="M128 224H182L188 233H122Z" fill="#ffffff" fill-opacity=".09"/>
+          <path d="M-42 236H352L348 242H-38Z" fill="#0a0a0e"/>
+          <text class="h3-label" x="155" y="290" text-anchor="middle">PC</text>
         </g>
 
-        <!-- the link -->
-        <path class="sg-link-glow" d="M420 250 H780" stroke="url(#sg-link)" filter="url(#sg-glow)"/>
-        <path class="sg-link" d="M420 250 H780" stroke="url(#sg-link)"/>
-        <circle class="sg-packet" r="5"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#sg-path"/></animateMotion></circle>
-        <circle class="sg-packet" r="5"><animateMotion dur="3.2s" begin="-1.6s" repeatCount="indefinite"><mpath href="#sg-path-back"/></animateMotion></circle>
+        <!-- Mac -->
+        <g transform="translate(795 150)">
+          <ellipse cx="155" cy="252" rx="215" ry="16" fill="#000" opacity=".6" filter="url(#h3-blur-md)"/>
+          <rect class="h3-breathe" x="14" y="12" width="282" height="170" rx="16" fill="#a16bf2" filter="url(#h3-blur-lg)"/>
+          <rect x="0" y="0" width="310" height="196" rx="16" fill="url(#h3-lid-mac)" stroke="#ffffff" stroke-opacity=".5"/>
+          <circle cx="155" cy="7" r="2.2" fill="#2a2b33"/>
+          <rect x="10" y="12" width="290" height="174" rx="10" fill="#0a0a0e"/>
+          <rect x="14" y="16" width="282" height="166" rx="8" fill="url(#h3-screen)"/>
+          <circle cx="28" cy="30" r="3.5" fill="#ff5f57"/><circle cx="40" cy="30" r="3.5" fill="#febc2e"/><circle cx="52" cy="30" r="3.5" fill="#28c840"/>
+          <text class="h3-ui-title" x="66" y="34">VINAC Link</text>
+          <rect x="103" y="52" width="104" height="36" rx="18" fill="url(#h3-chip)"/>
+          <text class="h3-ui-chip" x="155" y="75" text-anchor="middle">AI agent</text>
+          <rect x="63" y="104" width="184" height="38" rx="11" fill="#ffffff" fill-opacity=".05" stroke="#ffffff" stroke-opacity=".12"/>
+          <path d="M82 121v-5a7 7 0 0 1 14 0v5M79 121h20v14h-20z" fill="none" stroke="#3ddc84" stroke-width="2.6" stroke-linejoin="round"/>
+          <text class="h3-ui" x="108" y="128">Key store</text>
+          <circle class="h3-blink" cx="232" cy="123" r="4" fill="#3ddc84" style="animation-delay:-1s"/>
+          <rect x="63" y="152" width="184" height="20" rx="10" fill="#3ddc84" fill-opacity=".12"/>
+          <text class="h3-ui-ok" x="155" y="166" text-anchor="middle">Paired with PC</text>
+          <path d="M14 16h150L66 182H14z" fill="#ffffff" fill-opacity=".035"/>
+          <rect x="-6" y="194" width="322" height="5" rx="2" fill="#8d919b"/>
+          <path d="M-6 199H316L352 236H-42Z" fill="url(#h3-deck-mac)"/>
+          <path d="M18 204H292L310 221H0Z" fill="url(#h3-keys-mac)"/>
+          <path d="M128 224H182L188 233H122Z" fill="#000" fill-opacity=".08"/>
+          <path d="M-42 236H352L348 242H-38Z" fill="#7d818c"/>
+          <text class="h3-label" x="155" y="290" text-anchor="middle">Mac</text>
+        </g>
 
-        <!-- 1: pair once (same 6 digits on both screens, Allow) -->
-        <rect class="sg-code" x="414" y="230" width="86" height="40" rx="12"/>
-        <text class="sg-code-text" x="457" y="256" text-anchor="middle">482 913</text>
-        <circle class="sg-check-bg" cx="499" cy="231" r="11"/>
-        <path class="sg-check" d="M494 231l4 4 7-7"/>
-        <circle class="sg-num" cx="452" cy="178" r="16"/><text class="sg-num-text" x="452" y="184" text-anchor="middle">1</text>
-        <text class="sg-step" x="452" y="318" text-anchor="middle">Pair once</text>
+        <!-- the link: a glowing tube with traffic both ways and a key passing through -->
+        <path d="M405 247H795" stroke="url(#h3-link)" stroke-width="22" opacity=".45" filter="url(#h3-blur-md)" fill="none"/>
+        <path d="M405 247H795" stroke="#141733" stroke-width="10" stroke-linecap="round" fill="none"/>
+        <path d="M405 247H795" stroke="url(#h3-link)" stroke-width="5" stroke-linecap="round" fill="none"/>
+        <path class="h3-flow" d="M405 247H795" stroke="#ffffff" stroke-width="2" stroke-linecap="round" stroke-dasharray="2 16" fill="none" opacity=".55"/>
+        <g class="h3-moving">
+          <circle r="9" fill="#a9b4ff" opacity=".6" filter="url(#h3-blur-sm)"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#h3-path"/></animateMotion></circle>
+          <circle r="4.5" fill="#fff"><animateMotion dur="3.2s" repeatCount="indefinite"><mpath href="#h3-path"/></animateMotion></circle>
+          <circle r="9" fill="#d3a9ff" opacity=".6" filter="url(#h3-blur-sm)"><animateMotion dur="3.2s" begin="-1.6s" repeatCount="indefinite"><mpath href="#h3-path-back"/></animateMotion></circle>
+          <circle r="4.5" fill="#fff"><animateMotion dur="3.2s" begin="-1.6s" repeatCount="indefinite"><mpath href="#h3-path-back"/></animateMotion></circle>
+        </g>
+
+        <!-- 1: pair once: the same 6 digits on both screens, Allow -->
+        <g transform="translate(470 247)">
+          <rect x="-47" y="-21" width="94" height="42" rx="13" fill="#0e1130"/>
+          <rect x="-47" y="-21" width="94" height="42" rx="13" fill="url(#h3-glass)" stroke="#8c9bff" stroke-width="1.6"/>
+          <text class="h3-code" x="0" y="6" text-anchor="middle">482 913</text>
+          <circle cx="44" cy="-20" r="11" fill="#3ddc84"/>
+          <path d="M39 -20l4 4 7-7" fill="none" stroke="#07140c" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <g class="h3-float"><circle cx="470" cy="192" r="16" fill="url(#h3-chip)"/><text class="h3-num" x="470" y="198" text-anchor="middle">1</text></g>
+        <text class="h3-step" x="470" y="326" text-anchor="middle">Pair once</text>
 
         <!-- 2: keys and tokens -->
-        <g class="sg-key" transform="translate(560 226)">
-          <circle cx="-14" cy="0" r="10"/><path d="M-4 0h30M16 0v8M24 0v6"/>
+        <g transform="translate(590 247)">
+          <circle r="26" fill="#f5b84a" opacity=".25" filter="url(#h3-blur-sm)"/>
+          <circle r="24" fill="#1f1a10" stroke="#f5b84a" stroke-opacity=".55" stroke-width="1.6"/>
+          <g fill="none" stroke="#f5b84a" stroke-width="3.6" stroke-linecap="round"><circle cx="-8" cy="0" r="7"/><path d="M-1 0h16M9 0v6M14 0v4"/></g>
         </g>
-        <circle class="sg-num" cx="566" cy="178" r="16"/><text class="sg-num-text" x="566" y="184" text-anchor="middle">2</text>
-        <text class="sg-step" x="566" y="318" text-anchor="middle">Keys &amp; tokens</text>
+        <g class="h3-moving">
+          <g opacity="0"><animateMotion dur="6s" repeatCount="indefinite" keyPoints="0;1;1" keyTimes="0;.55;1" calcMode="linear"><mpath href="#h3-path"/></animateMotion>
+            <animate attributeName="opacity" dur="6s" repeatCount="indefinite" values="0;1;1;0;0" keyTimes="0;.06;.48;.55;1"/>
+            <g fill="none" stroke="#ffd27a" stroke-width="2.6" stroke-linecap="round" transform="translate(0 -18)"><circle cx="-5" cy="0" r="4.5"/><path d="M0 0h10M6 0v4"/></g>
+          </g>
+        </g>
+        <g class="h3-float" style="animation-delay:-.8s"><circle cx="590" cy="192" r="16" fill="url(#h3-chip)"/><text class="h3-num" x="590" y="198" text-anchor="middle">2</text></g>
+        <text class="h3-step" x="590" y="326" text-anchor="middle">Keys &amp; tokens</text>
 
-        <!-- 3: your rules, a person approves -->
-        <rect class="sg-gate" x="652" y="204" width="76" height="92" rx="18"/>
-        <path class="sg-shield" d="M690 220l20 8v14c0 14-9 22-20 27-11-5-20-13-20-27v-14z"/>
-        <circle class="sg-dot-ok" cx="674" cy="283" r="4"/><circle class="sg-dot-ask" cx="690" cy="283" r="4"/><circle class="sg-dot-block" cx="706" cy="283" r="4"/>
-        <circle class="sg-num" cx="740" cy="190" r="16"/><text class="sg-num-text" x="740" y="196" text-anchor="middle">3</text>
-        <text class="sg-step" x="690" y="318" text-anchor="middle">Your rules</text>
-        <path class="sg-dash" d="M690 328 V368"/>
-        <g class="sg-person"><circle cx="690" cy="384" r="12"/><path d="M670 422a20 18 0 0 1 40 0z"/></g>
-        <text class="sg-small" x="690" y="446" text-anchor="middle">You approve</text>
+        <!-- 3: your rules (a glass gate), a person approves -->
+        <g transform="translate(700 247)">
+          <circle class="h3-ring" r="50" fill="none" stroke="#8c9bff" stroke-width="2"/>
+          <circle class="h3-ring" r="50" fill="none" stroke="#8c9bff" stroke-width="2" style="animation-delay:-1.4s"/>
+          <rect x="-34" y="-42" width="80" height="100" rx="20" fill="#05060d"/>
+          <rect x="-40" y="-50" width="80" height="100" rx="20" fill="#11143a"/>
+          <rect x="-40" y="-50" width="80" height="100" rx="20" fill="url(#h3-glass)" stroke="url(#h3-chip)" stroke-width="2"/>
+          <path d="M-30 -48h46" stroke="#ffffff" stroke-opacity=".35" stroke-width="2" stroke-linecap="round"/>
+          <path d="M0 -32l20 8v14c0 14-9 22-20 27-11-5-20-13-20-27v-14z" fill="#8c9bff" fill-opacity=".35" stroke="#a9b4ff" stroke-width="2.4" stroke-linejoin="round"/>
+          <circle class="h3-blink" cx="-16" cy="32" r="4.5" fill="#3ddc84"/>
+          <circle class="h3-blink" cx="0" cy="32" r="4.5" fill="#f5b84a" style="animation-delay:-.6s"/>
+          <circle class="h3-blink" cx="16" cy="32" r="4.5" fill="#ff6b6b" style="animation-delay:-1.2s"/>
+        </g>
+        <g class="h3-float" style="animation-delay:-1.6s"><circle cx="756" cy="196" r="16" fill="url(#h3-chip)"/><text class="h3-num" x="756" y="202" text-anchor="middle">3</text></g>
+        <text class="h3-step" x="700" y="326" text-anchor="middle">Your rules</text>
+        <path class="h3-flow-dash" d="M700 336V364"/>
+        <g transform="translate(700 384)">
+          <circle class="h3-ring-ok" r="22" fill="none" stroke="#3ddc84" stroke-width="2"/>
+          <circle cy="-6" r="10" fill="#f2f2f6"/><path d="M-17 22a17 15 0 0 1 34 0z" fill="#f2f2f6"/>
+          <circle cx="15" cy="-12" r="8" fill="#3ddc84"/><path d="M11 -12l3 3 5-5" fill="none" stroke="#07140c" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+        </g>
+        <text class="h3-small" x="700" y="432" text-anchor="middle">You approve</text>
 
         <!-- offline -->
-        <g class="sg-offline">
-          <rect class="sg-pill" x="370" y="488" width="460" height="48" rx="24"/>
-          <path class="sg-plug" d="M404 512h12m0-8h12v16h-12zm24 0h12v16h-12zm12 8h12M434 506v12"/>
-          <text class="sg-small sg-strong" x="482" y="518">Local models: everything works offline</text>
+        <g>
+          <rect x="370" y="522" width="460" height="46" rx="23" fill="#0f2a1b" stroke="#3ddc84" stroke-opacity=".45"/>
+          <path d="M404 545h12m0-8h12v16h-12zm24 0h12v16h-12zm12 8h12M434 539v12" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
+          <text class="h3-small h3-strong" x="482" y="551">Local models: everything works offline</text>
         </g>
       </svg>
     </figure>
@@ -358,7 +441,7 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
       <details><summary>Some AI tools can already message their other sessions. Why VINAC Link?</summary><p>Built-in messaging usually works within one vendor's tools and goes through that vendor's cloud and account. VINAC Link connects agents from any vendor (Claude Code, Codex, OpenClaw and local models) directly between your own computers, with no account or cloud in between, and works fully offline. It also adds what plain messaging leaves out: a firewall that checks every request, keys and tokens agents can use but never see, and a person who approves what matters.</p></details>
       <details><summary>What about A2A and other agent standards?</summary><p>Standards such as A2A connect companies' cloud services to each other. VINAC Link is for the agents on your own computers, including ones that are never online. We plan to make VINAC Link work with A2A, so the two fit together rather than compete.</p></details>
       <details><summary>Does it work online and offline?</summary><p>Both. The link between your computers never needs the internet: Wi-Fi without internet, a hotspot or a cable is enough. Cloud agents such as Claude Code, Codex or Cursor need the internet for their own AI model; local models in LM Studio, Ollama, Goose or Open WebUI can run with no internet at all. You only need a connection once, to download VINAC Link, and you can copy the package over on a USB stick instead.</p></details>
-      <details><summary>What leaves my computer?</summary><p>Only what you or your agent send to a device you paired, encrypted for that device. Nothing goes to us. This website sets no cookies and loads no trackers either.</p></details>
+      <details><summary>What leaves my computer?</summary><p>Only what you or your agent send to a device you paired, encrypted for that device. While <i>Pair a device</i> is open, your computer also says "I'm here" on your local network (its name and a one-time code) so the other one can find it; that stays on your network and stops when you leave the screen. Nothing goes to us. This website sets no cookies and loads no trackers either.</p></details>
       <details><summary>Can an agent approve its own requests?</summary><p>No. Agents get tools to send and read. Confirming a pairing, approving a request, changing a rule or revealing a secret value only happens on the VINAC Link page, by a person.</p></details>
       <details><summary>Do I need sound? Is it safe?</summary><p>No: computers on the same network find each other, and you just compare 6 digits and press Allow. Sound is an optional beta for when they can't. It's a six-second, very high tone that most adults barely hear. It only helps the two computers find each other; the real check is the 6-digit code you confirm on each side, so overhearing the sound isn't enough to pair.</p></details>
       <details><summary>Which agents work with it?</summary><p>Claude Code, Codex and OpenClaw have their own setup; LM Studio, Goose, Open WebUI, Cursor and any other MCP app use it as a standard MCP server.</p></details>

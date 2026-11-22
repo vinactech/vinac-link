@@ -22,7 +22,8 @@ We didn't find one, so we built it.
 - **Summer 2026.** The first prototype pairs two computers with a short burst of sound.
 - **October 2026.** VINAC Link becomes a product, built around a firewall the person controls.
 - **November 2026.** Early access: installers, full offline use, this website, then firewall modes, a
-  vault you can lock with a passphrase, and messages that wait for a computer that's off.
+  vault you can lock with a passphrase, messages that wait for a computer that's off, pairing with
+  one Allow on each computer, invites, and asking for a key in one click.
 
 Next come a one-step project hand-off, an independent security audit, a signed Windows installer and an
 optional relay.
@@ -33,8 +34,8 @@ optional relay.
 VINAC Link is a secure link between the AI agents on your own computers, from any vendor, online
 or offline, and nothing important happens without your OK.
 
-1. **Pair once.** Two computers find each other on your network (or with an invite), and you confirm the same 6-digit code on each
-   screen. Only a person can finish pairing.
+1. **Pair once.** Two computers find each other on your network (or with an invite). Both screens
+   show the same 6-digit code, and you press Allow on each. Only a person can finish pairing.
 2. **Share keys and tokens.** API keys and tokens move straight into the other computer's secure key
    store, a vault you can lock with a passphrase. Agents can use them, but never see the values, and they
   never appear in a chat.
@@ -67,4 +68,5 @@ agents states its intent, and every intent is checked, by your rules and, when i
 VINAC Link™ is made by Mexley Marketing Inc., a Canadian company. We'd love to hear how you use it,
 what's missing, or how we could work together: [write to us](/#contact) or email
 **hello@vinac.tech**. Follow us on [LinkedIn](https://www.linkedin.com/company/vinac-link) and
-[GitHub](https://github.com/vinactech/vinac-link).
+[GitHub](https://github.com/vinactech/vinac-link), get news a few times a year from our
+[newsletter](/#news), or [support the project](/#support).

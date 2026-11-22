@@ -78,6 +78,18 @@ for (const contactForm of document.querySelectorAll('.contact-form, .signup-form
   });
 }
 
+// How it works: the 3D stage tilts a little toward the pointer (not with reduced motion, not on touch).
+const stage = document.querySelector('.stage3d');
+if (stage && matchMedia('(prefers-reduced-motion: no-preference) and (hover: hover)').matches) {
+  stage.addEventListener('pointermove', e => {
+    const r = stage.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width - 0.5, y = (e.clientY - r.top) / r.height - 0.5;
+    stage.style.setProperty('--ty', `${(x * 7).toFixed(2)}deg`);
+    stage.style.setProperty('--tx', `${(5 - y * 6).toFixed(2)}deg`);
+  });
+  stage.addEventListener('pointerleave', () => { stage.style.removeProperty('--ty'); stage.style.removeProperty('--tx'); });
+}
+
 // Tabs (without this script every panel simply shows, one after another)
 for (const list of document.querySelectorAll('[role="tablist"]')) {
   const tabs = [...list.querySelectorAll('[role="tab"]')];

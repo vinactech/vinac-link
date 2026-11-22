@@ -48,6 +48,8 @@ test('site: builds every page with no leftover placeholders, no outside requests
   for (const f of files) {
     const html = fs.readFileSync(f, 'utf8');
     assert.doesNotMatch(html, /\{\{\w+\}\}/, f);
+    // The bottom bar on every page: GitHub, PayPal, newsletter (our own script, consent box required).
+    assert.match(html, /<aside class="sbar"[\s\S]*href="https:\/\/paypal\.me\/vinactech"[\s\S]*action="\/subscribe\.php"[\s\S]*name="consent" type="checkbox" value="yes" required/, `${f} has the bottom bar`);
     assert.doesNotMatch(html, /<(script|img|iframe|video|source)[^>]+src="https?:|<link(?![^>]*rel="canonical")[^>]+href="https?:/i, `${f} loads something from another site`);
     assert.doesNotMatch(html, /LAUNCH\.md|ROADMAP\.md|CHANGELOG\.md|TODO|googletagmanager|gtag\(|connect\.facebook/, f);
     assert.doesNotMatch(html, /MacBook|Workstation|OpenClawGateway|ivadesk|SilentAuth|C:\\Users/i, `${f} has a device name or internal detail`);

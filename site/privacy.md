@@ -1,6 +1,6 @@
 # Privacy Policy
 
-*Effective November 20, 2026*
+*Effective November 22, 2026*
 
 This policy explains what personal information Mexley Marketing Inc. ("we", "us") collects through
 the website vinac.tech and the VINAC Link software, and how we handle it. We are based in Ontario,
@@ -13,6 +13,10 @@ VINAC Link runs on your own computers. **It does not send us anything.** There i
 telemetry, no analytics and no automatic reporting. Your pairings, messages, requests, files, keys
 and tokens stay on the computers you pair, and travel only directly between them, encrypted. We run
 no server in between and cannot see or recover any of it.
+
+While the *Pair a device* screen is open, VINAC Link announces the computer on your **local
+network only** (its name, its network address and a one-time pairing code), so your other computer
+can find it. This never goes to us or to the internet, and it stops when you leave that screen.
 
 If you choose to connect VINAC Link to third-party AI services (for example a cloud AI agent), those
 services handle your data under their own terms and privacy policies, not ours.
@@ -32,8 +36,12 @@ services handle your data under their own terms and privacy policies, not ours.
 
 When you write to us through the contact form or by email, we receive your name, email address,
 the topic you chose and your message. We use them **only to answer you** and to keep a record of our
-conversation. We don't add you to a mailing list, and we don't sell, rent or share your details with
-anyone, except our email and hosting providers, who process them on our behalf.
+conversation. Writing to us doesn't add you to our newsletter (only the newsletter form does), and
+we don't sell, rent or share your details with anyone, except our email and hosting providers, who
+process them on our behalf.
+
+We keep messages for as long as needed to help you and for our normal business records, and then
+delete them.
 
 If you join the relay waitlist, we keep your email address only to tell you when the relay is
 ready, and delete it on request or when the waitlist closes.
@@ -43,26 +51,26 @@ one hour, only to limit how many messages can be sent.
 
 ## The newsletter
 
-If you subscribe, we keep your email address, when you subscribed and the consent you gave, and
-use them only to send you VINAC Link news a few times a year. We add you only when you tick the
-consent box yourself. Every newsletter has a way to unsubscribe, and you can also write to
-hello@vinac.tech; we then remove your address. If we move the list to a newsletter service, that
-service processes it on our behalf only. The signup form uses the same spam protection as the
-contact form.
+If you subscribe (on the home page or in the bar at the bottom of every page), we keep your email
+address, when you subscribed and the consent you gave, and use them only to send you VINAC Link
+news a few times a year. We add you only when you tick the consent box yourself, as Canada's
+anti-spam law (CASL) requires. Every newsletter has a way to unsubscribe, and you can also write to
+hello@vinac.tech; we then remove your address promptly. We keep the record of your consent as long
+as the law requires. The list is stored with our hosting provider; if we move it to a newsletter
+service, that service processes it on our behalf only. The signup form uses the same spam
+protection as the contact form.
 
 ## Supporting the project
 
-The Support button takes you to PayPal. PayPal processes the payment under its own privacy policy;
-we receive your name, email address and the amount, and use them only for our records and to
-thank you.
-
-We keep messages for as long as needed to help you and for our normal business records, and then
-delete them.
+The Support buttons take you to PayPal. PayPal processes the payment under its own privacy policy.
+We receive the details PayPal shares with us (usually your name, email address and the amount) and
+use them only for our records, as tax law requires, and to thank you. We don't add supporters to
+the newsletter unless they subscribe themselves.
 
 ## Service providers
 
 We use a small number of providers to run the website and email, currently our web hosting provider
-(SiteGround). They may store data in Canada or other countries, and they are bound to protect it.
+(SiteGround), and PayPal for contributions. They may store data in Canada or other countries, and they are bound to protect it.
 Information stored outside Canada may be subject to the laws of that country.
 
 ## Your choices and rights
