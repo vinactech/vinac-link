@@ -20,8 +20,10 @@ studied for years:
   one click; high-risk requests stay blocked in every mode.
 - **Secrets that never touch the chat.** Keys and tokens travel straight into your operating
   system's own secure key store. A key nobody asked for arrives as an offer and can't be used until
-  you accept it. Agents can ask for a key by name and use it in programs you approve, but never see
-  the values. Lock the vault with a passphrase and, while it's locked, no program can read them.
+  you accept it. Agents can ask for a key by name and use it in programs you approve; VINAC Link's
+  agent tools don't return secret values. Other programs running under the same OS account can
+  still read unlocked secrets from the key store: lock the vault with a passphrase and, while it's
+  locked, no program can read them.
 - **Published, well-studied cryptography.** Pairing and every connection are built on the Noise
   protocol framework, the same family of protocols behind WireGuard and WhatsApp's transport
   encryption, with fresh keys for every session.
@@ -37,8 +39,8 @@ studied for years:
 | **Human in the loop** | Agents can use the devices you paired, but only a person can pair a device, approve a request, change a rule or reveal a secret. |
 | **Keys stay protected at rest** | Pairing keys and secrets are kept by Windows, macOS or Linux's own key store, and message history is encrypted on disk. With a vault passphrase, secrets are sealed again with a key only your passphrase opens. |
 | **No flood of requests** | At most 25 requests from one device wait for you at a time, and a request nobody decides on expires after 3 days. |
-| **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents. Search it on the Activity log page, export it, and make reports signed with the device's key that anyone can verify. |
-| **Agents within limits** | An allowed run lets one agent use named keys for one command in one folder until a set time. VINAC Link starts the program itself, so the agent never sees the values; you can revoke it any time. |
+| **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents: a changed or removed line is detected, though someone with full control of the computer could still replace the whole log. Search it on the Activity log page, export it, and make reports signed with the device's key that anyone can verify. It supports a compliance program; it isn't proof of compliance on its own. |
+| **Agents within limits** | An allowed run lets one agent use named keys for one command in one folder until a set time. VINAC Link starts the program itself, so the values don't pass through the agent or its tools (the program itself gets them); you can revoke it any time. |
 | **A private local page** | The VINAC Link page only answers on your own computer and refuses other websites. |
 | **Quiet on the network** | Only while *Pair a device* is open does a computer announce itself on your local network (its name and a one-time code). That alone can't pair anything, and it stops when you leave the screen. |
 

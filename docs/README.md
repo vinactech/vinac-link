@@ -12,6 +12,7 @@ on your computers. It needs no cloud and no internet, and nothing important happ
 - [Messages, requests and files](guide/messages-and-requests.md): what agents send each other; groups, files up to 64 MB, git branches
 - [The firewall](guide/firewall.md): allow / ask me / block, rules per device, recipes
 - [Secrets](guide/secrets.md): moving keys without exposing them
+- [Sound and speakers](guide/sound.md): how sound works, which speakers work best, troubleshooting
 - [Networks, Tailscale and ports](guide/networks.md): hotspots, cables, no internet
 - [Offline use](guide/offline.md): local models, files, git and records without the internet
 - [Connecting agents](guide/agents.md): Claude Code, Codex, MCP apps, OpenClaw; tool reference

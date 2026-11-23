@@ -93,6 +93,7 @@ const CODE_ATTEMPTS = 3;
 const RECEIVE_WINDOW_MS = 3 * 60_000;
 const MAX_SECRETS = 100;
 const MSG_ID = /^[A-Za-z0-9_-]{16}$/;
+const AGENT_FP = /^AGT-[0-9A-F]{4}(-[0-9A-F]{4}){3}$/; // grants.js agentFingerprint
 const HEX = n => new RegExp(`^[0-9a-f]{${n}}$`);
 const PEER_ID = HEX(16), SECRET_ID = HEX(16), SID = HEX(24);
 
@@ -1046,6 +1047,7 @@ export class Daemon {
       ...(m.intent ? { intent: m.intent, args: m.args ?? null } : {}),
       ...(m.firewall ? { firewall: m.firewall } : {}),
       ...(m.auto ? { auto: true } : {}),
+      ...(m.agent ? { agent: m.agent } : {}),
       ...(m.outbox ? { queued: true, queuedAt: m.outbox.queuedAt } : {}),
       ...(m.undelivered ? { undelivered: m.undelivered } : {}),
     };
@@ -1181,7 +1183,10 @@ export class Daemon {
     this.pairKeyOf(peer);
     // Asking that device for a secret: when its person sends it within the hour, it is accepted here without a click.
     if (intent === 'person.secret.request' && typeof reqArgs?.name === 'string') this.secretAsks.set(`${peer.id}|${reqArgs.name}`, Date.now() + SECRET_ASK_MS);
-    const inner = { id: b64u(randomBytes(12)), text: body, sentAt: new Date().toISOString(), replyTo: replyTo || null, by, ...(intent ? { intent, args: sendArgs } : {}), ...(auto ? { auto: true } : {}) };
+    // A named agent (its own token, made on the page) travels with the message inside the encryption,
+    // so the other device's log can say which agent here sent it. Older devices ignore the field.
+    const sender = agent && by === 'agent' && agent.name && agent.fp ? { name: String(agent.name).slice(0, 40), fp: agent.fp } : null;
+    const inner = { id: b64u(randomBytes(12)), text: body, sentAt: new Date().toISOString(), replyTo: replyTo || null, by, ...(intent ? { intent, args: sendArgs } : {}), ...(auto ? { auto: true } : {}), ...(sender ? { agent: sender } : {}) };
     try {
       await this.sendSealed(peer, 'msg', '/msg', inner.id, JSON.stringify(inner));
       this.setOnline(peer.id, true);
@@ -1224,6 +1229,15 @@ export class Daemon {
     if (inner.replyTo != null && !MSG_ID.test(String(inner.replyTo))) throw httpError(400, 'BAD_FIELD');
     if (inner.by != null && !['agent', 'person'].includes(inner.by)) throw httpError(400, 'BAD_FIELD');
     if (inner.auto != null && typeof inner.auto !== 'boolean') throw httpError(400, 'BAD_FIELD'); // automatic reply; older devices ignore the field
+    // The sending device names the agent that sent it (its own identity there): as that device says, not proof.
+    let fromAgent = null;
+    if (inner.agent != null) {
+      const a = inner.agent;
+      if (inner.by !== 'agent' || !a || typeof a !== 'object' || typeof a.name !== 'string' || !AGENT_FP.test(String(a.fp))) throw httpError(400, 'BAD_FIELD');
+      const name = a.name.replace(/[\u0000-\u001f\u007f-\u009f​-‏‪-‮⁦-⁩]/g, '').trim().slice(0, 40);
+      if (!name) throw httpError(400, 'BAD_FIELD');
+      fromAgent = { name, fp: a.fp };
+    }
     // A request names a Logos intent; anything else in that field is refused, not guessed.
     if (inner.intent != null && !isIntent(inner.intent)) throw httpError(400, 'UNKNOWN_INTENT');
     if (inner.intent == null && inner.args != null) throw httpError(400, 'BAD_FIELD');
@@ -1244,6 +1258,7 @@ export class Daemon {
       dir: 'in', peer: { id: peer.id, name: peer.name }, receivedAt: now, read: false,
       by: inner.by || undefined, // as the sender says; not proof
       ...(inner.auto === true ? { auto: true } : {}),
+      ...(fromAgent ? { agent: fromAgent } : {}),
     };
     if (fileBytes) { args.file = this.store.fileId(); this.store.saveFile(args.file, fileBytes); }
     // The firewall decides here, before any agent could see it: requests by intent,
@@ -1260,7 +1275,7 @@ export class Daemon {
     this.setOnline(peer.id, true);
     setImmediate(() => this.flushOutbox(peer.id).catch(() => {})); // it's back: send what waited for it
     this.log(`message ← ${peer.name} (${text.length} chars${rec.intent ? `, request ${rec.intent}` : ''}${rec.firewall ? `: ${rec.firewall.status}` : ''})`);
-    this.audit.add('msg.in', { peer, id, intent: rec.intent, chars: text.length, firewall: rec.firewall?.status || 'delivered', rule: rec.firewall?.rule, ...(args?.size ? { fileBytes: args.size } : {}), ...(rec.auto ? { auto: true } : {}) });
+    this.audit.add('msg.in', { peer, id, intent: rec.intent, chars: text.length, firewall: rec.firewall?.status || 'delivered', rule: rec.firewall?.rule, ...(args?.size ? { fileBytes: args.size } : {}), ...(rec.auto ? { auto: true } : {}), ...(fromAgent ? { agent: fromAgent.name, agentFp: fromAgent.fp, remoteAgent: true } : {}) });
     if (agentVisible(rec)) { for (const w of this.waiters) w(); this.auto.consider(rec); }
     return { ok: true, receipt: receipt(id) };
   }
@@ -1685,7 +1700,7 @@ export class Daemon {
    *  that device is in Auto mode; otherwise it is kept as an offer that waits for Accept on this page
    *  and can't be used before. By sound it only arrives while the person listens. */
   receiveSecret(bytes, via) {
-    if (via === 'sound' && !this.receiving()) throw httpError(409, 'NOT_RECEIVING: the person on that device must press "Receive a secret" first.');
+    if (via === 'sound' && !this.receiving()) throw httpError(409, 'NOT_RECEIVING: the person on that device must press "Receive…" and choose "By sound" first.');
     const b = Buffer.from(bytes);
     if (via === 'sound' && b[0] === PHONE_SECRET) return this.receivePhoneSecret(b);
     if (!secretFrameLooksValid(b)) throw httpError(400, 'That did not sound like a complete VINAC Link secret. Try again.');

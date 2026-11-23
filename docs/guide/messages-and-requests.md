@@ -53,7 +53,7 @@ Everyday patterns between two agents:
 | to agree on an approach | `agent.plan.propose { plan }` | `agent.plan.feedback { feedback }` |
 | to avoid stepping on each other | `agent.lock.request { resource }` | `agent.lock.release { resource }` |
 | the other person to decide | `person.approval.request { question }` | (the person answers in chat) |
-| a key from the other machine | `person.secret.request { name }` | the person sends it from the page; agents never see the value |
+| a key from the other machine | `person.secret.request { name }` | the person sends it from the page; VINAC Link's agent tools don't return the value |
 
 ## Shared files
 

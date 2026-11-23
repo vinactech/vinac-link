@@ -72,6 +72,13 @@
           <button type="button" data-theme-choice="light" title="Light"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4"/></svg>Light</button>
           <button type="button" data-theme-choice="dark" title="Dark"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg>Dark</button>
         </div>
+        <label class="lang-pick"><span>Language</span>
+          <select id="langPick" aria-label="Language">
+            <option value="auto">Auto</option>
+            <option value="en" translate="no" lang="en">English</option>
+            <option value="fr" translate="no" lang="fr">Français</option>
+          </select>
+        </label>
       </div>
     </aside>
 
@@ -88,7 +95,7 @@
             <p id="ovSubtitle">Your agent network at a glance</p>
           </div>
           <div class="page-actions">
-            <button class="ghost" id="ovReceiveBtn">Receive a secret</button>
+            <button class="ghost" id="ovReceiveBtn">Receive a key…</button>
             <button class="primary" id="ovPairBtn">Pair a device</button>
           </div>
         </header>
@@ -189,16 +196,26 @@
           <button class="icon back" id="secretsBackBtn" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
           </button>
-          <div class="head-text"><b>Secrets</b><small>Your vault: API keys and tokens in this device's key store. Agents see names only.</small></div>
+          <div class="head-text"><b>Secrets</b><small>Your vault: API keys and tokens in this device's key store. VINAC Link's agent tools show names, not values.</small></div>
           <div class="vault-actions">
-            <button class="ghost small-btn" id="addSecretBtn">Add</button>
-            <button class="ghost small-btn" id="sendSecretBtn">Send</button>
-            <button class="ghost small-btn" id="receiveBtn" title="Listen for a secret sent by sound">Receive by sound</button>
+            <button class="ghost small-btn" id="addSecretBtn" title="Keep a key on this device">Add</button>
+            <button class="ghost small-btn" id="sendSecretBtn" title="Send a key to a paired device">Send…</button>
+            <button class="primary small-btn" id="receiveBtn" title="Get a key from a paired computer or your phone">Receive…</button>
           </div>
         </header>
+        <div class="secret-tabs" role="tablist" aria-label="Secrets">
+          <button type="button" role="tab" id="tabKeys" data-tab="keys" aria-selected="true">Keys <span class="tab-count" id="tabKeysCount"></span></button>
+          <button type="button" role="tab" id="tabRequests" data-tab="requests" aria-selected="false">Requests <span class="tab-count" id="tabRequestsCount"></span></button>
+          <button type="button" role="tab" id="tabDevices" data-tab="devices" aria-selected="false">Phones &amp; agents <span class="tab-count" id="tabDevicesCount"></span></button>
+        </div>
         <div class="pair-body">
+          <div class="tab-panel" data-panel="keys" role="tabpanel" aria-labelledby="tabKeys">
           <div class="vault-lock" id="vaultLock"></div>
           <input type="search" id="secretSearch" placeholder="Find a secret by name or device" aria-label="Find a secret" autocomplete="off">
+          <ul class="secret-list" id="secretList"></ul>
+          </div>
+          <div class="tab-panel" data-panel="requests" role="tabpanel" aria-labelledby="tabRequests" hidden>
+          <p class="fw-note" id="requestsEmpty">Nothing is waiting. Here you'll see keys your devices ask for, programs asking to use a key, and the runs you've allowed for a while.</p>
           <div id="askBox" hidden>
             <h3 class="fw-h">Asked for by your devices</h3>
             <ul class="secret-list" id="askList"></ul>
@@ -209,13 +226,14 @@
           </div>
           <div id="grantBox" hidden>
             <h3 class="fw-h">Allowed runs</h3>
-            <p class="fw-note">These commands may use the named keys without asking each time, until they expire. VINAC Link starts them itself, so the agent never sees the values. Whatever the command runs gets the keys: allow only commands and folders you trust.</p>
+            <p class="fw-note">These commands may use the named keys without asking each time, until they expire. VINAC Link starts them itself, so the values go to the program, not through the agent. Whatever the command runs gets the keys: allow only commands and folders you trust.</p>
             <ul class="secret-list" id="grantList"></ul>
           </div>
-          <ul class="secret-list" id="secretList"></ul>
-          <details class="agents-box" id="phonesBox">
+          </div>
+          <div class="tab-panel" data-panel="devices" role="tabpanel" aria-labelledby="tabDevices" hidden>
+          <details class="agents-box" id="phonesBox" open>
             <summary><b>Phones</b> <span id="phonesCount"></span> <span class="betatag">beta</span></summary>
-            <p class="fw-note">Keep keys on your phone and hand one to this computer by sound, with no network. Pair once: scan the code with your phone's camera, play the sound it makes near this computer, check the 6 digits and press Allow. To receive a key later, press <b>Receive by sound</b> here, then <b>Send</b> on the phone.</p>
+            <p class="fw-note">Keep keys on your phone and hand one to this computer by sound, with no network. Pair once: scan the code with your phone's camera, play the sound it makes near this computer, check the 6 digits and press Allow. To receive a key later, press <b>Receive…</b> here and choose <b>From your phone</b>, then <b>Send</b> on the phone.</p>
             <ul class="secret-list" id="phoneList"></ul>
             <div class="phone-pair" id="phonePair" hidden>
               <div class="phone-qr" id="phoneQr"></div>
@@ -236,7 +254,7 @@
             </div>
             <button class="ghost small-btn" id="phonePairBtn" type="button">Pair a phone</button>
           </details>
-          <details class="agents-box" id="agentsBox">
+          <details class="agents-box" id="agentsBox" open>
             <summary><b>Agents on this computer</b> <span id="agentsCount"></span></summary>
             <p class="fw-note">Give each agent app its own name, so the audit log and allowed runs say which agent did what. Add one, then put its line in that app's VINAC Link settings (environment). Agents can't add themselves.</p>
             <ul class="secret-list" id="agentList"></ul>
@@ -246,6 +264,7 @@
             </form>
             <div class="agent-token" id="agentToken" hidden></div>
           </details>
+          </div>
           <p class="foot">VINAC Link's agent tools show names only. Without a passphrase, values are protected by this device's key store, which other programs running as you can ask for. With a passphrase, they can't read them while the vault is locked. Until VINAC Link's security audit, use test or low-risk keys.</p>
         </div>
       </section>
@@ -478,11 +497,55 @@
         <button class="icon" id="secretClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </header>
 
+      <!-- Receive…: the ways to get a key, best first -->
+      <div class="modal-body" id="secretChoose" hidden>
+        <p class="hint">How will the key arrive?</p>
+        <div class="choose-list">
+          <button type="button" class="choose" id="chooseAsk">
+            <b>Ask a computer for it</b>
+            <small>Name the key; the other computer shows it with a Send button, and it arrives here ready to use. Over the network.</small>
+          </button>
+          <button type="button" class="choose" id="chooseNetwork">
+            <b>Someone is sending it over the network</b>
+            <small>For the next 3 minutes, a key sent from a paired computer is accepted here without asking. Nothing to set up.</small>
+          </button>
+          <button type="button" class="choose" id="chooseSound">
+            <b>By sound, no network <span class="tag beta">Beta</span></b>
+            <small>From a paired computer nearby. This computer listens with its microphone for 3 minutes.</small>
+          </button>
+          <button type="button" class="choose" id="choosePhone">
+            <b>From your phone <span class="tag beta">Beta</span></b>
+            <small id="choosePhoneHint">From the phone vault, by sound. Press Send on the phone after this.</small>
+          </button>
+          <button type="button" class="choose" id="choosePaste">
+            <b>Type or paste it</b>
+            <small>You already have the value: keep it on this device.</small>
+          </button>
+        </div>
+        <p class="hint small">Sound works best with built-in speakers, 0.5 to 2 metres apart; Bluetooth speakers often don't work. <a href="https://vinac.tech/docs/guide/sound.html" target="_blank" rel="noopener">Sound tips</a></p>
+      </div>
+
+      <!-- Ask a paired computer for a key by name (person.secret.request) -->
+      <form class="modal-body" id="secretAsk" hidden autocomplete="off">
+        <p class="hint">The other computer shows <b>Asked for by your devices</b> with a <b>Send</b> button. When its person sends it, the key is accepted here without another click (for an hour).</p>
+        <label for="askPeer">Ask</label>
+        <select id="askPeer"></select>
+        <label for="askName">Key name</label>
+        <input id="askName" placeholder="OPENAI_API_KEY" maxlength="40" spellcheck="false" autocapitalize="characters" required>
+        <label for="askReason">Why (optional)</label>
+        <input id="askReason" placeholder="For example: npm start needs it" maxlength="200">
+        <button class="primary wide" id="askSend">Ask for it</button>
+      </form>
+
       <form class="modal-body" id="secretForm" data-mode="send" autocomplete="off">
         <p class="hint" id="secretHint">Sealed so only <b id="secretTo">the other device</b> can open it, then stored in its key store. Its agent tools show the name, never the value. Use test values until VINAC Link has had a security review.</p>
         <div id="peerRow">
           <label for="secretPeer">Send to</label>
           <select id="secretPeer"></select>
+        </div>
+        <div id="keyPickRow" hidden>
+          <label for="secretKeyPick">Key</label>
+          <select id="secretKeyPick"></select>
         </div>
         <label for="secretName">Name</label>
         <input id="secretName" placeholder="OPENAI_API_KEY" maxlength="40" spellcheck="false" autocapitalize="characters">
@@ -496,13 +559,13 @@
         <p class="hint small" id="storedNote" hidden>Sends the value stored in this device's key store. It never shows on this page.</p>
         <fieldset class="how" id="howBox">
           <legend>Send by</legend>
-          <label><input type="radio" name="how" value="wifi" checked> Wi-Fi <small>instant, needs both on the same network or Tailscale</small></label>
+          <label><input type="radio" name="how" value="wifi" checked> Network <small id="netHint">instant: same Wi-Fi or cable, or Tailscale</small></label>
           <label><input type="radio" name="how" value="sound"> Sound <span class="tag beta">Beta</span> <small id="soundTime">near-ultrasound, works without a network</small></label>
         </fieldset>
         <div id="speakerRow">
           <label for="secretSpeaker">Speaker</label>
           <select id="secretSpeaker"><option value="">System default</option></select>
-          <p class="hint small">By sound, the other device must be listening: open Secrets there and press <b>Receive</b> first. By Wi-Fi it arrives as an offer its person accepts (or at once if it asked for it, or is in Auto mode).</p>
+          <p class="hint small">By sound, the other device must be listening first: there, open Secrets, press <b>Receive…</b> and choose <b>By sound</b>. Built-in speakers work best; Bluetooth speakers often don't.</p>
         </div>
         <button class="primary wide" id="secretSend">Send</button>
       </form>
@@ -536,7 +599,7 @@
           <ul>
             <li><b>Pairing:</b> with a code (recommended, works on any network the devices share or over Tailscale) or by sound (beta, no typing, devices close together). Either way you swap 6 digits, so only you can finish it.</li>
             <li><b>Messages, requests and files</b> travel over your local network or Tailscale, encrypted end to end. No internet needed.</li>
-            <li><b>Secrets</b> live in this computer's key store. Send one by Wi-Fi, or by sound (beta) when there is no network. Agents see names only.</li>
+            <li><b>Secrets</b> live in this computer's key store. Send one by Wi-Fi, or by sound (beta) when there is no network. VINAC Link's agent tools show names, not values.</li>
           </ul>
         </div>
         <nav class="about-links" aria-label="Help and legal">

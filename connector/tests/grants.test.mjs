@@ -50,6 +50,37 @@ test('agent identities: only the page makes them; a token is shown once and work
   } finally { await A.stop(); }
 });
 
+test('agent fingerprints across devices: a named agent\'s messages say who sent them on the other device too', { timeout: 30_000 }, async () => {
+  const { pair } = await import('./helpers.mjs');
+  const A = await startDevice('fp-a'), B = await startDevice('fp-b');
+  try {
+    await pair(A, B);
+    const r = await ui(A, 'POST', '/ui/agents/add', { name: 'Codex on the PC' });
+    const { token } = r.body.newAgent;
+    const fp = (await state(A)).agents[0].fingerprint;
+    assert.match(fp, /^AGT-[0-9A-F]{4}(-[0-9A-F]{4}){3}$/);
+    const bPeer = (await state(A)).peers[0].id, aAtB = (await state(B)).peers[0].id;
+    // Sent by the named agent, then by the default token (no identity), then by the person.
+    assert.equal((await as(A, token)('POST', '/api/send', { to: bPeer, text: 'Which branch has the auth refactor?' })).status, 200);
+    assert.equal((await api(A, 'POST', '/api/send', { to: bPeer, text: 'From the default agent token' })).status, 200);
+    assert.equal((await ui(A, 'POST', '/ui/send', { to: bPeer, text: 'From the person' })).status, 200);
+    const got = (await ui(B, 'GET', `/ui/messages?peer=${aAtB}`)).body.messages;
+    const named = got.find(m => m.text.startsWith('Which branch'));
+    assert.deepEqual(named.agent, { name: 'Codex on the PC', fp }, 'the receiving page sees the agent\'s name and fingerprint');
+    assert.ok(!got.find(m => m.text.startsWith('From the default')).agent, 'no identity, no agent name');
+    assert.ok(!got.find(m => m.text === 'From the person').agent);
+    // The sender's own history and both audit logs name the agent.
+    assert.equal((await ui(A, 'GET', `/ui/messages?peer=${bPeer}`)).body.messages.find(m => m.text.startsWith('Which branch')).agent.fp, fp);
+    const inB = (await ui(B, 'GET', '/ui/audit?agent=Codex%20on%20the%20PC')).body.entries.filter(e => e.type === 'msg.in');
+    assert.equal(inB.length, 1);
+    assert.equal(inB[0].fields.agentFp, fp); assert.equal(inB[0].fields.remoteAgent, true);
+    assert.match(inB[0].who.name, /› agent Codex on the PC$/);
+    // The receiving agent's inbox shows it too (as the other device says).
+    const inbox = (await api(B, 'GET', '/api/inbox?all=1')).body;
+    assert.equal((inbox.messages || []).find(m => m.text.startsWith('Which branch'))?.agent?.fp, fp);
+  } finally { await A.stop(); await B.stop(); }
+});
+
 test('standing grants: approve once and allow; then the service runs exactly that command for that agent in that folder, and the values never reach the agent', { timeout: 60_000 }, async () => {
   const A = await startDevice('grants-a');
   try {

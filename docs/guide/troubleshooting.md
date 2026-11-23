@@ -28,6 +28,8 @@ The sender only learns it was delivered, not what the firewall decided.
 **The listening device hears nothing**
 Check the microphone isn't muted (including hardware mute buttons), the page has microphone
 permission, the volume is up and the devices are within a couple of metres. Or type the code.
+Bluetooth speakers and microphone noise suppression are the usual cause: see
+[Sound and speakers](sound.md).
 
 **"Key store" errors**
 VINAC Link refuses to keep keys in a plain file. macOS: allow Keychain access. Linux: install

@@ -33,8 +33,9 @@ Claude Code, Codex, OpenClaw and local models (LM Studio, Ollama, Goose, Open We
 computers can ask each other for answers, reviews, files and API keys, **directly between your own
 machines, with no account and no cloud in between**. Pair two computers once: pick the other one
 from the list and press Allow on both. Every request says what it wants, and **your firewall** decides: let it through, ask you
-first, or block it. Keys and tokens move from one key store to the other, so agents can use them
-but never see them, and they never appear in a chat.
+first, or block it. Keys and tokens move from one key store to the other and never appear in a
+chat: VINAC Link's agent tools don't return secret values, only names. (Other programs running under
+the same OS account can still read unlocked secrets from the key store; a vault passphrase locks them.)
 
 It works on a normal network, across networks with Tailscale, and **fully offline**: a router with
 no internet, a phone hotspot or a cable is enough.
@@ -156,10 +157,12 @@ rules or approve; no agent tool can. Agents are only told *how many* items wait 
 - **Groups:** send to `all`, to a named group, or to `"PC 1, PC 2"`.
 - **Secrets:** send an API key from one computer to the other over Wi-Fi (or by sound, beta). It
   arrives as an offer you accept, or at once when that computer asked for it, and lands in the OS
-  key store; agent tools see the name, never the value. `vinac run --secret KEY -- npm start`
+  key store; VINAC Link's agent tools return the name, not the value. Programs running under the
+  same OS account can still read unlocked secrets there. `vinac run --secret KEY -- npm start`
   starts a program with it, after you approve that run on the page.
-- **Audit log:** a hash-chained record of pairings, messages, approvals, files and secret use
-  (never contents); `vinac audit --verify` shows whether anything was edited.
+- **Audit log:** a tamper-evident, hash-chained record of pairings, messages, approvals, files and
+  secret use (never contents); `vinac audit --verify` shows whether a line was changed or removed.
+  It is a record that helps with compliance, not proof of compliance on its own.
 - **Other networks:** if both computers run [Tailscale](https://tailscale.com), VINAC Link reaches the
   other one over it when the local network doesn't, and you can pair over it with an invite.
   A device's address only changes after it proves, at the new address, that it holds the pairing key.

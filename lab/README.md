@@ -43,11 +43,19 @@ Open:
 
 For testing on phones, deploy the folder behind HTTPS. A plain LAN `http://192.168.x.x` URL will normally not be allowed to use the microphone.
 
-## Deploy at `/lab/nus/`
+## Hosting the lab
 
-This application has no build step and no external dependencies. Copy the complete directory contents to the web root for `/lab/nus/`. Preserve the `js/` and `worklets/` relative paths.
-
-If the parent site uses a framework/router, the safest first integration is to serve this directory as static files. Once validated, its engine modules can be imported into the site's framework.
+- **Static files only.** No build step, no external dependencies, no server code. Copy the whole
+  folder to any path on a web server and keep the `js/` and `worklets/` paths as they are. If the
+  site uses a framework or router, serve this folder as plain static files.
+- **HTTPS.** Two-device tests need the microphone, which browsers allow only on secure pages
+  (`https://`, or `localhost` while developing).
+- **Content Security Policy.** No remote scripts are needed, so a strict policy works. It must allow
+  same-origin JavaScript modules, AudioWorklet modules from the same origin, `blob:` URLs (for the
+  report downloads) and microphone permission for the lab's page.
+- **The test key stays in the browser.** The receiver link carries a temporary session key after the
+  `#`, which browsers don't send to the server. Don't add analytics or scripts that read the fragment,
+  and don't upload microphone audio.
 
 ## Two-device flow
 

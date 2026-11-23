@@ -4,6 +4,10 @@ VINAC Link keeps a record of **who did what** on each computer: pairings, reques
 firewall decided, approvals, keys sent, received and used, allowed runs, agents added, settings
 changed. It never records message text, request arguments, file contents or secret values.
 
+The log is **tamper-evident**, not tamper-proof: a changed or removed line is detected, but a
+program with full access to your account could replace the whole log (see *Limits*). It supports a
+compliance program; it is not, on its own, proof that you comply with any law or standard.
+
 ## The Activity log page
 
 **Activity log** in the sidebar shows the record, newest first.
@@ -13,6 +17,12 @@ changed. It never records message text, request arguments, file contents or secr
   **agent**, and **dates**.
 - Each line says who did it. An agent added under *Secrets › Agents on this computer* shows with its
   name and **fingerprint** (`AGT-…`), so you can tell agents apart in reports.
+- **Across devices.** When a named agent sends a message or request, its name and fingerprint travel
+  with it inside the encryption. The receiving computer's log then says, for example, *Request
+  agent.review.request from Mac (agent Codex on the Mac there)*, and the conversation and Requests
+  list show the agent's name (fingerprint on hover). That device vouches for it, the way it vouches
+  for its own messages; it isn't a separate signature by the agent. Agents using the computer's
+  default token, and older devices, show as before.
 - At the top: whether the **chain is intact**. Each line includes the fingerprint (SHA-256) of the
   one before it, so a changed or removed line is detected.
 

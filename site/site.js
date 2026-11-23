@@ -1,3 +1,5 @@
+// Page language (the French pages say lang="fr-CA"): the few texts this script shows.
+const L = (en, fr) => (document.documentElement.lang.startsWith('fr') ? fr : en);
 // Small page behaviours: copy buttons, the light/dark switch, the header pill, and the feature tabs.
 // No cookies, no tracking; the theme choice stays in this browser.
 
@@ -6,9 +8,9 @@ document.addEventListener('click', async e => {
   const btn = e.target.closest('.copy');
   if (!btn) return;
   const text = btn.parentElement.querySelector('pre')?.innerText ?? '';
-  try { await navigator.clipboard.writeText(text.trim()); btn.textContent = 'Copied'; }
-  catch { btn.textContent = 'Select and copy'; }
-  setTimeout(() => { btn.textContent = 'Copy'; }, 1600);
+  try { await navigator.clipboard.writeText(text.trim()); btn.textContent = L('Copied', 'Copié'); }
+  catch { btn.textContent = L('Select and copy', 'Sélectionnez et copiez'); }
+  setTimeout(() => { btn.textContent = L('Copy', 'Copier'); }, 1600);
 });
 
 // Light / dark switch
@@ -34,7 +36,7 @@ const menuBtn = document.querySelector('.menu-toggle');
 const setMenu = open => {
   siteHeader?.classList.toggle('open', open);
   menuBtn?.setAttribute('aria-expanded', String(open));
-  menuBtn?.setAttribute('aria-label', open ? 'Close menu' : 'Open menu');
+  menuBtn?.setAttribute('aria-label', open ? L('Close menu', 'Fermer le menu') : L('Open menu', 'Ouvrir le menu'));
 };
 menuBtn?.addEventListener('click', () => setMenu(menuBtn.getAttribute('aria-expanded') !== 'true'));
 document.querySelector('.nav')?.addEventListener('click', e => { if (e.target.closest('a')) setMenu(false); });
@@ -60,18 +62,18 @@ for (const contactForm of document.querySelectorAll('.contact-form, .signup-form
     if (!contactForm.reportValidity()) return;
     button.disabled = true;
     status.className = 'form-status';
-    status.textContent = contactForm.classList.contains('signup-form') ? 'Subscribing…' : 'Sending…';
+    status.textContent = contactForm.classList.contains('signup-form') ? L('Subscribing…', 'Inscription…') : L('Sending…', 'Envoi…');
     try {
       const r = await fetch(contactForm.action, { method: 'POST', body: new FormData(contactForm), headers: { accept: 'application/json' } });
       const j = await r.json().catch(() => ({}));
-      if (!r.ok || !j.ok) throw new Error(j.error || 'The message could not be sent.');
+      if (!r.ok || !j.ok) throw new Error(j.error || L('The message could not be sent.', 'Le message n\'a pas pu être envoyé.'));
       contactForm.reset();
       if (started) started.value = String(Math.floor(Date.now() / 1000));
       status.className = 'form-status ok';
-      status.textContent = contactForm.dataset.ok || 'Thank you. Your message is on its way, and we will reply by email.';
+      status.textContent = contactForm.dataset.ok || L('Thank you. Your message is on its way, and we will reply by email.', 'Merci. Votre message est en route, et nous répondrons par courriel.');
     } catch (err) {
       status.className = 'form-status bad';
-      status.textContent = `${err.message} You can also write to hello@vinac.tech.`;
+      status.textContent = `${err.message} ${L('You can also write to hello@vinac.tech.', 'Vous pouvez aussi écrire à hello@vinac.tech.')}`;
     } finally {
       button.disabled = false;
     }

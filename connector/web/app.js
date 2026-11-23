@@ -7,6 +7,9 @@ import { SECRET_FEC, SECRET_MIN_BYTES, SECRET_MAX_BYTES, secretFrameLooksValid }
 import { codedLength } from '/lab/js/fec.js';
 import { qrSvg } from '/web/qr.js';
 import { parseHello, parseSecretFrame, PHONE_SECRET_MIN, HELLO_MIN, HELLO_MAX } from '/web/phone-frame.js';
+import { startI18n, setLang, chosenLang, locale, t } from '/web/i18n.js';
+
+await startI18n(); // French (or English) before the first render
 
 const TOKEN = document.querySelector('meta[name="ui-token"]').content;
 const $ = id => document.getElementById(id);
@@ -33,6 +36,10 @@ function applyTheme(choice) {
 }
 applyTheme(LS.get('theme', 'system'));
 for (const b of document.querySelectorAll('[data-theme-choice]')) b.onclick = () => { LS.set('theme', b.dataset.themeChoice); applyTheme(b.dataset.themeChoice); };
+
+// Language: Auto (the browser's), English or Français; remembered in this browser only.
+$('langPick').value = chosenLang();
+$('langPick').onchange = () => setLang($('langPick').value);
 
 // Help & about: links to the docs, support, terms, privacy and the license (they open in the browser).
 const helpModal = $('helpModal');
@@ -77,18 +84,18 @@ function avatar(el, peer) {
   el.dataset.online = peer?.online == null ? '' : String(peer.online);
 }
 const sameDay = (a, b) => new Date(a).toDateString() === new Date(b).toDateString();
-const clock = iso => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+const clock = iso => new Date(iso).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
 function dayLabel(iso) {
   const d = new Date(iso), now = new Date(), y = new Date(now); y.setDate(now.getDate() - 1);
   if (d.toDateString() === now.toDateString()) return 'Today';
   if (d.toDateString() === y.toDateString()) return 'Yesterday';
-  return d.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
+  return d.toLocaleDateString(locale(), { weekday: 'long', month: 'short', day: 'numeric', year: d.getFullYear() === now.getFullYear() ? undefined : 'numeric' });
 }
 function shortWhen(iso) {
   const d = new Date(iso), now = new Date();
   if (d.toDateString() === now.toDateString()) return clock(iso);
-  if ((now - d) < 6 * 864e5) return d.toLocaleDateString([], { weekday: 'short' });
-  return d.toLocaleDateString([], { month: 'short', day: 'numeric' });
+  if ((now - d) < 6 * 864e5) return d.toLocaleDateString(locale(), { weekday: 'short' });
+  return d.toLocaleDateString(locale(), { month: 'short', day: 'numeric' });
 }
 const personUnread = c => (c?.incoming || []).filter(x => x.at > (lastSeen[c.peerId] || '')).length;
 const flat = t => t.replace(/`+/g, '').replace(/\s+/g, ' ').trim(); // one-line preview
@@ -253,7 +260,13 @@ function messageEl(m, cont, q) {
 
   const who = document.createElement('div'); who.className = 'who';
   if (!out) { const n = document.createElement('span'); n.textContent = m.peer.name; who.append(n); }
-  if (m.by) { const tag = document.createElement('span'); tag.className = `tag${m.by === 'person' ? ' person' : ''}`; tag.textContent = m.by === 'agent' ? 'Agent' : out ? 'You' : 'Person'; who.append(tag); }
+  if (m.by) {
+    const tag = document.createElement('span'); tag.className = `tag${m.by === 'person' ? ' person' : ''}`;
+    // A named agent: its name, with its fingerprint on hover (as the sending device says).
+    tag.textContent = m.by === 'agent' ? (m.agent ? m.agent.name : 'Agent') : out ? 'You' : 'Person';
+    if (m.agent) tag.title = `Agent ${m.agent.name} · ${m.agent.fp}${out ? '' : `, as ${m.peer.name} says`}`;
+    who.append(tag);
+  }
   if (who.childElementCount) el.append(who);
 
   const bubble = document.createElement('div'); bubble.className = 'bubble';
@@ -278,7 +291,7 @@ function messageEl(m, cont, q) {
   el.append(bubble);
 
   const meta = document.createElement('div'); meta.className = 'meta';
-  const time = document.createElement('span'); time.textContent = clock(m.sentAt); time.title = new Date(m.sentAt).toLocaleString();
+  const time = document.createElement('span'); time.textContent = clock(m.sentAt); time.title = new Date(m.sentAt).toLocaleString(locale());
   meta.append(time);
   if (m.status === 'sending') meta.append(text('span', '· Sending…'));
   else if (m.status === 'failed') {
@@ -408,7 +421,7 @@ function renderGrants() {
   const grants = state.grants || [];
   $('grantBox').hidden = !grants.length;
   const list = $('grantList'); list.replaceChildren();
-  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const when = iso => new Date(iso).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
   for (const g of grants) {
     const li = document.createElement('li'); li.className = 'secret';
     li.append(text('b', `${g.agentName}: ${g.names.join(', ')}`));
@@ -426,7 +439,7 @@ function renderGrants() {
     const li = document.createElement('li'); li.className = 'secret';
     li.append(text('b', a.name));
     const row = document.createElement('div'); row.className = 'row';
-    const del = button('Remove', () => { if (confirm(`Remove "${a.name}"? Its token stops working and its allowed runs end.`)) act('POST', '/ui/agents/remove', { id: a.id }); }); del.className = 'ghost';
+    const del = button('Remove', () => { if (confirm(t(`Remove "${a.name}"? Its token stops working and its allowed runs end.`))) act('POST', '/ui/agents/remove', { id: a.id }); }); del.className = 'ghost';
     row.append(del);
     li.append(row, text('small', `Added ${when(a.createdAt)}${a.lastSeenAt ? ` · last seen ${when(a.lastSeenAt)}` : ' · not used yet'}`));
     al.append(li);
@@ -451,7 +464,7 @@ function renderGrants() {
 const EVENT_TEXT = {
   'pair': f => `Paired with ${f.peer?.name || 'a device'}`, 'unpair': f => `Unpaired ${f.peer?.name || 'a device'}`,
   'invite.created': () => 'Made an invite', 'phone.paired': f => `Paired the phone ${f.phone}`, 'phone.removed': f => `Removed the phone ${f.phone}`,
-  'msg.in': f => `${f.intent ? `Request ${f.intent}` : 'Message'} from ${f.peer?.name || 'a device'}${f.firewall ? ` (${f.firewall})` : ''}`,
+  'msg.in': f => `${f.intent ? `Request ${f.intent}` : 'Message'} from ${f.peer?.name || 'a device'}${f.agent ? ` (agent ${f.agent} there)` : ''}${f.firewall ? ` (${f.firewall})` : ''}`,
   'msg.out': f => `${f.intent ? `Request ${f.intent}` : 'Message'} to ${f.peer?.name || 'a device'}`,
   'msg.queued': f => `Message to ${f.peer?.name || 'a device'} waits (device offline)`, 'msg.cancelled': () => 'Waiting message cancelled',
   'request.decided': f => `Request ${f.intent || ''} from ${f.peer?.name || 'a device'}: ${f.status}`, 'request.expired': f => `Request ${f.intent || ''} expired`,
@@ -484,12 +497,12 @@ async function loadActivity(more = false) {
   const c = r.chain;
   $('auditChain').className = `audit-chain ${c.ok ? 'ok' : 'bad'}`;
   $('auditChain').replaceChildren(
-    text('b', c.ok ? `Chain intact · ${c.count.toLocaleString()} entries checked` : 'Chain broken: an entry was changed or removed'),
+    text('b', c.ok ? `Chain intact · ${c.count.toLocaleString(locale())} entries checked` : 'Chain broken: an entry was changed or removed'),
     text('small', c.ok ? `Latest fingerprint ${c.head.slice(0, 16)}… · this device ${r.device.fingerprint}${r.retention.anchor ? ` · ${r.retention.anchor.removedEntries} older entries removed by retention` : ''}` : c.problem));
-  $('auditTotal').textContent = `${r.total.toLocaleString()} matching ${r.total === 1 ? 'entry' : 'entries'}${r.total > auditOffset + r.entries.length ? `, showing ${auditOffset + r.entries.length}` : ''}`;
+  $('auditTotal').textContent = `${r.total.toLocaleString(locale())} matching ${r.total === 1 ? 'entry' : 'entries'}${r.total > auditOffset + r.entries.length ? `, showing ${auditOffset + r.entries.length}` : ''}`;
   const list = $('auditList');
   if (!more) list.replaceChildren();
-  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' });
+  const when = iso => new Date(iso).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'medium' });
   for (const e of r.entries) {
     const li = document.createElement('li');
     if (e.damaged) { li.append(text('b', 'A damaged line')); list.append(li); continue; }
@@ -546,13 +559,13 @@ let phoneKey = '';
 function renderPhones() {
   const phones = state.phones || [];
   $('phonesCount').textContent = phones.length ? `(${phones.length})` : '';
-  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const when = iso => new Date(iso).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
   const pl = $('phoneList'); pl.replaceChildren();
   for (const p of phones) {
     const li = document.createElement('li'); li.className = 'secret';
     li.append(text('b', p.name));
     const row = document.createElement('div'); row.className = 'row';
-    const del = button('Remove', () => { if (confirm(`Remove "${p.name}"? Keys it sends will no longer open here.`)) act('POST', '/ui/phones/remove', { id: p.id }); }); del.className = 'ghost';
+    const del = button('Remove', () => { if (confirm(t(`Remove "${p.name}"? Keys it sends will no longer open here.`))) act('POST', '/ui/phones/remove', { id: p.id }); }); del.className = 'ghost';
     row.append(del);
     li.append(row, text('small', `Paired ${when(p.pairedAt)}${p.lastUsedAt ? ` · last key ${when(p.lastUsedAt)}` : ''}`));
     pl.append(li);
@@ -578,7 +591,7 @@ $('phonePairBtn')?.addEventListener('click', async () => {
 $('phoneCancel')?.addEventListener('click', async () => { stopListening(); await act('POST', '/ui/phone/cancel', {}); });
 $('phoneCopy')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(state.phonePairing.link); toast('Link copied. Open it on the phone only.'); } catch { toast('Could not copy.'); } });
 $('phoneAllow')?.addEventListener('click', async () => {
-  try { const r = await api('POST', '/ui/phone/confirm', { allow: true }); Object.assign(state, r); toast(`Paired with ${r.pairedPhone.name}. Press Receive by sound here, then Send on the phone.`); renderPhones(); } catch (e) { toast(e.message); }
+  try { const r = await api('POST', '/ui/phone/confirm', { allow: true }); Object.assign(state, r); toast(`Paired with ${r.pairedPhone.name}. To get a key from it: Receive… › From your phone here, then Send on the phone.`); renderPhones(); } catch (e) { toast(e.message); }
 });
 $('phoneDeny')?.addEventListener('click', async () => { await act('POST', '/ui/phone/confirm', { allow: false }); });
 
@@ -603,6 +616,7 @@ function renderSecrets(force = false) {
   renderUses();
   renderGrants();
   renderPhones();
+  renderSecretTabs();
   const list = $('secretList'); list.replaceChildren();
   $('secretSearch').hidden = state.secrets.length < 4 && !q;
   if (!state.secrets.length) {
@@ -611,7 +625,7 @@ function renderSecrets(force = false) {
   }
   const shown = [...state.secrets].reverse().filter(s => !q || s.name.toLowerCase().includes(q) || (s.from?.name || '').toLowerCase().includes(q));
   if (!shown.length) { const li = text('li', 'No secret matches.'); li.className = 'none'; list.append(li); return; }
-  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const when = iso => new Date(iso).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
   for (const s of shown) {
     const li = document.createElement('li'); li.className = 'secret';
     const name = text('b', s.name);
@@ -676,7 +690,7 @@ function renderSecretRequests() {
     if (r.have) { const send = button('Send', () => answer(false)); send.className = 'primary small-btn'; row.append(send); }
     else { const add = button('Add it', () => openSecretModal('add', { name: r.name })); add.className = 'primary small-btn'; row.append(add); }
     const no = button('Dismiss', () => answer(true)); no.className = 'ghost'; row.append(no);
-    li.append(row, text('small', `${r.peer.name} asks for it${r.reason ? `: "${r.reason}"` : ''} · ${new Date(r.at).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })}${r.have ? '' : ' · not on this device yet: add it, then Send'}`));
+    li.append(row, text('small', `${r.peer.name} asks for it${r.reason ? `: "${r.reason}"` : ''} · ${new Date(r.at).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })}${r.have ? '' : ' · not on this device yet: add it, then Send'}`));
     list.append(li);
   }
 }
@@ -706,7 +720,7 @@ function vaultForm(label, button1, action, hint) {
     const v = i.value; i.value = '';
     if (action === 'setup') {
       if ([...v].length < 8) return toast('Choose at least 8 characters.');
-      const again = prompt('Type the passphrase again to confirm. If you forget it, the values are lost (send them again from another device).');
+      const again = prompt(t('Type the passphrase again to confirm. If you forget it, the values are lost (send them again from another device).'));
       if (again !== v) return toast('The two passphrases differ. Nothing changed.');
     }
     await vaultDo(action, v);
@@ -726,11 +740,11 @@ function renderVaultLock() {
     head.append(text('b', 'Vault locked'), text('small', 'Unlock to reveal, copy or send a secret, or to approve a program run. New secrets still arrive.'));
     box.append(head, vaultForm('Passphrase', 'Unlock', 'unlock'));
   } else {
-    const until = new Date(v.unlockedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const until = new Date(v.unlockedUntil).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
     head.append(text('b', `Vault unlocked until ${until}`), text('small', 'It locks itself after 15 minutes.'));
     const row = document.createElement('div'); row.className = 'row';
     const lock = button('Lock now', () => vaultDo('lock')); lock.className = 'ghost small-btn';
-    const off = button('Remove passphrase…', () => { const p = prompt('Type your passphrase to remove it. Secrets then rely on the OS key store only.'); if (p) vaultDo('remove', p); }); off.className = 'linkish';
+    const off = button('Remove passphrase…', () => { const p = prompt(t('Type your passphrase to remove it. Secrets then rely on the OS key store only.')); if (p) vaultDo('remove', p); }); off.className = 'linkish';
     row.append(lock, off);
     box.append(head, row);
   }
@@ -769,7 +783,7 @@ function openOverview() { wantOverview = true; wantFirewall = false; wantActivit
 $('overviewNav').onclick = openOverview;
 $('overviewBackBtn').onclick = () => { mobileMain = false; render(state); };
 $('ovFirewallLink').onclick = openFirewall;
-$('ovReceiveBtn').onclick = () => { wantSecrets = true; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); openSecretModal('receive'); };
+$('ovReceiveBtn').onclick = () => { wantSecrets = true; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
 const ICON_PATH = {
   devices: '<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M7 18h5M9.5 14v4"/><rect x="17.5" y="8" width="4" height="10" rx="1"/>',
   waiting: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
@@ -816,7 +830,7 @@ function renderOverview() {
     const info = document.createElement('div'); info.className = 'devrow-text';
     info.append(text('b', peer.name), text('small', `${peer.fingerprint}${peer.address ? ` · ${peer.address}` : ''}`));
     const st = text('span', peer.online === true ? 'Online' : peer.online === false ? 'Offline' : 'Checking'); st.className = `pill ${peer.online === true ? 'ok' : peer.online === false ? '' : 'muted'}`;
-    const last = text('small', c?.last ? `Last message ${shortWhen(c.last.sentAt)}` : `Paired ${new Date(peer.pairedAt).toLocaleDateString([], { month: 'short', day: 'numeric' })}`); last.className = 'devrow-when';
+    const last = text('small', c?.last ? `Last message ${shortWhen(c.last.sentAt)}` : `Paired ${new Date(peer.pairedAt).toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`); last.className = 'devrow-when';
     row.append(av, info, last, st);
     row.onclick = () => select(peer.id);
     box.append(row);
@@ -848,7 +862,7 @@ function renderOverview() {
     [s.peers.length > 0, 'Pair a second computer', 'Sound or a typed code; you swap 6-digit codes.', openPair],
     [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'Run npx vinac-link setup for Claude Code, Codex or OpenClaw.', null],
     [!!fw && fw.intents.some(i => i.all || Object.keys(i.devices).length), 'Set your firewall rules', 'Allow what you trust, keep risky intents blocked.', openFirewall],
-    [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive, then send from the other computer.', () => $('ovReceiveBtn').click()],
+    [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive…, then send it from the other computer.', () => $('ovReceiveBtn').click()],
     [!!d.tailscale, 'Reach your devices from anywhere', 'Install Tailscale on both computers.', null],
   ];
   const ul = $('ovChecklist'); ul.replaceChildren();
@@ -879,9 +893,9 @@ function requestItem(r) {
   const risk = text('span', r.risk); risk.className = `fwtag r-${r.risk}`; risk.title = RISK_LABEL[r.risk] || '';
   const st = text('span', FW_LABEL[r.firewall.status]); st.className = `fwtag ${r.firewall.status}`;
   name.append(risk, st);
-  const when = new Date(r.receivedAt || r.sentAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
-  const by = r.firewall.decidedAt ? `you, ${new Date(r.firewall.decidedAt).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}` : r.firewall.rule;
-  const meta = text('small', `From ${r.peer.name}${r.by === 'agent' ? ' (its agent)' : ''} · ${when} · decided by ${by}`);
+  const when = new Date(r.receivedAt || r.sentAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
+  const by = r.firewall.decidedAt ? `you, ${new Date(r.firewall.decidedAt).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' })}` : r.firewall.rule;
+  const meta = text('small', `From ${r.peer.name}${r.agent ? ` (agent ${r.agent.name}, ${r.agent.fp})` : r.by === 'agent' ? ' (its agent)' : ''} · ${when} · decided by ${by}`);
   const row = document.createElement('div'); row.className = 'row';
   if (r.firewall.status === 'pending') {
     const yes = button('Approve', () => decide(r, true)); yes.className = 'primary small-btn';
@@ -891,7 +905,7 @@ function requestItem(r) {
     if (r.risk !== 'high') { const hour = button('Approve for 1 hour', () => decide(r, true, 60)); hour.className = 'ghost'; hour.title = `Also allow ${r.intent || 'plain messages'} from ${r.peer.name} for the next hour`; row.append(hour); }
     row.append(no);
   }
-  if (r.firewall.allowedUntil) meta.textContent += ` · allowed until ${new Date(r.firewall.allowedUntil).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+  if (r.firewall.allowedUntil) meta.textContent += ` · allowed until ${new Date(r.firewall.allowedUntil).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' })}`;
   li.append(name, row, meta);
   if (r.intent === 'document.file.share' && r.args?.file) {
     // A shared file: show what it is, and let the person look before approving.
@@ -971,7 +985,7 @@ function renderModes() {
   box.append(seg, hint);
   const temp = fwScope === '*' ? Object.entries(m.temporary) : Object.entries(m.temporary).filter(([p]) => p === fwScope);
   if (temp.length) {
-    const names = temp.flatMap(([p, x]) => Object.entries(x).map(([k, u]) => `${k === '@text' ? 'plain messages' : k} from ${fw.peers.find(q => q.id === p)?.name || p} until ${new Date(u).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`));
+    const names = temp.flatMap(([p, x]) => Object.entries(x).map(([k, u]) => `${k === '@text' ? 'plain messages' : k} from ${fw.peers.find(q => q.id === p)?.name || p} until ${new Date(u).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' })}`));
     const t = text('p', `Allowed for a while: ${names.join('; ')}. `); t.className = 'hint small';
     const end = button('End now', async () => { try { await api('POST', '/ui/firewall/temporary/clear', fwScope === '*' ? {} : { peer: fwScope }); loadFirewall(true); } catch (e) { toast(e.message); } });
     end.className = 'linkish'; t.append(end); box.append(t);
@@ -1060,7 +1074,7 @@ function renderAutoReply() {
   for (const e of a.log) {
     const li = document.createElement('li');
     const st = text('span', e.status); st.className = `fwtag ${{ done: 'approved', running: 'pending', skipped: 'r-text', failed: 'rejected' }[e.status] || ''}`;
-    const when = new Date(e.at).toLocaleString([], { dateStyle: 'short', timeStyle: 'short' });
+    const when = new Date(e.at).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' });
     const what = `${e.peer?.name || '?'} · ${(e.intents || []).join(', ')}`;
     const extra = [e.replies != null ? `${e.replies} repl${e.replies === 1 ? 'y' : 'ies'}` : '', e.ms != null ? `${(e.ms / 1000).toFixed(1)} s` : '', e.reason || ''].filter(Boolean).join(' · ');
     li.append(st, text('span', ` ${when} · ${what}${extra ? ` · ${extra}` : ''}`));
@@ -1131,7 +1145,7 @@ function renderInfo() {
   $('infoStatus').textContent = peer.online === true ? 'Online now' : peer.online === false ? 'Offline' : 'Checking…';
   $('infoFp').textContent = peer.fingerprint;
   $('infoAddr').textContent = peer.address || 'Unknown';
-  $('infoPaired').textContent = `${new Date(peer.pairedAt).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' })} · by ${peer.via}`;
+  $('infoPaired').textContent = `${new Date(peer.pairedAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })} · by ${peer.via}`;
   $('infoCount').textContent = `${c?.total || 0}`;
   $('infoAgent').textContent = c?.agentUnread ? `${c.agentUnread} message${c.agentUnread > 1 ? 's' : ''} not yet read` : 'Has read everything';
 }
@@ -1565,44 +1579,142 @@ function syncSecretPeer() {
   $('secretTo').textContent = p ? p.name : 'the other device';
   if (secretMode !== 'add') $('secretTitle').textContent = secretMode === 'stored' ? `Send ${storedItem.name}${p ? ` to ${p.name}` : ''}` : `Send a secret${p ? ` to ${p.name}` : ''}`;
 }
-function openSecretModal(mode, { item = null, fromConversation = false, name = '' } = {}) {
+// Keys in the vault that can be sent on (not waiting for approval or acceptance).
+const sendableSecrets = () => (state?.secrets || []).filter(s => !s.pending && !s.offered);
+function showSecretBody(id) {
+  for (const b of ['secretChoose', 'secretAsk', 'secretForm', 'secretProgress']) $(b).hidden = b !== id;
+}
+// The method follows the device: the network when it is reachable, sound when it is offline.
+function pickHow() {
+  const p = peerById($('secretPeer').value);
+  $('secretForm').how.value = p?.online === false ? 'sound' : 'wifi';
+  $('netHint').textContent = p?.online === false ? `${p.name} looks offline right now: sound works without a network` : 'instant: same Wi-Fi or cable, or Tailscale';
+  syncHow();
+}
+// Send: a new key typed here, or one from the vault ('stored').
+function useKeyPick() {
+  const id = $('secretKeyPick').value;
+  const item = id ? sendableSecrets().find(s => s.id === id) : null;
+  secretMode = item ? 'stored' : 'send'; storedItem = item;
+  $('valueRow').hidden = !!item; $('storedNote').hidden = !item;
+  $('secretName').readOnly = !!item; $('secretName').value = item ? item.name : '';
+  syncSecretPeer(); updateSoundTime();
+}
+function openSecretModal(mode, { item = null, fromConversation = false, name = '', via = 'sound' } = {}) {
   const sending = mode === 'send' || mode === 'stored';
   const peers = secretPeers();
-  if (sending && !peers.length) return toast('Pair a device first: secrets go only to paired devices.');
+  if ((sending || mode === 'ask') && !peers.length) return toast('Pair a device first: secrets go only to paired devices.');
   if (sending && fromConversation && !peerById(selected)?.canMessage) return toast('Pair this device again before sending it secrets.');
+  if (secretRun) secretRun.stop = true;
+  if (listenMode === 'secret') stopListening();
   secretMode = mode; storedItem = item;
   secretRun = null;
   $('secretModal').hidden = false;
-  $('secretForm').hidden = mode === 'receive';
-  $('secretProgress').hidden = mode !== 'receive';
   $('secretResult').hidden = true; $('secretDone').hidden = true; $('secretStop').hidden = false;
   $('secretPulse').hidden = false;
-  if (mode !== 'receive') {
-    $('peerRow').hidden = !sending; $('howBox').hidden = !sending; $('speakerRow').hidden = !sending;
-    $('valueRow').hidden = mode === 'stored'; $('storedNote').hidden = mode !== 'stored';
-    $('secretName').readOnly = mode === 'stored';
-    $('secretName').value = item ? item.name : name; $('secretValue').value = ''; $('secretValue').type = 'password'; $('secretShow').textContent = 'Show';
-    if (sending) {
-      $('secretPeer').replaceChildren(...peers.map(p => new Option(p.name, p.id)));
-      const pre = fromConversation ? selected : (peers.find(p => p.id === selected) || peers[0]).id;
-      $('secretPeer').value = pre;
-      $('secretHint').replaceChildren(text('span', 'Sealed so only '), text('b', ''), text('span', ' can open it, then stored in its key store. Its agent tools show the name, never the value. Use test values until VINAC Link has had a security review.'));
-      $('secretHint').children[1].id = 'secretTo';
-      syncSecretPeer(); updateSoundTime(); syncHow();
-    } else {
-      $('secretTitle').textContent = 'Add a secret to this device';
-      $('secretHint').textContent = 'Kept in this device\'s key store. Agents can ask to use it by name (you approve each run), but never see the value. You can send it to a paired device later.';
-      $('secretSend').textContent = 'Save';
-    }
-    (mode === 'stored' ? $('secretPeer') : $('secretName')).focus();
-  } else {
-    $('secretTitle').textContent = 'Receive a secret';
-    $('secretMeter').hidden = false;
-    $('secretStatus').textContent = 'Listening for 3 minutes (sound or Wi-Fi)… Start sending on the other device.';
+  if (mode === 'choose') {
+    $('secretTitle').textContent = 'Receive a key';
+    showSecretBody('secretChoose');
+    const computers = peers.length > 0, phones = (state?.phones || []).length > 0;
+    $('chooseAsk').disabled = $('chooseNetwork').disabled = $('chooseSound').disabled = !computers;
+    $('choosePhoneHint').textContent = phones ? 'From the phone vault, by sound. Press Send on the phone after this.' : 'No phone paired yet: this opens Pair a phone.';
+    if (!computers) $('chooseAsk').querySelector('small').textContent = 'Pair a computer first (Pair a device).';
+    $(computers ? 'chooseAsk' : 'choosePhone').focus();
+    return;
+  }
+  if (mode === 'ask') {
+    $('secretTitle').textContent = 'Ask for a key';
+    showSecretBody('secretAsk');
+    $('askPeer').replaceChildren(...peers.map(p => new Option(p.online === false ? `${p.name} (offline)` : p.name, p.id)));
+    $('askPeer').value = (peers.find(p => p.id === selected) || peers[0]).id;
+    $('askName').value = name; $('askReason').value = '';
+    $('askName').focus();
+    return;
+  }
+  if (mode === 'receive') {
+    showSecretBody('secretProgress');
+    const sound = via !== 'network';
+    $('secretTitle').textContent = via === 'phone' ? 'Receive from your phone' : sound ? 'Receive by sound' : 'Receive over the network';
+    $('secretMeter').hidden = !sound;
+    $('secretStatus').textContent = via === 'phone' ? 'Listening for 3 minutes… Now press Send on the phone, close to this computer, volume up.'
+      : sound ? 'Listening for 3 minutes… Now press Send on the other computer and choose Sound.'
+      : 'Waiting 3 minutes for a key from a paired computer. Send it there now; it is accepted here without asking.';
     secretRun = { stop: false };
     api('POST', '/ui/secret/receive', { on: true }).then(() => refresh.once()).catch(e => toast(e.message));
-    startListening('secret');
+    if (sound) startListening('secret');
+    return;
   }
+  showSecretBody('secretForm');
+  $('peerRow').hidden = !sending; $('howBox').hidden = !sending; $('speakerRow').hidden = !sending;
+  $('valueRow').hidden = mode === 'stored'; $('storedNote').hidden = mode !== 'stored';
+  $('secretName').readOnly = mode === 'stored';
+  $('secretName').value = item ? item.name : name; $('secretValue').value = ''; $('secretValue').type = 'password'; $('secretShow').textContent = 'Show';
+  // Send…: choose a key from the vault, or type a new one.
+  const stored = sendableSecrets();
+  $('keyPickRow').hidden = !(mode === 'send' && stored.length);
+  if (mode === 'send' && stored.length) {
+    $('secretKeyPick').replaceChildren(new Option('A new key (type it below)', ''), ...stored.map(s => new Option(s.name, s.id)));
+    $('secretKeyPick').value = '';
+  }
+  if (sending) {
+    $('secretPeer').replaceChildren(...peers.map(p => new Option(p.online === false ? `${p.name} (offline)` : p.name, p.id)));
+    const pre = fromConversation ? selected : (peers.find(p => p.id === selected) || peers[0]).id;
+    $('secretPeer').value = pre;
+    $('secretHint').replaceChildren(text('span', 'Sealed so only '), text('b', ''), text('span', ' can open it, then stored in its key store. Its agent tools show the name, never the value. Use test values until VINAC Link has had a security review.'));
+    $('secretHint').children[1].id = 'secretTo';
+    syncSecretPeer(); updateSoundTime(); pickHow();
+  } else {
+    $('secretTitle').textContent = 'Add a key to this device';
+    $('secretHint').textContent = 'Kept in this device\'s key store. Agents can ask to use it by name (you approve each run); VINAC Link\'s agent tools don\'t return its value. You can send it to a paired device later.';
+    $('secretSend').textContent = 'Save';
+  }
+  (mode === 'stored' ? $('secretPeer') : mode === 'send' && stored.length ? $('secretKeyPick') : $('secretName')).focus();
+}
+
+// Receive…: the ways to get a key.
+$('chooseAsk').onclick = () => openSecretModal('ask');
+$('chooseNetwork').onclick = () => openSecretModal('receive', { via: 'network' });
+$('chooseSound').onclick = () => openSecretModal('receive', { via: 'sound' });
+$('choosePhone').onclick = () => {
+  if ((state?.phones || []).length) return openSecretModal('receive', { via: 'phone' });
+  closeSecretModal(); showSecretTab('devices'); $('phonesBox').open = true; $('phonePairBtn').focus();
+};
+$('choosePaste').onclick = () => openSecretModal('add');
+$('secretAsk').onsubmit = async e => {
+  e.preventDefault();
+  const name = $('askName').value.trim(), peer = peerById($('askPeer').value);
+  if (!name || !peer) return;
+  const reason = $('askReason').value.trim();
+  try {
+    const s = await api('POST', '/ui/send', { to: peer.id, text: `Please send the key ${name}${reason ? `: ${reason}` : '.'}`, intent: 'person.secret.request', args: { name, ...(reason ? { reason } : {}) } });
+    closeSecretModal(); render(s);
+    toast(s.sent?.queued ? `${peer.name} is offline: the request goes out when it's back.` : `Asked ${peer.name} for ${name}. When they press Send there, it arrives here ready to use.`);
+  } catch (err) { toast(err.message); }
+};
+$('secretKeyPick').addEventListener('change', useKeyPick);
+
+// Secrets tabs: Keys · Requests · Phones & agents (remembered in this browser).
+let secretTab = LS.get('secretTab', 'keys');
+function showSecretTab(tab) {
+  secretTab = tab; LS.set('secretTab', tab);
+  for (const b of document.querySelectorAll('.secret-tabs [role=tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  for (const p of document.querySelectorAll('.secrets-view .tab-panel')) p.hidden = p.dataset.panel !== tab;
+}
+for (const b of document.querySelectorAll('.secret-tabs [role=tab]')) b.onclick = () => showSecretTab(b.dataset.tab);
+showSecretTab(secretTab);
+let seenWaiting = 0;
+function renderSecretTabs() {
+  const keys = (state.secrets || []).length;
+  const waiting = (state.secretRequests || []).length + (state.secretUses || []).length;
+  const devices = (state.phones || []).length + (state.agents || []).length;
+  const setCount = (id, n, hot = false) => { const el = $(id); el.textContent = n || ''; el.classList.toggle('hot', hot && n > 0); };
+  setCount('tabKeysCount', keys, (state.secrets || []).some(s => s.pending || s.offered));
+  setCount('tabRequestsCount', waiting, true);
+  setCount('tabDevicesCount', devices);
+  $('requestsEmpty').hidden = !$('askBox').hidden || !$('useBox').hidden || !$('grantBox').hidden;
+  // Something new needs the person (a key asked for, a program waiting): show it.
+  if (waiting > seenWaiting && secretTab !== 'requests') showSecretTab('requests');
+  seenWaiting = waiting;
 }
 
 function secretFinish(kind, message, done = true) {
@@ -1626,14 +1738,14 @@ function syncHow() {
   if (secretMode === 'add') return;
   const sound = $('secretForm').how.value === 'sound';
   $('speakerRow').hidden = !sound;
-  $('secretSend').textContent = sound ? 'Play it' : 'Send over Wi-Fi';
+  $('secretSend').textContent = sound ? 'Play it' : 'Send';
 }
 
 $('secretBtn').onclick = () => openSecretModal('send', { fromConversation: true });
-$('receiveBtn').onclick = () => openSecretModal('receive');
+$('receiveBtn').onclick = () => openSecretModal('choose');
 $('addSecretBtn').onclick = () => openSecretModal('add');
 $('sendSecretBtn').onclick = () => openSecretModal('send');
-$('secretPeer').addEventListener('change', syncSecretPeer);
+$('secretPeer').addEventListener('change', () => { syncSecretPeer(); pickHow(); });
 $('secretSearch').addEventListener('input', () => renderSecrets(true));
 $('secretClose').onclick = closeSecretModal;
 $('secretDone').onclick = closeSecretModal;

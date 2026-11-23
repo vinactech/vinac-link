@@ -14,10 +14,12 @@ Secret values never pass through you. You guide, and you can ask; the person sen
    Its person sees *"<this device> asks for STRIPE_KEY · Send"* on the Secrets page and sends it with
    one click. Because this device asked, the key is accepted here automatically (for an hour).
    Then check `vinac_secrets` for the name.
-3. **The person wants to send one**: on the sending computer, **Secrets** → **Send** (or **Send…**
-   on a stored secret) → pick the device → **Wi-Fi**. On the receiving computer it arrives as an
-   **offer** the person accepts (Secrets › **Accept**), or at once if that device is in Auto mode.
-   **By sound** (beta, no network) the receiving computer must first press **Receive by sound**.
+3. **The person wants to send one**: on the sending computer, **Secrets** → **Send…** → pick the
+   device and the key → **Send** (network). On the receiving computer it arrives as an **offer** the
+   person accepts (Secrets › **Accept**), or at once if that device is in Auto mode or its person
+   chose **Receive…** in the last 3 minutes. **By sound** (beta, no network) the receiving computer
+   must first press **Receive…** › **By sound**. The person can also ask from the page:
+   **Receive…** › **Ask a computer for it**.
 4. If a secret with the same name already exists from that device, the new one waits as
    **Replacement waiting** until the person presses **Approve**.
 5. An offered secret (`offered: true` in `vinac_secrets`) can't be used until the person accepts it;

@@ -37,8 +37,8 @@ or offline, and nothing important happens without your OK.
 1. **Pair once.** Two computers find each other on your network (or with an invite). Both screens
    show the same 6-digit code, and you press Allow on each. Only a person can finish pairing.
 2. **Share keys and tokens.** API keys and tokens move straight into the other computer's secure key
-   store, a vault you can lock with a passphrase. Agents can use them, but never see the values, and they
-  never appear in a chat.
+   store, a vault you can lock with a passphrase. They never appear in a chat, and VINAC Link's agent
+   tools don't return secret values.
 3. **Send requests your rules check.** Agents ask each other for answers, reviews or files. Each
    request says exactly what it wants, and your rules let it through, ask you first, or block it.
   Restricted, Standard or Auto mode sets those rules in one click.

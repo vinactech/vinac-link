@@ -3,14 +3,28 @@
 Send an API key or token from one computer to the other **without it passing through any chat,
 agent or tool output**.
 
-1. On the **sending** computer: **Secrets** → **Send** (or the key button in a conversation) →
-   pick the device, a name (like `OPENAI_API_KEY`) and the value → **Wi-Fi**.
+The **Secrets** page has three actions: **Add** (keep a key here), **Send…** and **Receive…**, and
+three tabs: **Keys** (your vault), **Requests** (keys your devices ask for, programs asking to use a
+key, allowed runs) and **Phones & agents**. A tab shows a count when something waits for you.
+
+1. On the **sending** computer: **Secrets** → **Send…** (or the key button in a conversation) →
+   pick the device, then a key from the vault or a new one (name like `OPENAI_API_KEY` and value).
+   The method follows the device: **Network** when it is reachable (same Wi-Fi or cable, or
+   Tailscale), **Sound** when it looks offline. You can change it.
 2. On the **receiving** computer it arrives as an **offer**: *Offered: accept?* with **Accept** /
    **Decline**. Nothing can use it before you accept. It is accepted at once when that computer
-   asked for it (below), or when the sending device is in **Auto** mode there.
-3. **By sound** (beta, no network needed): the receiving computer first presses **Receive by
-   sound** (it listens for 3 minutes), then the sender chooses **Sound** (~15 s, devices close
-   together).
+   asked for it (below), when its person chose **Receive…** in the last 3 minutes, or when the
+   sending device is in **Auto** mode there.
+
+**Receive…** lists the ways to get a key, best first:
+
+| Choice | What happens |
+|---|---|
+| **Ask a computer for it** | Name the key; the other computer shows it under *Requests* with **Send**. When its person sends it, it is accepted here without another click (for an hour). |
+| **Someone is sending it over the network** | For 3 minutes, a key sent from a paired computer is accepted here without asking. |
+| **By sound, no network** (beta) | This computer listens with its microphone for 3 minutes; the other one chooses **Sound** when it sends (about 10 to 35 s, devices close together). See [Sound and speakers](sound.md). |
+| **From your phone** (beta) | Listens for the [phone vault](#your-keys-on-your-phone-phone-vault-beta); press **Send** on the phone. With no phone paired yet, it opens *Pair a phone*. |
+| **Type or paste it** | You have the value already: the same as **Add**. |
 
 ## Asking for a key
 
@@ -19,6 +33,9 @@ When a program on one computer needs a key the other has, its agent asks for it 
 Secrets page shows **Asked for by your devices · STRIPE_KEY · Send**: one click sends it from the
 vault, and because the asking computer asked, it is accepted there without another click (for an
 hour). **Dismiss** removes the request; if the key isn't there yet, **Add it** first.
+
+A person can ask too: **Receive…** › **Ask a computer for it**, then the key name (and why, if you
+like). It shows up on the other computer's *Requests* tab the same way.
 
 ## The vault
 
@@ -82,7 +99,7 @@ it expires. Tick *also with more arguments after this command* to allow, say, `n
 any script name.
 
 - A run under a grant is **started by VINAC Link itself**: the values go from the key store into
-  that program's environment and nowhere else, so the agent never sees them. Its output comes back
+  that program's environment, not through the agent or VINAC Link's agent tools. (The program itself gets them, and anything it runs.) Its output comes back
   with values shown as `[hidden: NAME]`; it gets no keyboard input, and Ctrl-C stops it.
 - **Allowed runs** on the Secrets page lists every grant (agent, keys, command, folder, until when,
   how often it was used) with **Revoke**. While the vault is locked, grants don't work: you're asked
@@ -102,7 +119,7 @@ Keep keys on your phone and hand one to a computer by sound, with no network bet
    press **Allow** on the computer.
 2. **Add keys** on the phone (**Add a key**). They are encrypted on the phone with your passphrase
    (AES-256, key from PBKDF2) and never leave it except as sound.
-3. **Send one:** on the computer, **Receive by sound**; on the phone, **Send** next to the key, then
+3. **Send one:** on the computer, **Receive…** › **From your phone**; on the phone, **Send** next to the key, then
    **Play** (10–20 seconds, phone close to the computer). It's sealed for that one computer (X25519,
    AES-256-GCM); a recording played again is refused.
 

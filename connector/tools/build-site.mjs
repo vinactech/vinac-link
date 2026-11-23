@@ -27,6 +27,7 @@ export const PAGES = [
   ['docs/guide/messages-and-requests.md', '/docs/guide/messages-and-requests.html', 'Messages, requests, files', 'Guide'],
   ['docs/guide/firewall.md', '/docs/guide/firewall.html', 'The firewall', 'Guide'],
   ['docs/guide/secrets.md', '/docs/guide/secrets.html', 'Secrets', 'Guide'],
+  ['docs/guide/sound.md', '/docs/guide/sound.html', 'Sound and speakers', 'Guide'],
   ['docs/guide/networks.md', '/docs/guide/networks.html', 'Networks and ports', 'Guide'],
   ['docs/guide/offline.md', '/docs/guide/offline.html', 'Offline use', 'Guide'],
   ['docs/guide/agents.md', '/docs/guide/agents.html', 'Connecting agents', 'Guide'],
@@ -105,20 +106,37 @@ const NAV = [
   ['/how-it-works.html', 'How it works', 'how'], ['/about.html', 'About', 'about'], ['/roadmap.html', 'Roadmap', 'roadmap'],
   ['/docs/', 'Docs', 'docs'], ['/security.html', 'Security', 'security'], ['/#contact', 'Contact', 'contact'],
 ];
-const header = active => `<header class="top">
+// French (fr-CA) pages live under /fr/. Pages without a French version (docs, legal) link to English.
+const NAV_FR = [
+  ['/fr/how-it-works.html', 'Comment ça marche', 'how'], ['/fr/about.html', 'À propos', 'about'], ['/fr/roadmap.html', 'Feuille de route', 'roadmap'],
+  ['/docs/', 'Documentation (en anglais)', 'docs'], ['/fr/security.html', 'Sécurité', 'security'], ['/fr/#contact', 'Contact', 'contact'],
+];
+// English URL -> French URL, for the language switch and hreflang links.
+export const FR_OF = { '/': '/fr/', '/how-it-works.html': '/fr/how-it-works.html', '/about.html': '/fr/about.html', '/roadmap.html': '/fr/roadmap.html', '/security.html': '/fr/security.html' };
+const EN_OF = Object.fromEntries(Object.entries(FR_OF).map(([en, fr]) => [fr, en]));
+const S = {
+  en: { home: 'VINAC Link home', main: 'Main', download: 'Download', theme: 'Switch theme', menu: 'Open menu', home_url: '/', other: 'Français', other_label: 'Voir cette page en français', other_lang: 'fr' },
+  fr: { home: 'Accueil VINAC Link', main: 'Principal', download: 'Télécharger', theme: 'Changer de thème', menu: 'Ouvrir le menu', home_url: '/fr/', other: 'English', other_label: 'View this page in English', other_lang: 'en' },
+};
+const header = (active, lang = 'en', url = '/') => {
+  const s = S[lang], nav = lang === 'fr' ? NAV_FR : NAV;
+  const other = lang === 'fr' ? (EN_OF[url] || '/') : (FR_OF[url] || '/fr/');
+  return `<header class="top">
   <div class="wrap top-in">
-    <a class="brand" href="/" aria-label="VINAC Link home">${ICON}<span>VINAC Link</span></a>
-    <nav class="nav" id="site-nav" aria-label="Main">
-      ${NAV.map(([href, label, key]) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('\n      ')}
-      <a class="btn small primary nav-download" href="/#download">Download</a>
+    <a class="brand" href="${s.home_url}" aria-label="${s.home}">${ICON}<span>VINAC Link</span></a>
+    <nav class="nav" id="site-nav" aria-label="${s.main}">
+      ${nav.map(([href, label, key]) => `<a href="${href}"${active === key ? ' aria-current="page"' : ''}>${label}</a>`).join('\n      ')}
+      <a class="btn small primary nav-download" href="${s.home_url}#download">${s.download}</a>
     </nav>
     <div class="top-actions">
-      <button class="theme-toggle" type="button" aria-label="Switch theme"><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg></button>
-      <a class="btn small primary top-download" href="/#download">Download</a>
-      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Open menu"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg></button>
+      <a class="lang-switch" href="${other}" hreflang="${s.other_lang}" lang="${s.other_lang}" aria-label="${s.other_label}">${lang === 'fr' ? 'EN' : 'FR'}</a>
+      <button class="theme-toggle" type="button" aria-label="${s.theme}"><svg class="i-sun" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"/></svg><svg class="i-moon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5Z"/></svg></button>
+      <a class="btn small primary top-download" href="${s.home_url}#download">${s.download}</a>
+      <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="${s.menu}"><svg viewBox="0 0 24 24" aria-hidden="true"><path class="l1" d="M4 7h16"/><path class="l2" d="M4 12h16"/><path class="l3" d="M4 17h16"/></svg></button>
     </div>
   </div>
 </header>`;
+};
 
 // Social profiles (the GitHub repository may still be private; the link is ready for launch).
 const LINKEDIN = 'https://www.linkedin.com/company/vinac-link';

@@ -53,6 +53,7 @@ removes the pairing too. Agents can also call `vinac_unpair`; pairing again alwa
 
 - Keep the devices within a couple of metres for sound; turn the volume up a little.
 - If B hears nothing, check the microphone isn't muted (hardware mute buttons count) and that the
-  page has microphone permission.
+  page has microphone permission. More in [Sound and speakers](sound.md): which speakers work best
+  (not Bluetooth) and a troubleshooting checklist.
 - Pairing with a device on an older protocol version fails with "update both"; existing pairings keep
   working across updates.

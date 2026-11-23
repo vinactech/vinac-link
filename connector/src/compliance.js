@@ -33,6 +33,7 @@ export function actorOf(e) {
   if (e.type === 'secret.used') return e.via === 'grant' ? { kind: 'agent', name: e.agent || 'agent' } : { kind: 'person', name: `approved by the person${e.agent ? ` for ${e.agent}` : ''}` };
   if (BY_PERSON.has(e.type)) return { kind: 'person', name: 'the person (this page)' };
   if (e.type === 'msg.out') return e.by === 'person' ? { kind: 'person', name: 'the person (this page)' } : { kind: 'agent', name: e.agent || 'agent' };
+  if (e.type === 'msg.in' && e.agent) return { kind: 'device', name: `${e.peer?.name || 'a paired device'} › agent ${e.agent}` };
   if (e.type === 'msg.in' || e.type === 'secret.in' || e.type === 'unpair') return { kind: 'device', name: e.peer?.name || e.phone || 'a paired device' };
   if (e.type === 'file.saved') return { kind: 'agent', name: e.agent || 'agent' };
   return { kind: 'service', name: 'VINAC Link' };
