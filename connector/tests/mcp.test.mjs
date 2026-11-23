@@ -32,7 +32,7 @@ test('MCP server: handshake, eight tools, none can confirm pairing or read secre
     const init = await c.call('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'test', version: '0' } });
     assert.equal(init.result.serverInfo.name, 'vinac');
     const tools = (await c.call('tools/list', {})).result.tools.map(t => t.name);
-    assert.deepEqual(tools, ['vinac_status', 'vinac_pair_request', 'vinac_pair_status', 'vinac_peers', 'vinac_send', 'vinac_file', 'vinac_intents', 'vinac_inbox', 'vinac_secrets', 'vinac_unpair']);
+    assert.deepEqual(tools, ['vinac_status', 'vinac_pair_request', 'vinac_pair_status', 'vinac_peers', 'vinac_send', 'vinac_cards', 'vinac_help', 'vinac_search', 'vinac_file', 'vinac_intents', 'vinac_inbox', 'vinac_secrets', 'vinac_unpair']);
     assert.ok(!tools.some(t => /confirm|approve|accept|reveal|firewall|rule|decide/.test(t)));
     const intents = JSON.parse((await c.call('tools/call', { name: 'vinac_intents', arguments: {} })).result.content[0].text);
     assert.equal(intents.logos, (await import('../src/logos.js')).LOGOS_VERSION);

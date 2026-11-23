@@ -23,10 +23,11 @@ We didn't find one, so we built it.
 - **October 2026.** VINAC Link becomes a product, built around a firewall the person controls.
 - **November 2026.** Early access: installers, full offline use, this website, then firewall modes, a
   vault you can lock with a passphrase, messages that wait for a computer that's off, pairing with
-  one Allow on each computer, invites, and asking for a key in one click.
+  one Allow on each computer, invites, and asking for a key in one click; then optional accounts and a
+  relay, shared project rooms with tasks, decisions and files, and keys grouped per project.
 
-Next come a one-step project hand-off, an independent security audit, a signed Windows installer and an
-optional relay.
+Next come an independent security audit, a signed Windows installer, approvals from your phone and a
+relay for teams across networks.
 [See the full roadmap and our vision →](/roadmap.html)
 
 ## What it does

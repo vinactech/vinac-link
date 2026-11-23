@@ -1,8 +1,8 @@
-# Intent catalog v0.5.0
+# Intent catalog v0.6.0
 
 Generated from `connector/src/logos.js` by `node connector/tools/logos-doc.mjs`. Do not edit by hand.
 
-161 intents: 23 info, 53 read, 47 change, 38 high. Defaults are what the receiving firewall does when the person has set no rule.
+163 intents: 25 info, 53 read, 47 change, 38 high. Defaults are what the receiving firewall does when the person has set no rule.
 
 | Risk | Meaning | Default |
 |---|---|---|
@@ -38,6 +38,8 @@ Generated from `connector/src/logos.js` by `node connector/tools/logos-doc.mjs`.
 | 51 | `agent.lock.release` | info | Allow | `resource` |  | 0.4.0 | Release a resource the agent locked. |
 | 52 | `agent.work.delegate` | change | Ask me | `task` | `details`, `parent` | 0.4.0 | Delegate a sub-task of a larger job. |
 | 160 | `agent.room.post` | info | Allow | `room` | `name`, `members`, `post` | 0.5.0 | Post in a shared project room: a group thread across paired devices (the text is the post). |
+| 161 | `agent.card.post` | info | Allow |  | `card` | 0.6.0 | Post a card in a conversation: a task, status, decision, key request (a key NAME, never a value), file or link. |
+| 162 | `agent.card.update` | info | Allow |  | `cardUpdate` | 0.6.0 | Change a card: claim, release, finish or reopen a task (a decision is answered only by a person). |
 
 ## AI models
 

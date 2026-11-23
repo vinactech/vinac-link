@@ -29,6 +29,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
           <span>Overview</span>
         </button>
+        <button class="navbtn" id="needsNav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg>
+          <span>Needs me</span><span class="count waiting" id="needsCount"></span>
+        </button>
         <button class="navbtn" id="firewallNav">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3Z"/><path d="M9 12l2 2 4-4"/></svg>
           <span>Firewall</span><span class="count waiting" id="firewallCount"></span>
@@ -57,6 +61,7 @@
         <input id="convoSearch" type="search" placeholder="Search devices and messages" aria-label="Search devices and messages" autocomplete="off">
       </div>
       <nav class="convos" id="convos" aria-label="Conversations"></nav>
+      <div class="search-results" id="searchResults" hidden aria-live="polite"></div>
 
       <div class="side-section">
         <span class="side-label">Rooms</span>
@@ -115,6 +120,10 @@
           <div class="kpis" id="ovKpis"></div>
           <div class="ov-grid">
             <div class="ov-col">
+            <section class="panel needs-panel" id="needsPanel" hidden>
+              <header class="panel-head"><h3>Needs me</h3><span class="panel-sub" id="needsSub"></span></header>
+              <ul class="needs-list" id="needsList"></ul>
+            </section>
             <section class="panel ov-devices">
               <header class="panel-head"><h3>Devices</h3><span class="panel-sub" id="ovDevicesSub"></span></header>
               <div id="ovDevices"></div>
@@ -213,13 +222,29 @@
             <b id="roomName"></b>
             <small id="roomMembers"></small>
           </div>
+          <select id="roomProject" class="room-project" aria-label="Project for this room" title="Project for this room" hidden></select>
+          <button type="button" class="ghost small-btn" id="roomPauseBtn" title="Stop agents posting here, and hold other devices' agent posts from your agent">Pause agents</button>
+          <button class="icon" id="roomRulesBtn" title="Room rules for agents" aria-label="Room rules for agents">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h12M20 18h0"/><circle cx="16" cy="6" r="2"/><circle cx="10" cy="12" r="2"/><circle cx="18" cy="18" r="2"/></svg>
+          </button>
           <button class="icon" id="roomLeaveBtn" title="Leave this room" aria-label="Leave this room">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
           </button>
         </header>
         <div class="banner" id="roomBanner" hidden></div>
+        <div class="room-rules" id="roomRules" hidden></div>
         <div class="thread" id="roomThread" aria-live="polite"></div>
         <form class="composer" id="roomComposer">
+          <button type="button" class="icon" id="roomAttachBtn" title="Post a file in this room (or drop it here)" aria-label="Post a file">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11.5 12.4 19a5 5 0 0 1-7-7L13 4.4a3.3 3.3 0 0 1 4.7 4.7L10 16.7a1.7 1.7 0 0 1-2.4-2.4l7-7"/></svg>
+          </button>
+          <input type="file" id="roomAttachInput" hidden>
+          <select id="roomKind" aria-label="Post as" title="Post as">
+            <option value="post">Post</option>
+            <option value="task">Task</option>
+            <option value="decision">Decision</option>
+            <option value="status">Status</option>
+          </select>
           <textarea id="roomText" rows="1" maxlength="8000" placeholder="Post in this room" aria-label="Post in this room"></textarea>
           <button class="send" aria-label="Post" title="Post (Enter)">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5L4 12Z"/></svg>
@@ -249,6 +274,7 @@
         <div class="pair-body">
           <div class="tab-panel" data-panel="keys" role="tabpanel" aria-labelledby="tabKeys">
           <div class="vault-lock" id="vaultLock"></div>
+          <div class="projects-box" id="projectsBox"></div>
           <input type="search" id="secretSearch" placeholder="Find a secret by name or device" aria-label="Find a secret" autocomplete="off">
           <ul class="secret-list" id="secretList"></ul>
           </div>
@@ -364,6 +390,8 @@
           <ul class="secret-list" id="fwWaiting"></ul>
           <h3 class="fw-h">Recent requests</h3>
           <ul class="secret-list" id="fwRecent"></ul>
+          <h3 class="fw-h">Notifications</h3>
+          <div class="panel auto-panel" id="notifyBox"></div>
           <h3 class="fw-h">Auto-reply</h3>
           <div class="panel auto-panel" id="autoReply"></div>
           <h3 class="fw-h">Rules</h3>
@@ -540,22 +568,27 @@
         <p class="hint">How will the key arrive?</p>
         <div class="choose-list">
           <button type="button" class="choose" id="chooseAsk">
+            <span class="ch-ico ic-blue" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="14" height="10" rx="2"/><path d="M7 18h6M10 14v4"/><path d="M19 9l2 2-2 2M21 11h-5"/></svg></span>
             <b>Ask a computer for it</b>
             <small>Name the key; the other computer shows it with a Send button, and it arrives here ready to use. Over the network.</small>
           </button>
           <button type="button" class="choose" id="chooseNetwork">
+            <span class="ch-ico ic-green" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M2.5 9a14 14 0 0 1 19 0M5.5 12.5a9.5 9.5 0 0 1 13 0M8.8 16a5 5 0 0 1 6.4 0"/><circle cx="12" cy="19.5" r="1.2"/></svg></span>
             <b>Someone is sending it over the network</b>
             <small>For the next 3 minutes, a key sent from a paired computer is accepted here without asking. Nothing to set up.</small>
           </button>
           <button type="button" class="choose" id="chooseSound">
+            <span class="ch-ico ic-violet" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 10v4M8 7v10M12 4v16M16 8v8M20 11v2"/></svg></span>
             <b>By sound, no network <span class="tag beta">Beta</span></b>
             <small>From a paired computer nearby. This computer listens with its microphone for 3 minutes.</small>
           </button>
           <button type="button" class="choose" id="choosePhone">
+            <span class="ch-ico ic-orange" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="7" y="2.5" width="10" height="19" rx="2.5"/><path d="M11 18.5h2"/></svg></span>
             <b>From your phone <span class="tag beta">Beta</span></b>
             <small id="choosePhoneHint">From the phone vault, by sound. Press Send on the phone after this.</small>
           </button>
           <button type="button" class="choose" id="choosePaste">
+            <span class="ch-ico ic-gray" aria-hidden="true"><svg viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2"/><path d="M6 10h1M9.5 10h1M13 10h1M16.5 10h1M7 14h10"/></svg></span>
             <b>Type or paste it</b>
             <small>You already have the value: keep it on this device.</small>
           </button>
@@ -621,6 +654,16 @@
   </div>
 
   <!-- ===== new shared project room (only the person makes rooms) ===== -->
+  <div class="overlay" id="explainModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="explainTitle">
+      <header class="modal-head">
+        <b id="explainTitle">Why?</b>
+        <button class="icon" id="explainClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </header>
+      <div class="modal-body explain-body" id="explainBody"></div>
+    </div>
+  </div>
+
   <div class="overlay" id="roomModal" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="roomModalTitle">
       <header class="info-head">

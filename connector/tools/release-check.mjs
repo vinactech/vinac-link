@@ -138,7 +138,7 @@ async function smoke(bin, home, env) {
   try {
     await call('initialize', { protocolVersion: '2025-06-18', capabilities: {}, clientInfo: { name: 'release-check', version } });
     const tools = (await call('tools/list', {})).result.tools.map(t => t.name);
-    if (tools.length === 10) ok(`MCP handshake, ${tools.length} tools`); else fail(`MCP lists ${tools.length} tools: ${tools.join(', ')}`);
+    if (tools.length === 13) ok(`MCP handshake, ${tools.length} tools`); else fail(`MCP lists ${tools.length} tools: ${tools.join(', ')}`);
     const status = JSON.parse((await call('tools/call', { name: 'vinac_status', arguments: {} })).result.content[0].text);
     const page = new URL(status.approvalPage);
     for (const p of ['/', '/web/app.js', '/web/styles.css','/lab/js/modem.js', '/lab/js/audio.js', '/lab/worklets/vinac-tx-processor.js', '/lab/worklets/vinac-rx-processor.js']) {

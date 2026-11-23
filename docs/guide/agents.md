@@ -9,7 +9,7 @@ package, double-click **Connect my agent**.
 
 **Claude Code** (plugin: tools + skills + session-start note + live-mode monitor)
 ```
-claude plugin marketplace add <folder where VINAC Link is>     # or <owner>/vinac-link once it's on GitHub
+claude plugin marketplace add vinactech/vinac-link      # or the folder where VINAC Link is
 claude plugin install vinac-link@vinac
 ```
 Skills: `/vinac-link:pair`, `:send`, `:inbox`, `:secrets`, `:firewall`, `:status`.
@@ -20,7 +20,7 @@ hears about new messages and waiting items as they arrive, without their text. S
 **Codex**
 ```
 codex mcp add vinac -- node <folder>/connector/bin/vinac.mjs mcp
-codex plugin marketplace add <owner>/vinac-link        # once it's on GitHub; then /plugins → VINAC Link → Install
+codex plugin marketplace add vinactech/vinac-link       # then /plugins → VINAC Link → Install
 ```
 
 **Any MCP client** (Cursor, Windsurf, LibreChat, Claude Desktop…): a stdio server

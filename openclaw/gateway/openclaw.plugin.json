@@ -2,7 +2,7 @@
   "id": "vinac-link-gateway",
   "name": "VINAC Link",
   "description": "VINAC Link tools for OpenClaw agents: messages and intent-checked requests between paired computers, through the node that runs VINAC Link. No pairing confirmation, secret values, firewall changes or unpairing.",
-  "version": "0.13.0",
+  "version": "0.14.0",
   "enabledByDefault": false,
   "activation": { "onStartup": true },
   "configSchema": {
@@ -34,7 +34,7 @@
     }
   },
   "contracts": {
-    "tools": ["vinac_status", "vinac_peers", "vinac_intents", "vinac_secrets", "vinac_pair_status", "vinac_pair_request", "vinac_send", "vinac_file", "vinac_inbox"]
+    "tools": ["vinac_status", "vinac_peers", "vinac_intents", "vinac_secrets", "vinac_pair_status", "vinac_pair_request", "vinac_send", "vinac_help", "vinac_search", "vinac_cards", "vinac_file", "vinac_inbox"]
   },
   "toolMetadata": {
     "vinac_status": { "optional": true },
@@ -44,6 +44,9 @@
     "vinac_pair_status": { "optional": true },
     "vinac_pair_request": { "optional": true },
     "vinac_send": { "optional": true },
+    "vinac_help": { "optional": true },
+    "vinac_search": { "optional": true },
+    "vinac_cards": { "optional": true },
     "vinac_file": { "optional": true },
     "vinac_inbox": { "optional": true }
   }

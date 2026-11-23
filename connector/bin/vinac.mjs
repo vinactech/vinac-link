@@ -132,7 +132,7 @@ Next: pair another computer on the page, then connect your agent:
     if (!st.isFile()) fail(`${file} is not a file.`);
     const api = await connected();
     console.error(`Sending ${path.basename(file)} (${kb(st.size)})…`);
-    printSent(await api.upload('/api/send-file', { to: opt.to, name: path.basename(file), text: opt.text }, fs.readFileSync(file)));
+    printSent(await api.upload('/api/send-file', { to: opt.to, room: opt.room, name: path.basename(file), text: opt.text }, fs.readFileSync(file)));
     await api.daemon?.stop();
   } else if (command === 'files') {
     const api = await connected();
@@ -219,11 +219,33 @@ Next: pair another computer on the page, then connect your agent:
         console.log(`${new Date(at).toLocaleString()}  ${type.padEnd(16)}${who}  ${Object.entries(f).map(([k, v]) => `${k}=${typeof v === 'object' ? JSON.stringify(v) : v}`).join(' ')}`);
       }
     }
-  } else if (command === 'run') {
-    if (!opt.secret?.length || !opt.cmd.length) fail('usage: vinac run --secret NAME[=ENV_VAR] [--secret ...] -- COMMAND [ARGS]');
-    const wanted = opt.secret.map(s => { const [name, as] = s.split('='); return { name, as: as || name.toUpperCase().replace(/[^A-Z0-9_]/g, '_') }; });
+  } else if (command === 'keys') {
+    // vinac keys check [--env dev|prod]: what this folder's project needs (vinac.keys.json) and what's missing here.
+    if (opt._[0] !== 'check') fail('usage: vinac keys check [--env dev|prod]');
     const api = await connected();
-    const ask = await api.call('POST', '/api/secret-use', { names: wanted.map(w => w.name), command: opt.cmd, cwd: process.cwd(), envNames: Object.fromEntries(wanted.map(w => [w.name, w.as])) });
+    const r = await api.call('GET', `/api/keys/check?cwd=${encodeURIComponent(process.cwd())}&env=${encodeURIComponent(opt.env || 'dev')}`);
+    if (opt.json) console.log(JSON.stringify(r, null, 2));
+    else {
+      console.log(r.project ? `Project: ${r.project} (${r.env})` : 'This folder is not in a VINAC Link project (set one on the page: Secrets › Projects).');
+      if (r.manifest) console.log(`Needed (${r.manifest}): ${r.needed.join(', ') || 'none'}`);
+      else console.log('No vinac.keys.json here: list the key NAMES the project needs, e.g. {"dev": ["SUPABASE_URL"], "prod": []}.');
+      if (r.missing?.length) console.log(`Missing on this device: ${r.missing.join(', ')}. Ask for them on the page, or post a key request card in the project's room.`);
+      else if (r.manifest) console.log('All needed keys are on this device.');
+    }
+    await api.daemon?.stop();
+  } else if (command === 'run') {
+    if (!opt.cmd.length) fail('usage: vinac run [--secret NAME[=ENV_VAR] ...] [--env dev|prod] -- COMMAND [ARGS]   (no --secret: the keys vinac.keys.json lists)');
+    const api = await connected();
+    let names = opt.secret || [];
+    if (!names.length) {
+      const k = await api.call('GET', `/api/keys/check?cwd=${encodeURIComponent(process.cwd())}&env=${encodeURIComponent(opt.env || 'dev')}`);
+      if (!k.manifest) fail('Name the keys with --secret NAME, or add a vinac.keys.json to the project folder.');
+      if (k.missing.length) fail(`Missing on this device: ${k.missing.join(', ')} (vinac keys check).`);
+      names = k.needed;
+      if (!names.length) fail(`vinac.keys.json lists no keys for ${k.env}.`);
+    }
+    const wanted = names.map(s => { const [name, as] = s.split('='); return { name, as: as || name.toUpperCase().replace(/[^A-Z0-9_]/g, '_') }; });
+    const ask = await api.call('POST', '/api/secret-use', { names: wanted.map(w => w.name), command: opt.cmd, cwd: process.cwd(), env: opt.env || 'dev', envNames: Object.fromEntries(wanted.map(w => [w.name, w.as])) });
     if (ask.status === 'granted') {
       // A standing grant covers this run: VINAC Link starts the program itself and streams its
       // output (values hidden). The values never reach this process. No stdin; Ctrl-C stops it.
@@ -285,7 +307,7 @@ Usage: vinac <command>        (or: npx vinac-link <command>, or: node connector/
   daemon      run the service in this window (--name NAME, --open)
   mcp         agent tools over stdio, for MCP apps (--simple: three tools, for small local models)
   watch       print one line per new message or waiting item (no text); for agent monitors
-  send-file   send a file up to 64 MB:  vinac send-file report.pdf --to "Office PC"
+  send-file   send a file up to 64 MB:  vinac send-file report.pdf --to "Office PC"  (or --room NAME: posted once, members get it on request)
   files       list received files;  file save ID --out DIR  saves one
   git         git send [--to D] [--branch B] [--since REF]  ·  git fetch ID  (branches arrive as vinac/<device>/...)
   group       group list | group set NAME "PC 1,PC 2" | group remove NAME   (then send "to": NAME)

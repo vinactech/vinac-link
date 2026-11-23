@@ -26,10 +26,11 @@ agent peut faire. Nous ne l'avons pas trouvé, alors nous l'avons construit.
 - **Novembre 2026.** Accès anticipé : installateurs, usage entièrement hors ligne, ce site, puis les
   modes du pare-feu, un coffre verrouillable par phrase de passe, des messages qui attendent un
   ordinateur éteint, le jumelage avec un seul Autoriser sur chaque ordinateur, les invitations, et la
-  demande de clé en un clic.
+  demande de clé en un clic; puis les comptes facultatifs et un relais, les salons de projet partagés
+  avec tâches, décisions et fichiers, et les clés regroupées par projet.
 
-Viennent ensuite le transfert de projet en une étape, un audit de sécurité indépendant, un
-installateur Windows signé et un relais facultatif.
+Viennent ensuite un audit de sécurité indépendant, un installateur Windows signé, les approbations
+depuis votre téléphone et un relais pour les équipes entre réseaux.
 [Voir la feuille de route complète et notre vision →](/fr/roadmap.html)
 
 ## Ce qu'il fait

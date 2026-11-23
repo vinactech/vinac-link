@@ -260,7 +260,7 @@ function buildMac(files) {
 # Run this on a Mac (in Terminal: sh make-dmg.sh) to make VINAC-Link-${V}.dmg next to it.
 # This signs the app ad hoc (not notarized), so on other Macs people must allow it once in
 # System Settings > Privacy & Security, unless it is then signed with a Developer ID and notarized
-# (as 0.8.0 was on the owner's Mac; see MAC-BUILD instructions). Ad hoc builds: allow it once in
+# (as release builds are; see MAC-BUILD instructions). Ad hoc builds: allow it once in
 # System Settings > Privacy & Security > Open Anyway, until Apple Developer signing is added.
 set -e
 cd "$(dirname "$0")"

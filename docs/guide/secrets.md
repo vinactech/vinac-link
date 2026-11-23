@@ -108,6 +108,32 @@ any script name.
   an agent that can edit them can make the command leak a key. Allow only commands and folders you
   trust, for as short as works.
 
+## Projects: keys per project and environment
+
+With several projects (each with its own Supabase, Resend… keys), group them on **Secrets ›
+Projects**:
+
+1. **New project**: a name and its folder on this computer (the repo). Production keys ask you every
+   time they're used, unless you turn that off.
+2. Put each key in a project and environment with the picker next to it (**Website · dev**,
+   **Website · prod**), or leave it in **No project**. The same name can live in several projects.
+3. An agent working in the project's folder sees only that project's key names (and keys in no
+   project); `vinac run` there uses that project's key. A key of another project is never used.
+
+**What the project needs.** Commit a `vinac.keys.json` with the key *names* (never values):
+
+```json
+{ "dev": ["SUPABASE_URL", "SUPABASE_ANON_KEY", "RESEND_API_KEY"], "prod": ["SUPABASE_URL"] }
+```
+
+`vinac keys check` (or `--env prod`) lists what's missing on this computer, and
+`vinac run -- npm run dev` (no `--secret`) runs with exactly that list. `--env prod` uses the prod
+keys and always asks you.
+
+**In a room.** Link the room to the project (picker in the room's header). A key request card posted
+there names the project; on the computer that has the key, press **Send** on the card. The value goes
+sealed to the computer that asked, never to the room, and lands in the same project there.
+
 ### Your keys on your phone (phone vault, beta)
 
 Keep keys on your phone and hand one to a computer by sound, with no network between them.

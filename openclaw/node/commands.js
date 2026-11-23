@@ -42,9 +42,21 @@ export const COMMANDS = {
     if (!MODES.includes(p.mode)) throw new BadRequest('mode must be "announce" or "listen"');
     return { mode: p.mode };
   }],
-  'vinac.send': ['vinac_send', ['to', 'room', 'text', 'replyTo', 'intent', 'args'], p => {
-    if (p.args != null && (typeof p.args !== 'object' || Array.isArray(p.args))) throw new BadRequest('args must be an object');
-    return { to: optStr(p.to, 'to', 200), room: optStr(p.room, 'room', 100), text: optStr(p.text, 'text', 8000), replyTo: optStr(p.replyTo, 'replyTo', 64), intent: optStr(p.intent, 'intent', 80), args: p.args ?? undefined };
+  'vinac.send': ['vinac_send', ['to', 'room', 'text', 'replyTo', 'intent', 'args', 'card', 'cardUpdate'], p => {
+    for (const k of ['args', 'card', 'cardUpdate']) if (p[k] != null && (typeof p[k] !== 'object' || Array.isArray(p[k]))) throw new BadRequest(`${k} must be an object`);
+    return { to: optStr(p.to, 'to', 200), room: optStr(p.room, 'room', 100), text: optStr(p.text, 'text', 8000), replyTo: optStr(p.replyTo, 'replyTo', 64), intent: optStr(p.intent, 'intent', 80), args: p.args ?? undefined, card: p.card ?? undefined, cardUpdate: p.cardUpdate ?? undefined };
+  }],
+  'vinac.help': ['vinac_help', ['topic', 'ref'], p => {
+    if (!['message', 'request', 'peer', 'key', 'card'].includes(p.topic)) throw new BadRequest('topic must be message, request, peer, key or card');
+    return { topic: p.topic, ref: optStr(p.ref, 'ref', 200) || '' };
+  }],
+  'vinac.search': ['vinac_search', ['q', 'room', 'to', 'kind', 'since', 'limit'], p => {
+    if (p.limit != null && typeof p.limit !== 'number') throw new BadRequest('limit must be a number');
+    return { q: optStr(p.q, 'q', 200), room: optStr(p.room, 'room', 100), to: optStr(p.to, 'to', 200), kind: optStr(p.kind, 'kind', 20), since: optStr(p.since, 'since', 40), limit: p.limit ?? undefined };
+  }],
+  'vinac.cards': ['vinac_cards', ['room', 'to', 'open'], p => {
+    if (p.open != null && typeof p.open !== 'boolean') throw new BadRequest('open must be true or false');
+    return { room: optStr(p.room, 'room', 100), to: optStr(p.to, 'to', 200), open: p.open === true };
   }],
   'vinac.file': ['vinac_file', ['id'], p => ({ id: optStr(p.id, 'id', 64) || (() => { throw new BadRequest('id is required'); })() })],
   'vinac.inbox': ['vinac_inbox', ['waitSeconds', 'all'], p => {

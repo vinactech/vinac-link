@@ -198,6 +198,9 @@ function render(s) {
   app.dataset.main = main;
   app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
+  const needs = s.needsMe || [];
+  $('needsCount').textContent = needs.length || '';
+  renderNeeds();
 
   renderPairing(p);
   renderConvos();
@@ -268,7 +271,7 @@ function renderHead() {
   $('headStatus').textContent = `${peer.online === true ? (peer.reachedVia === 'relay' ? 'Online via relay' : 'Online') :peer.online === false ? 'Offline' : 'Checking…'} · ${peer.fingerprint}`;
   const banner = $('banner');
   if (!peer.canMessage) { banner.hidden = false; banner.textContent = 'This device was paired before messaging existed. Remove it and pair again to send messages.'; }
-  else if (peer.online === false) { banner.hidden = false; banner.textContent = `${peer.name} seems to be offline. Messages and requests wait here and go out by themselves when it's back (up to 24 hours). Files and secrets need it online.`; }
+  else if (peer.online === false) { banner.hidden = false; banner.textContent = `${peer.name} seems to be offline. Messages and requests wait here and go out by themselves when it's back (up to 24 hours). Files and secrets need it online. `; const w = button('Why?', () => explain('peer', peer.id)); w.className = 'linkish'; banner.append(w); }
   else banner.hidden = true;
   $('composeText').disabled = $('sendBtn').disabled = $('attachBtn').disabled = !peer.canMessage;
 }
@@ -282,7 +285,7 @@ async function loadThread() {
   try {
     const r = await api('GET', `/ui/messages?peer=${encodeURIComponent(peer)}`);
     if (peer !== selected) return;
-    thread = r.messages;
+    thread = r.messages; cardMap = new Map((r.cards || []).map(c => [c.id, c]));
     renderThread();
   } catch (e) { threadKey = ''; toast(e.message); }
 }
@@ -315,7 +318,72 @@ function renderThread() {
 
 const KEY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>';
 
+// ---- cards: tasks, statuses, decisions, key requests, files, links (state worked out by the service) ----
+let cardMap = new Map();
+const CARD_LABEL = { task: 'Task', status: 'Status', decision: 'Decision', key: 'Key request', file: 'File', link: 'Link' };
+const STATE_LABEL = { open: 'Open', claimed: 'Claimed', done: 'Done', answered: 'Answered', posted: '' };
+async function cardAction(card, action, option) {
+  const where = app.dataset.main === 'room' && roomOpen ? { room: roomOpen } : { to: selected };
+  try {
+    const s = await api('POST', '/ui/card', { ...where, cardUpdate: { card: card.id, action, ...(option ? { option } : {}) } });
+    if (where.room) { roomKey = ''; roomJustOpened = true; } else threadKey = '';
+    render(s);
+  } catch (e) { toast(e.message); }
+}
+function cardEl(c0, m = null) {
+  const c = cardMap.get(c0.id) || c0;
+  const box = document.createElement('div'); box.className = `card card-${c.type}${c.state ? ` st-${c.state}` : ''}${c.level ? ` lv-${c.level}` : ''}`;
+  const head = document.createElement('div'); head.className = 'card-head';
+  head.append(text('span', CARD_LABEL[c.type] || 'Card'));
+  if (STATE_LABEL[c.state]) { const s = text('span', STATE_LABEL[c.state]); s.className = 'card-state'; head.append(s); }
+  box.append(head, text('b', c.title));
+  if (c.body) { const b = document.createElement('div'); b.className = 'card-body'; rich(b, c.body, ''); box.append(b); }
+  const info = [];
+  if (c.type === 'key') info.push(`${c.name}${c.project ? ` · ${c.project}` : ''}${c.env ? ` · ${c.env}` : ''}`);
+  if (c.type === 'file') info.push(`${c.name}${c.size ? ` · ${kb(c.size)}` : ''}`);
+  if (c.type === 'link') info.push(c.url);
+  const you = w => (w === 'me' ? 'you' : w);
+  if (c.claimedBy && c.state === 'claimed') info.push(`Claimed by ${you(c.claimedBy)}`);
+  if (c.doneBy) info.push(`Done by ${you(c.doneBy)}`);
+  if (c.answer) info.push(`Answer: ${c.answer} (${you(c.answeredBy)})`);
+  for (const i of info) { const p = text('small', i); p.className = 'card-info'; box.append(p); }
+  const acts = document.createElement('div'); acts.className = 'card-acts';
+  if (c.type === 'task') {
+    if (c.state === 'open') acts.append(button('Claim', () => cardAction(c, 'claim')));
+    if (c.state !== 'done') acts.append(button('Mark done', () => cardAction(c, 'done')));
+    if (c.state === 'claimed' && c.claimedBy === 'me') acts.append(button('Release', () => cardAction(c, 'release')));
+    if (c.state === 'done') acts.append(button('Reopen', () => cardAction(c, 'reopen')));
+  }
+  if (c.type === 'decision' && c.state === 'open') for (const o of c.options) acts.append(button(o, () => cardAction(c, 'answer', o)));
+  if (c.type === 'key' && c.state !== 'done' && m?.direction === 'received') acts.append(button('Send', async () => {
+    if (!confirm(`Send your ${c.name}${c.project ? ` (${c.project}${c.env ? `, ${c.env}` : ''})` : ''} to ${m.peer.name}? It goes sealed to that device only, never to the room.`)) return;
+    try { const s = await api('POST', '/ui/card/send-key', { card: c.id }); toast(`Sent ${c.name} to ${m.peer.name}.`); roomKey = ''; threadKey = ''; render(s); } catch (e) { toast(e.message); }
+  }));
+  if (c.type === 'key' && c.state !== 'done') acts.append(button('Mark sent', () => cardAction(c, 'done')));
+  if (c.type === 'file') {
+    if (c.localFile) acts.append(button('Download', () => downloadFile(c.localFile, c.name)));
+    else if (m?.direction === 'received') acts.append(button('Get file', async () => {
+      try { const s = await api('POST', '/ui/card/fetch', { card: c.id }); toast(s.fetched?.note || 'Asked for the file.'); render(s); } catch (e) { toast(e.message); }
+    }));
+  }
+  if (c.type === 'link') acts.append(button('Open link', () => { if (confirm(`Open this link from another device?\n${c.url}`)) window.open(c.url, '_blank', 'noopener,noreferrer'); }));
+  for (const b of acts.children) b.className = 'ghost small';
+  const why = button('?', () => explain('card', c.id)); why.title = 'What is this card?'; acts.append(why);
+  for (const b of acts.children) b.className = 'ghost small';
+  if (acts.childElementCount) box.append(acts);
+  return box;
+}
+function cardUpdateEl(m) {
+  const el = document.createElement('div'); el.className = 'note card-note'; el.dataset.id = m.id;
+  const who = m.direction === 'sent' ? 'You' : `${m.peer.name}${m.agent ? ` › ${m.agent.name}` : ''}`;
+  const t = document.createElement('span'); t.textContent = `${who}: ${m.text}`;
+  const time = document.createElement('small'); time.textContent = clock(m.sentAt);
+  el.append(t, time);
+  return el;
+}
+
 function messageEl(m, cont, q, { room = false } = {}) {
+  if (m.args?.cardUpdate) return cardUpdateEl(m);
   if (m.kind === 'secret') {
     // A secret was sent or received. The note never holds the value.
     const el = document.createElement('div'); el.className = 'note'; el.dataset.id = m.id;
@@ -344,7 +412,7 @@ function messageEl(m, cont, q, { room = false } = {}) {
   if (who.childElementCount) el.append(who);
 
   const bubble = document.createElement('div'); bubble.className = 'bubble';
-  if (m.intent && !room) {
+  if (m.intent && !room && !m.args?.card) {
     const r = text('span', `Request · ${m.intent}`); r.className = 'request';
     if (m.args) r.title = JSON.stringify(m.args, null, 1);
     bubble.append(r);
@@ -361,7 +429,8 @@ function messageEl(m, cont, q, { room = false } = {}) {
     if (orig) quote.onclick = () => jumpTo(orig.id);
     bubble.append(quote);
   }
-  rich(bubble, m.text, q);
+  if (m.args?.card) { bubble.classList.add('has-card'); bubble.append(cardEl(m.args.card, m)); }
+  else rich(bubble, m.text, q);
   el.append(bubble);
 
   const meta = document.createElement('div'); meta.className = 'meta';
@@ -374,11 +443,12 @@ function messageEl(m, cont, q, { room = false } = {}) {
     meta.append(button('Discard', () => { pending = pending.filter(x => x !== m); renderThread(); }));
   } else if (out && m.queued) {
     const q = text('span', '· Waiting to send: device offline'); q.className = 'queued'; q.title = 'Sent automatically when the device is back, for up to 24 hours.';
-    meta.append(q, button('Cancel', async () => { try { render(await api('POST', '/ui/outbox/cancel', { id: m.id })); loadThread?.(); } catch (e) { toast(e.message); } }));
-  } else if (out && m.undelivered) { const f = text('span', '· Not delivered'); f.className = 'fail'; f.title = m.undelivered; meta.append(f); }
+    meta.append(q, button('Cancel', async () => { try { render(await api('POST', '/ui/outbox/cancel', { id: m.id })); loadThread?.(); } catch (e) { toast(e.message); } }), button('Why?', () => explain('message', m.id)));
+  } else if (out && m.undelivered) { const f = text('span', '· Not delivered'); f.className = 'fail'; f.title = m.undelivered; meta.append(f, button('Why?', () => explain('message', m.id))); }
   else if (out && room && m.to) meta.append(text('span', `· Delivered to ${m.to.join(', ')}`));
   else if (out) meta.append(text('span', '· Delivered'));
   else if (m.firewall && !['allowed', 'approved'].includes(m.firewall.status)) {
+    meta.append(button('Why?', () => explain('request', m.id)));
     const f = button(`· ${FW_LABEL[m.firewall.status]}`, () => openFirewall());
     f.className = `linkish fw-${m.firewall.status}`; meta.append(f);
   } else meta.append(text('span', m.read ? '· Your agent read this' : '· Not yet read by your agent'));
@@ -682,9 +752,36 @@ $('agentAddForm')?.addEventListener('submit', async e => {
   } catch (err) { toast(err.message); }
 });
 
+// Projects: keys grouped per project and environment. The folder an agent works in picks the project.
+function renderProjects() {
+  const box = $('projectsBox'); if (!box) return;
+  box.replaceChildren();
+  const head = document.createElement('div'); head.className = 'proj-head';
+  head.append(text('b', 'Projects'));
+  const add = button('New project', () => editProject(null)); add.className = 'ghost small-btn';
+  head.append(add); box.append(head);
+  const list = state.projects || [];
+  if (!list.length) { const p = text('p', 'Group keys per project (dev and prod), so the same name can exist in several projects. Agents in a project\'s folder see only that project\'s keys.'); p.className = 'hint small'; box.append(p); return; }
+  for (const p of list) {
+    const row = document.createElement('div'); row.className = 'proj-row';
+    const n = (state.secrets || []).filter(s => s.projectId === p.id).length;
+    const t = document.createElement('div'); t.append(text('b', p.name), text('small', `${p.folders.join(' · ') || 'No folder yet'} · ${n} key${n === 1 ? '' : 's'}${p.prodAsks ? ' · prod keys ask every time' : ''}`));
+    const edit = button('Edit', () => editProject(p)); edit.className = 'ghost small-btn';
+    const del = button('Delete', () => { if (confirm(`Delete the project "${p.name}"? Its keys stay, in "No project".`)) act('POST', '/ui/projects/remove', { id: p.id }); }); del.className = 'ghost small-btn';
+    row.append(t, edit, del); box.append(row);
+  }
+}
+async function editProject(p) {
+  const name = prompt('Project name', p?.name || ''); if (!name) return;
+  const folder = prompt('The project\'s folder on this computer (full path; agents working there use this project\'s keys)', p?.folders?.[0] || '');
+  if (folder === null) return;
+  const prodAsks = confirm('Should production (prod) keys ask you every time they are used? (Recommended: OK)');
+  try { const s = await api('POST', '/ui/projects', { id: p?.id, name, folders: folder ? [folder] : [], prodAsks }); render(s); toast(`Project ${name} saved.`); } catch (e) { toast(e.message); }
+}
+
 function renderSecrets(force = false) {
   const q = ($('secretSearch').value || '').trim().toLowerCase();
-  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock) + JSON.stringify(state.secretRequests || []) + JSON.stringify(state.grants || []) + JSON.stringify(state.agents || []) + JSON.stringify(state.phones || []) + JSON.stringify(state.phonePairing || null);
+  const key = JSON.stringify(state.secrets) + JSON.stringify(state.projects || []) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock) + JSON.stringify(state.secretRequests || []) + JSON.stringify(state.grants || []) + JSON.stringify(state.agents || []) + JSON.stringify(state.phones || []) + JSON.stringify(state.phonePairing || null);
   if (key === secretsKey && !force) return;
   secretsKey = key;
   renderVaultLock();
@@ -693,6 +790,7 @@ function renderSecrets(force = false) {
   renderGrants();
   renderPhones();
   renderSecretTabs();
+  renderProjects();
   const list = $('secretList'); list.replaceChildren();
   $('secretSearch').hidden = state.secrets.length < 4 && !q;
   if (!state.secrets.length) {
@@ -742,6 +840,16 @@ function renderSecrets(force = false) {
     for (const b of buttons) b.className = 'ghost';
     if (s.pending || s.offered) buttons[0].className = 'primary small-btn';
     row.append(...buttons);
+    // Projects: which project and environment this key belongs to (none = "No project").
+    if ((state.projects || []).length && !s.offered) {
+      const sel = document.createElement('select'); sel.className = 'proj-pick'; sel.setAttribute('aria-label', `Project for ${s.name}`);
+      const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
+      sel.append(opt('', 'No project'));
+      for (const p of state.projects) for (const env of ['dev', 'prod']) sel.append(opt(`${p.id}|${env}`, `${p.name} · ${env}`));
+      sel.value = s.projectId ? `${s.projectId}|${s.env || 'dev'}` : '';
+      sel.onchange = () => { const [project, env] = sel.value.split('|'); act('POST', '/ui/secrets/assign', { id: s.id, project: project || null, env }); };
+      row.append(sel);
+    }
     li.append(name, row, meta);
     if (showing) { const v = text('code', shownSecret.value); v.className = 'value'; li.append(v); }
     list.append(li);
@@ -1028,6 +1136,7 @@ function renderFirewall() {
 
   renderModes();
   renderRules();
+  renderNotify();
   renderAutoReply();
 }
 
@@ -1066,6 +1175,42 @@ function renderModes() {
     const end = button('End now', async () => { try { await api('POST', '/ui/firewall/temporary/clear', fwScope === '*' ? {} : { peer: fwScope }); loadFirewall(true); } catch (e) { toast(e.message); } });
     end.className = 'linkish'; t.append(end); box.append(t);
   }
+}
+
+// Notifications and waking agents: only this page changes them; agent tools cannot.
+async function setNotify(body, done) {
+  try { await api('POST', '/ui/notify', body); if (done) toast(done); loadFirewall(true); }
+  catch (e) { toast(e.message); loadFirewall(true); }
+}
+function renderNotify() {
+  const box = $('notifyBox'); const n = fw.notify;
+  if (!box || !n) return;
+  box.replaceChildren();
+  const row = (title, hint, ...controls) => {
+    const r = document.createElement('div'); r.className = 'ar-row';
+    const t = document.createElement('div'); t.className = 'ar-label'; t.append(text('b', title));
+    if (hint) t.append(text('small', hint));
+    const c = document.createElement('div'); c.className = 'ar-control'; c.append(...controls);
+    r.append(t, c); return r;
+  };
+  const sw = (checked, label) => {
+    const l = document.createElement('label'); l.className = 'switch';
+    const i = document.createElement('input'); i.type = 'checkbox'; i.checked = checked; i.setAttribute('role', 'switch'); i.setAttribute('aria-label', label);
+    l.append(i, document.createElement('span')); return [l, i];
+  };
+  const g = document.createElement('div'); g.className = 'ar-group';
+  const [dl, desk] = sw(n.desktop, 'Desktop notifications');
+  desk.onchange = () => setNotify({ desktop: desk.checked }, desk.checked ? 'Desktop notifications on.' : 'Desktop notifications off.');
+  const testBtn = button('Test', async () => { try { await api('POST', '/ui/notify/test', {}); } catch (e) { toast(e.message); } });
+  testBtn.className = 'ghost small';
+  g.append(row('Desktop notifications', 'New messages, room posts and requests waiting for you. Shows the device, never the text.', testBtn, dl));
+  const [wl, wake] = sw(n.wakeAgents, 'Wake my agents');
+  wake.onchange = () => setNotify({ wakeAgents: wake.checked }, wake.checked ? 'Agents are woken when something arrives.' : 'Agents are no longer woken; they see new items at their next step.');
+  g.append(row('Wake my agents', 'An idle Claude Code session is woken when a message or room post arrives, so it can read it. Off: it sees new items at its next step.', wl));
+  const per = document.createElement('input'); per.type = 'number'; per.min = '1'; per.max = '60'; per.value = n.wakesPerHour; per.setAttribute('aria-label', 'Wake-ups per session per hour');
+  per.onchange = () => setNotify({ wakesPerHour: Number(per.value) });
+  g.append(row('Limit', 'Wake-ups per session per hour (stops two agents from waking each other all day)', per));
+  box.append(g);
 }
 
 // Auto-reply: per device Off / Questions & status, limits, and a log of runs.
@@ -1247,6 +1392,8 @@ function noticeNew() {
       const watching = document.visibilityState === 'visible' && selected === c.peerId && app.dataset.main === 'thread';
       if (watching) continue;
       const body = c.last?.id === x.id ? c.last.text.slice(0, 140) : 'New message';
+      // The service shows desktop notifications itself when they are on; the browser one would be a duplicate.
+      if (state.desktopNotify && document.visibilityState !== 'visible') continue;
       if (notifyOn && 'Notification' in window && Notification.permission === 'granted' && document.visibilityState !== 'visible') {
         try { const n = new Notification(peer?.name || 'VINAC Link', { body, tag: x.id }); n.onclick = () => { window.focus(); select(c.peerId); }; } catch { /* not allowed here */ }
       } else if (document.visibilityState === 'visible') toast(`New message from ${peer?.name || 'a device'}`);
@@ -1270,20 +1417,23 @@ $('notifyBtn').onclick = async () => {
 };
 
 // ---- shared project rooms: one thread for a project across several paired devices ----------
-let roomOpen = null, roomMsgs = [], roomKey = '', roomJustOpened = false;
+let roomOpen = null, roomMsgs = [], roomKey = '', roomJustOpened = false, showArchived = false;
 const roomById = id => (state?.rooms || []).find(r => r.id === id);
 const roomUnread = r => r.incoming.filter(x => x.at > (lastSeen[`room:${r.id}`] || '')).length;
 
 function renderRooms() {
   const nav = $('roomList'); nav.replaceChildren();
-  const rooms = [...(state.rooms || [])].sort((a, b) => (b.last?.sentAt || b.createdAt).localeCompare(a.last?.sentAt || a.createdAt));
+  // Pinned first, then by last activity; archived rooms hide behind a toggle (a new post brings one back).
+  const all = [...(state.rooms || [])].sort((a, b) => (!!b.pinned - !!a.pinned) || (b.last?.sentAt || b.createdAt).localeCompare(a.last?.sentAt || a.createdAt));
+  const archived = all.filter(r => r.archived);
+  const rooms = showArchived ? all : all.filter(r => !r.archived || r.id === roomOpen);
   if (!rooms.length) {
     const none = document.createElement('p'); none.className = 'none';
     none.textContent = state.peers.length > 1 ? 'No rooms yet. A room is one thread for a project across several devices.' : 'Pair two or more devices to make a room.';
     nav.append(none); return;
   }
   for (const r of rooms) {
-    const unread = roomUnread(r), last = r.last;
+    const unread = r.muted ? 0 : roomUnread(r), last = r.last;
     const b = document.createElement('button');
     b.className = `convo${unread ? ' unread' : ''}`;
     b.setAttribute('aria-current', String(r.id === roomOpen && app.dataset.main === 'room'));
@@ -1292,10 +1442,17 @@ function renderRooms() {
     const when = document.createElement('time'); when.textContent = last ? shortWhen(last.sentAt) : '';
     const prev = document.createElement('span'); prev.className = 'preview';
     prev.textContent = last ? `${last.direction === 'sent' ? (last.by === 'agent' ? 'Your agent: ' : 'You: ') : `${last.peer.name}: `}${flat(last.text)}` : `${r.members.length + 1} devices in this room`;
+    if (r.pinned) { const pi = text('span', ' · pinned'); pi.className = 'muted-tag'; name.append(pi); }
+    if (r.muted) { const mu = text('span', ' · muted'); mu.className = 'muted-tag'; name.append(mu); }
     b.append(av, name, when, prev);
-    if (unread) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = unread > 99 ? '99+' : unread; b.append(badge); }
+    if (r.mentions) { const at = document.createElement('span'); at.className = 'badge mention'; at.textContent = '@'; at.title = 'Mentions you'; b.append(at); }
+    else if (unread) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = unread > 99 ? '99+' : unread; b.append(badge); }
     b.onclick = () => openRoom(r.id);
     nav.append(b);
+  }
+  if (archived.length) {
+    const tg = button(showArchived ? 'Hide archived rooms' : `Archived (${archived.length})`, () => { showArchived = !showArchived; renderRooms(); });
+    tg.className = 'linkish archived-toggle'; nav.append(tg);
   }
 }
 
@@ -1310,10 +1467,119 @@ function renderRoomHead() {
   const r = roomById(roomOpen); if (!r) return;
   $('roomName').textContent = r.name;
   $('roomMembers').textContent = `You, ${r.members.map(m => m.name).join(', ')}`;
+  // Room rules on this computer: pause agents, card types, limits. Only ever stricter.
+  const pol = r.policy || {};
+  const pb = $('roomPauseBtn');
+  pb.textContent = pol.paused ? 'Resume agents' : 'Pause agents';
+  pb.classList.toggle('on', !!pol.paused);
+  pb.onclick = () => act('POST', '/ui/rooms/policy', { id: r.id, paused: !pol.paused });
+  $('roomRulesBtn').onclick = () => { $('roomRules').hidden = !$('roomRules').hidden; renderRoomRules(); };
+  if (pol.paused) { banner.hidden = false; banner.textContent = 'Agents are paused in this room on this computer: your agents can\'t post here, and other devices\' agent posts don\'t reach your agent.'; }
+  renderRoomRules();
+  // The room's project (on this computer): key requests posted here name it.
+  const ps = $('roomProject'); const projects = state.projects || [];
+  ps.hidden = !projects.length;
+  if (projects.length) {
+    ps.replaceChildren();
+    const o = (v, l) => { const x = document.createElement('option'); x.value = v; x.textContent = l; return x; };
+    ps.append(o('', 'No project'), ...projects.map(p => o(p.id, p.name)));
+    ps.value = r.projectId || '';
+    ps.onchange = () => act('POST', '/ui/rooms/project', { id: r.id, project: ps.value || null });
+  }
   const banner = $('roomBanner');
   const missing = r.notPairedHere?.length || 0;
   banner.hidden = !missing;
   banner.textContent = missing ? `${missing} member${missing > 1 ? 's' : ''} of this room ${missing > 1 ? 'are' : 'is'} not paired with this computer: your posts don't reach ${missing > 1 ? 'them' : 'it'}.` : '';
+}
+
+// "Why?": an explanation built from this computer's own data, with buttons for the steps the person takes.
+async function explain(topic, ref) {
+  try {
+    const x = await api('GET', `/ui/explain?topic=${encodeURIComponent(topic)}&ref=${encodeURIComponent(ref)}`);
+    $('explainTitle').textContent = x.title || 'Why?';
+    const body = $('explainBody'); body.replaceChildren();
+    const ul = document.createElement('ul'); ul.className = 'explain-facts';
+    for (const f of x.facts || []) ul.append(text('li', f));
+    body.append(ul);
+    if ((x.steps || []).length) {
+      body.append(text('b', 'What you can do'));
+      const ol = document.createElement('ol'); ol.className = 'explain-steps';
+      const ACT = {
+        openFirewall: () => { close(); openFirewall(); }, openSecrets: () => { close(); $('secretsNav').click(); },
+        openAccount: () => { close(); $('accountNav').click(); }, ping: () => { act('POST', '/ui/ping'); toast('Checking…'); },
+        cancelQueued: s => { act('POST', '/ui/outbox/cancel', { id: s.id }); close(); },
+      };
+      for (const s of x.steps) {
+        const li = text('li', s.text);
+        if (s.action && ACT[s.action]) { const b = button({ openFirewall: 'Open Firewall', openSecrets: 'Open Secrets', openAccount: 'Open Account', ping: 'Check now', cancelQueued: 'Cancel it' }[s.action], () => ACT[s.action](s)); b.className = 'ghost small'; li.append(' ', b); }
+        ol.append(li);
+      }
+      body.append(ol);
+    }
+    $('explainModal').hidden = false;
+  } catch (e) { toast(e.message); }
+  function close() { $('explainModal').hidden = true; }
+}
+$('explainClose').onclick = () => { $('explainModal').hidden = true; };
+$('explainModal').addEventListener('click', e => { if (e.target === $('explainModal')) $('explainModal').hidden = true; });
+
+// "Needs me": everything waiting for the person, across rooms and conversations, with the action at hand.
+const NEED_LABEL = { request: 'Held request', decision: 'Decision', key: 'Key request', task: 'Open task', keyOffer: 'Key to accept', run: 'Program asks', keyAsk: 'Key asked for', mention: 'Mention' };
+function renderNeeds() {
+  const list = $('needsList'); if (!list) return;
+  const needs = state.needsMe || [];
+  $('needsPanel').hidden = false;
+  $('needsSub').textContent = needs.length ? `${needs.length} waiting` : '';
+  list.replaceChildren();
+  if (!needs.length) { const li = text('li', 'All clear: nothing is waiting for you. Held requests, decisions, key requests, open tasks and mentions show up here.'); li.className = 'need-empty'; list.append(li); }
+  for (const n of needs.slice(0, 30)) {
+    const li = document.createElement('li'); li.className = `need need-${n.kind}`;
+    const t = document.createElement('div');
+    t.append(text('small', `${NEED_LABEL[n.kind] || n.kind}${n.room ? ` · # ${n.room}` : n.with ? ` · ${n.with}` : ''}`), text('b', n.title));
+    const acts = document.createElement('div'); acts.className = 'card-acts';
+    const go = () => { if (n.roomId) openRoom(n.roomId); else if (n.peerId) { wantOverview = false; select(n.peerId); } };
+    if (n.kind === 'decision') for (const o of n.options || []) acts.append(button(o, () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'answer', option: o } })));
+    else if (n.kind === 'request' || n.kind === 'run' || n.kind === 'keyAsk') acts.append(button('Open', () => (n.kind === 'request' ? openFirewall() : $('secretsNav').click())));
+    else if (n.kind === 'keyOffer') acts.append(button('Open', () => $('secretsNav').click()));
+    else if (n.kind === 'key') acts.append(button('Send', async () => { if (!confirm(`Send this key to ${n.from}? It goes sealed to that device only.`)) return; try { render(await api('POST', '/ui/card/send-key', { card: n.card })); toast('Sent.'); } catch (e) { toast(e.message); } }), button('Open', go));
+    else if (n.kind === 'task') acts.append(button('Claim', () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'claim' } })), button('Open', go));
+    else acts.append(button('Open', go));
+    for (const b of acts.children) b.className = 'ghost small';
+    li.append(t, acts); list.append(li);
+  }
+}
+$('needsNav').onclick = () => {
+  openOverview();
+  setTimeout(() => { const p = $('needsPanel'); p.scrollIntoView({ block: 'start', behavior: 'smooth' }); p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); }, 100);
+};
+
+function renderRoomRules() {
+  const box = $('roomRules'); const r = roomById(roomOpen);
+  if (!r || box.hidden) return;
+  const pol = r.policy || {};
+  // This room on this computer: pin, mute (no badge or notification unless it mentions you), archive.
+  const prefs = document.createElement('div'); prefs.className = 'rules-types';
+  for (const [k, label] of [['pinned', 'Pinned'], ['muted', 'Muted'], ['archived', 'Archived']]) {
+    const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'checkbox'; i.checked = !!r[k];
+    i.onchange = () => act('POST', '/ui/rooms/prefs', { id: r.id, [k]: i.checked });
+    l.append(i, text('span', label)); prefs.append(l);
+  }
+  box.replaceChildren(text('b', 'This room'), prefs, text('b', 'Room rules for agents on this computer'));
+  const types = document.createElement('div'); types.className = 'rules-types';
+  types.append(text('span', 'Agents may post:'));
+  for (const t of ['task', 'status', 'decision', 'key', 'file', 'link']) {
+    const l = document.createElement('label'); const i = document.createElement('input'); i.type = 'checkbox'; i.checked = (pol.agentCards || []).includes(t);
+    i.onchange = () => { const cur = new Set(pol.agentCards || []); i.checked ? cur.add(t) : cur.delete(t); act('POST', '/ui/rooms/policy', { id: r.id, agentCards: [...cur] }); };
+    l.append(i, text('span', CARD_LABEL[t])); types.append(l);
+  }
+  const num = (label, key, min, max) => {
+    const l = document.createElement('label'); l.className = 'rules-num';
+    const i = document.createElement('input'); i.type = 'number'; i.min = String(min); i.max = String(max); i.value = pol[key];
+    i.onchange = () => act('POST', '/ui/rooms/policy', { id: r.id, [key]: Number(i.value) });
+    l.append(text('span', label), i); return l;
+  };
+  const hint = text('small', 'Plain messages are always allowed. Limits stop agents from talking to each other without end; a person\'s post resets the count.');
+  box.append(types, num('Agent posts per minute', 'postsPerMinute', 1, 60), num('Agent posts in a row before a person must post', 'maxAgentRun', 2, 200), hint);
 }
 
 async function loadRoom() {
@@ -1322,9 +1588,9 @@ async function loadRoom() {
   if (key === roomKey) return;
   roomKey = key;
   try {
-    const { messages } = await api('GET', `/ui/rooms/messages?id=${encodeURIComponent(r.id)}`);
+    const { messages, cards } = await api('GET', `/ui/rooms/messages?id=${encodeURIComponent(r.id)}`);
     if (roomOpen !== r.id) return;
-    roomMsgs = messages; renderRoomThread();
+    roomMsgs = messages; cardMap = new Map((cards || []).map(c => [c.id, c])); renderRoomThread();
   } catch (e) { roomKey = ''; toast(e.message); }
 }
 
@@ -1359,9 +1625,19 @@ $('roomComposer').onsubmit = async e => {
   e.preventDefault();
   const body = roomText.value.trim(), r = roomById(roomOpen);
   if (!body || !r) return;
-  roomText.value = ''; roomText.style.height = 'auto';
+  // Post as a card: the first line is the title; for a decision, lines starting with "-" are the options.
+  const kind = $('roomKind').value;
+  let card = null;
+  if (kind !== 'post') {
+    const lines = body.split('\n').map(s => s.trim()).filter(Boolean);
+    const options = lines.slice(1).filter(s => s.startsWith('-')).map(s => s.replace(/^-\s*/, ''));
+    const rest = lines.slice(1).filter(s => !s.startsWith('-')).join('\n');
+    if (kind === 'decision' && (options.length < 2 || options.length > 4)) return toast('A decision: the question on the first line, then 2 to 4 options, each on a line starting with "-".');
+    card = { type: kind, title: lines[0], ...(rest ? { body: rest } : {}), ...(kind === 'decision' ? { options } : {}), ...(kind === 'status' ? { level: 'info' } : {}) };
+  }
+  roomText.value = ''; roomText.style.height = 'auto'; $('roomKind').value = 'post';
   try {
-    const s = await api('POST', '/ui/send', { room: r.id, text: body });
+    const s = await api('POST', '/ui/send', card ? { room: r.id, card } : { room: r.id, text: body });
     const res = s.sent;
     const failed = res.results.filter(x => !x.sent && !x.queued);
     if (failed.length) toast(`Not delivered to ${failed.map(x => x.to).join(', ')}.`);
@@ -1478,7 +1754,58 @@ $('attachInput').onchange = async () => {
   finally { btn.disabled = !peerById(selected)?.canMessage; }
 };
 
-$('convoSearch').oninput = () => renderConvos();
+// Post a file in the open room: stored once here; members get it when they press Get.
+async function postRoomFile(f) {
+  const r = roomById(roomOpen);
+  if (!f || !r) return;
+  if (f.size > 64 * 1024 * 1024) { toast('Files are limited to 64 MB.'); return; }
+  toast(`Posting ${f.name}…`);
+  try {
+    const qs = new URLSearchParams({ room: r.id, name: f.name, ...(f.type ? { mime: f.type } : {}) });
+    const res = await fetch(`/ui/send-file?${qs}`, { method: 'POST', headers: { 'x-ui-token': TOKEN, 'content-type': 'application/octet-stream' }, body: f });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `Error ${res.status}`);
+    roomJustOpened = true; roomKey = ''; render(data); toast(`${f.name} posted in ${r.name}.`);
+  } catch (e) { toast(e.message); }
+}
+$('roomAttachBtn').onclick = () => $('roomAttachInput').click();
+$('roomAttachInput').onchange = () => { const f = $('roomAttachInput').files[0]; $('roomAttachInput').value = ''; postRoomFile(f); };
+for (const el of [$('roomThread'), $('roomComposer')]) {
+  el.addEventListener('dragover', e => { if (e.dataTransfer?.types?.includes('Files')) { e.preventDefault(); $('roomThread').classList.add('drop'); } });
+  el.addEventListener('dragleave', () => $('roomThread').classList.remove('drop'));
+  el.addEventListener('drop', e => { $('roomThread').classList.remove('drop'); const f = e.dataTransfer?.files?.[0]; if (f) { e.preventDefault(); postRoomFile(f); } });
+}
+
+// Search everything on this computer (messages, room posts, cards, files, key names) from the sidebar box.
+let searchTimer = null, searchSeq = 0;
+async function runSearch() {
+  const q = $('convoSearch').value.trim(), box = $('searchResults');
+  const seq = ++searchSeq;
+  if (q.length < 2) { box.hidden = true; box.replaceChildren(); return; }
+  try {
+    const r = await api('GET', `/ui/search?q=${encodeURIComponent(q)}`);
+    if (seq !== searchSeq) return;
+    box.replaceChildren(text('small', r.results.length ? `${r.results.length} found on this computer` : 'Nothing found in messages, rooms, cards or key names.'));
+    for (const x of r.results.slice(0, 40)) {
+      const b = document.createElement('button'); b.type = 'button'; b.className = 'search-hit';
+      const where = x.kind === 'secret' ? `Key${x.project ? ` · ${x.project} · ${x.env}` : ''}` : x.room ? `# ${x.room}` : x.with;
+      const what = x.kind === 'secret' ? x.name : x.card ? `${CARD_LABEL[x.card.type] || 'Card'}: ${x.card.title}` : x.file ? `File: ${x.file}` : x.text;
+      b.append(text('b', where || ''), text('span', what || ''));
+      if (x.at) b.append(text('small', new Date(x.at).toLocaleString(locale(), { dateStyle: 'short', timeStyle: 'short' })));
+      b.onclick = () => {
+        if (x.kind === 'secret') { location.hash = '#secrets'; return; }
+        if (x.roomId) openRoom(x.roomId); else if (x.peerId) select(x.peerId);
+        setTimeout(() => {
+          const el = $(x.roomId ? 'roomThread' : 'thread').querySelector(`[data-id="${CSS.escape(x.id)}"]`);
+          if (el) { el.scrollIntoView({ block: 'center', behavior: 'smooth' }); el.classList.remove('flash'); void el.offsetWidth; el.classList.add('flash'); }
+        }, 700);
+      };
+      box.append(b);
+    }
+    box.hidden = false;
+  } catch (e) { if (seq === searchSeq) { box.hidden = false; box.replaceChildren(text('small', e.message)); } }
+}
+$('convoSearch').oninput = () => { renderConvos(); clearTimeout(searchTimer); searchTimer = setTimeout(runSearch, 250); };
 $('searchBtn').onclick = () => {
   const bar = $('searchBar'); bar.hidden = !bar.hidden;
   if (bar.hidden) { search = ''; $('threadSearch').value = ''; renderThread(); } else $('threadSearch').focus();

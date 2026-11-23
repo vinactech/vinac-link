@@ -40,6 +40,10 @@ export async function sessionStartContext({ home = defaultHome(), timeoutMs = 15
 }
 
 export async function runHook(event, { home } = {}) {
+  if (event === 'prompt' || event === 'tool' || event === 'wait') {
+    const { runNoteHook } = await import('./hooks.js');
+    return runNoteHook(event, { home: home || defaultHome() });
+  }
   if (event !== 'session-start') return;
   const text = await sessionStartContext({ home });
   if (text) process.stdout.write(JSON.stringify({ hookSpecificOutput: { hookEventName: 'SessionStart', additionalContext: text } }) + '\n');

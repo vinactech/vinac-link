@@ -24,7 +24,7 @@ on your computers. It needs no cloud and no internet, and nothing important happ
 
 ## Intents
 - [Intents](intents/README.md): names, risk levels, versions, adding intents
-- [Catalog](intents/catalog.md): all 161 intents (generated from the code)
+- [Catalog](intents/catalog.md): all 163 intents (generated from the code)
 
 ## Reference
 - [Security](../SECURITY.md): how VINAC Link protects you, and how to report a problem

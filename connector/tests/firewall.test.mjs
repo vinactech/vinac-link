@@ -35,7 +35,7 @@ test('Logos keeps every earlier intent at the same id; the catalog follows its r
   }
   // Anything that runs code, pushes, merges, deploys, deletes or spends must be high risk.
   for (const c of catalog().filter(x => /\.(run|push|merge|deploy|rollback|delete|apply|install|restart|rotate|approve|execute|control|write|move|rename|build|start|stop|revert|update)$/.test(x.intent) && !['code.dependency.audit'].includes(x.intent))) {
-    if (['ci.pipeline.run', 'model.prompt.run', 'docs.page.update', 'crm.contact.update', 'crm.deal.update', 'crm.task.update', 'agent.status.update', 'code.dependency.update', 'config.setting.update'].includes(c.intent)) continue;
+    if (['ci.pipeline.run', 'model.prompt.run', 'docs.page.update', 'crm.contact.update', 'crm.deal.update', 'crm.task.update', 'agent.status.update', 'agent.card.update', 'code.dependency.update', 'config.setting.update'].includes(c.intent)) continue;
     assert.equal(c.risk, 'high', `${c.intent} should be high risk`);
   }
   for (const k of ['code.dependency.update', 'config.setting.update', 'code.remote.push', 'code.test.run', 'database.query.write']) assert.equal(riskOf(k), 'high', k);

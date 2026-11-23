@@ -9,8 +9,9 @@
 //    reorder or remove; every release that appends bumps LOGOS_VERSION;
 //  - ids 0-29 are the v0.2.0 business intents shared with the VINAC research
 //    packages; 30-34 came in v0.3.0; v0.4.0 appends the agent and software library;
-//    v0.5.0 appends agent.room.post (shared project rooms).
-export const LOGOS_VERSION = '0.5.0';
+//    v0.5.0 appends agent.room.post (shared project rooms); v0.6.0 appends agent.card.post and
+//    agent.card.update (cards).
+export const LOGOS_VERSION = '0.6.0';
 
 // How much harm a request could do if a tricked agent acted on it.
 export const RISK_TEXT = {
@@ -202,6 +203,9 @@ const TABLE = [
   ['data.report.generate', 'change', ['topic'], ['format', 'period'], 'Generate a report.'],
   // ---- v0.5.0: shared project rooms (ids 160-) ----------------------------------------------------
   ['agent.room.post', 'info', ['room'], ['name', 'members', 'post'], 'Post in a shared project room: a group thread across paired devices (the text is the post).'],
+  // ---- v0.6.0: cards (ids 161-) ------------------------------------------------------------------
+  ['agent.card.post', 'info', [], ['card'], 'Post a card in a conversation: a task, status, decision, key request (a key NAME, never a value), file or link.'],
+  ['agent.card.update', 'info', [], ['cardUpdate'], 'Change a card: claim, release, finish or reopen a task (a decision is answered only by a person).'],
 ];
 
 export const CANONICAL_INTENTS = Object.freeze(TABLE.map(r => r[0]));
@@ -213,7 +217,7 @@ export const domainOf = intent => String(intent).split('.')[0];
 export const describe = intent => BY_NAME.get(intent) || null;
 
 /** The version that added each id range (for docs and compatibility notes). */
-export const sinceVersion = id => (id < 30 ? '0.2.0' : id < 35 ? '0.3.0' : id < 160 ? '0.4.0' : '0.5.0');
+export const sinceVersion = id => (id < 30 ? '0.2.0' : id < 35 ? '0.3.0' : id < 160 ? '0.4.0' : id < 161 ? '0.5.0' : '0.6.0');
 
 // Required args per intent (checked on send and on receipt).
 export const ARG_SHAPES = Object.fromEntries(TABLE.filter(r => r[2].length).map(r => [r[0], { required: r[2] }]));
