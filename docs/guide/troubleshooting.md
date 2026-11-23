@@ -34,7 +34,19 @@ VINAC Link refuses to keep keys in a plain file. macOS: allow Keychain access. L
 `libsecret-tools` and run a keyring. Windows: DPAPI needs a normal user session.
 
 **I updated and it still behaves the old way**
-`vinac stop`; the new version starts with the next command or agent session.
+`vinac stop`; the new version starts with the next command or agent session. On macOS, opening the
+new version updates a running older one by itself.
+
+**macOS: it asks to "Install / Update" when I open it**
+You opened VINAC Link from the disk image. Press **Install / Update**: it copies the app into
+Applications (checking its signature first, keeping the old copy until the new one starts) and
+runs it from there. Your keys, pairings and history stay as they are. You can eject the disk image
+afterwards.
+
+**macOS: it won't start, or says VINAC Link is not responding**
+Run `vinac diagnose-startup` (Terminal, in the app's folder) to see what holds the ports; it changes
+nothing. If a stuck VINAC Link is found, the app offers **Restart VINAC**, and **Force Stop** only as
+a second, separate choice. Anything it can't verify as your VINAC Link is never stopped.
 
 **A big file stops halfway ("Lost … after N of M parts")**
 The other computer went away during the transfer. Send it again; unfinished parts are deleted after

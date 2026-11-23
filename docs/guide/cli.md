@@ -10,7 +10,8 @@ folder (`./vinac` on macOS and Linux), or `node connector/bin/vinac.mjs <command
 | `doctor` | Checks Node, the key store, the service, paired devices and anything waiting. Changes nothing. `--json` for scripts. |
 | `status` | This device, pairing in progress, unread messages (JSON). |
 | `open` | Opens the page. |
-| `stop` | Stops the background service (do this after updating). |
+| `stop` | Stops the background service (do this after updating). On macOS it only stops a service it has verified as this profile's VINAC Link; if that one doesn't stop, `--force-recovery` is a separate, explicit choice. |
+| `diagnose-startup` | macOS installer only. Read-only: reports which process holds the two ports, whether it is verified as this profile's VINAC Link, and its version. `--sample` adds a short stack sample of a stuck service. Changes nothing. |
 | `daemon` | Runs the service in this terminal (`--name "My PC"`, `--open`, `--host IP` to advertise a specific address). |
 | `mcp` | The MCP server on stdio, for agent apps. `--simple` lists only `vinac_send`, `vinac_inbox` and `vinac_peers` (for small local models). |
 | `watch` | Prints one line per new message the agent may read and a count when more items wait for you; never the text; marks nothing read; doesn't start the service. Used by the Claude Code plugin's monitor ([auto mode](auto-mode.md)). |
@@ -50,5 +51,6 @@ later.
 | `VINAC_NO_BROWSER` | don't open browsers |
 | `VINAC_INPROCESS` | run the service inside the MCP process instead of in the background |
 | `VINAC_API_TOKEN` | set by the service for auto-reply runs (a one-run token); not for people to set |
+| `VINAC_AGENT_TOKEN` | an agent's own token, made on the page (*Secrets › Agents on this computer*), so the log and grants name that agent |
 
 The older `AGENTLINK_*` names still work.

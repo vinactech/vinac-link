@@ -255,7 +255,8 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   fs.mkdirSync(path.join(OUT, 'brand'), { recursive: true });
   for (const f of ['icon-512.png', 'icon-128.png', 'favicon-32.png']) fs.copyFileSync(path.join(SITE, 'brand', f), path.join(OUT, 'brand', f));
   fs.copyFileSync(path.join(SITE, 'brand', 'favicon-32.png'), path.join(OUT, 'favicon.png'));
-  fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(OUT, 'LICENSE.txt'));
+  // Not "LICENSE.txt": SiteGround's CDN refuses license.txt/readme.txt (403) everywhere.
+  fs.copyFileSync(path.join(ROOT, 'LICENSE'), path.join(OUT, 'apache-2.0.txt'));
   fs.copyFileSync(path.join(ROOT, 'NOTICE'), path.join(OUT, 'NOTICE.txt'));
   // The home page demo is the voiced product walkthrough. The animated explainer (demo.mp4,
   // poster.jpg) is a social-media clip now and stays out of the site.
