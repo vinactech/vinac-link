@@ -16,6 +16,8 @@
 // vinac git fetch ID [--repo DIR]                  add a received bundle's branches as vinac/<device>/<branch>
 // vinac group list | set NAME DEV1,DEV2 | remove NAME   names for sets of devices ("to": the group name)
 // vinac audit  [--verify] [--last N] [--json]      the hash-chained log of what happened (no message text)
+//   [--from DATE] [--to DATE] [--category C] [--who person|agent|device|service] [--agent NAME] [--device NAME] [--q TEXT]
+//   --csv (all matching, as CSV)   --check-report FILE (checks a signed report exported from the page)
 // vinac run --secret NAME[=ENV] ... [--show-output] -- COMMAND ARGS   run a program with secrets in its environment (approved on the page); values it prints show as [hidden: NAME]
 import fs from 'node:fs';
 import path from 'node:path';
@@ -28,9 +30,11 @@ import { env } from '../src/env.js';
 import { isOlderVersion } from '../src/version.js';
 import { defaultHome } from '../src/store.js';
 import { redactor } from '../src/redact.js';
+import {macLifecycleAvailable,managedConnect,readOnlyStartupDiagnostics,withLaunchLock} from '../src/mac-lifecycle.js';
+import {maybeInstallFromVolume} from '../src/mac-install.js';
 
 const [command = 'start', ...rest] = process.argv.slice(2);
-const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output']);
+const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output', 'csv', 'recover', 'force-recovery', 'sample']);
 const REPEAT = new Set(['secret']);
 const opt = { _: [], cmd: [] };
 for (let i = 0; i < rest.length; i++) {
@@ -59,10 +63,11 @@ function printSent(r) {
 try {
   if (command === 'start') {
     const api = new AgentApi({ home, port, name: opt.name });
+    if(macLifecycleAvailable() && await maybeInstallFromVolume({api,version:VERSION,explicitHome:!!opt.home,noOpen:!!opt['no-open'],openPage:opt.tab?openInBrowser:openApp})) process.exit(0);
     // After an update, an older service may still be running from before: replace it with this
     // version. Pairings, keys and messages live in the home folder and are kept. A newer running
     // service is left alone.
-    if (await api.attach()) {
+    if (!macLifecycleAvailable() && await api.attach()) {
       const running = (await api.call('GET', '/api/status', null, 2000).catch(() => ({}))).version;
       if (running && isOlderVersion(running, VERSION)) {
         console.log(`Updating the running VINAC Link from ${running} to ${VERSION} ...`);
@@ -70,10 +75,10 @@ try {
         for (const until = Date.now() + 10_000; Date.now() < until && await api.attach();) await new Promise(r => setTimeout(r, 200));
       }
     }
-    const how = await api.connect();
+    const how = macLifecycleAvailable() ? await managedConnect(api,{upgrade:true,version:VERSION,recover:!!opt.recover,force:!!opt['force-recovery'],expectedInstance:opt['recover-instance']}) : await api.connect();
     const s = await api.tool('vinac_status');
     if (!opt['no-open']) (opt.tab ? openInBrowser : openApp)(s.approvalPage);
-    console.log(`VINAC Link ${VERSION} is running (${how}).
+    console.log(`VINAC Link ${s.version||VERSION} is running (${how}).
   This device: ${s.device.name}  ·  ${s.device.fingerprint}
   Address:     ${s.device.address || 'no network found (connect Wi-Fi, a hotspot or a cable)'}
   Page:        ${s.approvalPage}
@@ -82,14 +87,23 @@ try {
 Next: pair another computer on the page, then connect your agent:
   vinac setup`);
     await api.daemon?.stop();
+  } else if (command === 'diagnose-startup') {
+    if(!macLifecycleAvailable()) throw Error('Native startup diagnostics are available in the macOS installer.');
+    console.log(JSON.stringify(await readOnlyStartupDiagnostics(home||defaultHome(),opt.port?port:undefined,{sample:!!opt.sample}),null,2));
   } else if (command === 'setup') {
     console.log(setupText());
   } else if (command === 'daemon') {
+    const runDaemon=async()=>{
     const d = await new Daemon({ home, port, name: opt.name, host: opt.host }).start();
     console.error(`[vinac] approval page: ${d.uiUrl}  (Ctrl+C to stop)`);
     if (opt.open) (opt.tab ? openInBrowser : openApp)(d.uiUrl);
-    const stop = async () => { await d.stop(); process.exit(0); };
-    process.on('SIGINT', stop); process.on('SIGTERM', stop);
+    await new Promise(resolve=>{
+      const stop=async()=>{await d.stop();resolve();};
+      process.once('SIGINT',stop);process.once('SIGTERM',stop);
+    });
+    };
+    if(macLifecycleAvailable())await withLaunchLock(home||defaultHome(),runDaemon,{timeout:1500,lockName:'.daemon.lock'});
+    else await runDaemon();
   } else if (command === 'mcp') {
     await runMcpServer({ home, port, name: opt.name, simple: !!opt.simple });
   } else if (command === 'status' || command === 'open') {
@@ -103,7 +117,7 @@ Next: pair another computer on the page, then connect your agent:
     const checks = await doctor({ home });
     console.log(opt.json ? JSON.stringify(checks, null, 2) : formatChecks(checks));
   } else if (command === 'stop') {
-    console.log((await stopDaemon({ home })).message);
+    console.log((await stopDaemon({ home,force:!!opt['force-recovery'],expectedInstance:opt['recover-instance'] })).message);
   } else if (command === 'hook') {
     await runHook(opt._[0], { home });
   } else if (command === 'watch') {
@@ -176,12 +190,26 @@ Next: pair another computer on the page, then connect your agent:
   } else if (command === 'audit') {
     const { AuditLog } = await import('../src/audit.js');
     const log = new AuditLog(home || defaultHome());
-    if (opt.verify) {
+    const compliance = await import('../src/compliance.js');
+    const filters = Object.fromEntries(['from', 'to', 'category', 'who', 'agent', 'device', 'q'].filter(k => opt[k]).map(k => [k, opt[k]]));
+    if (opt['check-report']) {
+      // A signed report exported from the page (Activity log > Report > JSON): checks the device's
+      // signature and that no entry was changed.
+      const fs = await import('node:fs');
+      const r = compliance.checkReport(JSON.parse(fs.readFileSync(opt['check-report'], 'utf8')));
+      console.log(r.ok ? `OK: signed by "${r.device.name}" (${r.device.fingerprint}) on ${r.generatedAt}; ${r.count} entries, unchanged.${r.chainOk ? '' : ' (Its chain was already broken when it was made.)'}` : `NOT OK: ${r.problem}`);
+      if (!r.ok) process.exitCode = 2;
+    } else if (opt.csv) {
+      const r = compliance.query(log, filters, { limit: 1_000_000 });
+      process.stdout.write(compliance.toCsv(r.entries.reverse()));
+    } else if (opt.verify) {
       const v = log.verify();
       console.log(v.ok ? `OK: ${v.count} entries, chain intact. Latest hash: ${v.head}` : `BROKEN at ${v.file} line ${v.line}: ${v.problem} (${v.count} entries checked before it).`);
       if (!v.ok) process.exitCode = 2;
     } else {
-      const entries = log.tail(Number(opt.last) || 30);
+      const entries = Object.keys(filters).length
+        ? compliance.query(log, filters, { limit: Number(opt.last) || 30 }).entries.reverse().map(v => ({ at: v.at, type: v.type, ...v.fields }))
+        : log.tail(Number(opt.last) || 30);
       if (opt.json) console.log(JSON.stringify(entries, null, 2));
       else if (!entries.length) console.log('The audit log is empty.');
       else for (const e of entries) {
@@ -195,7 +223,21 @@ Next: pair another computer on the page, then connect your agent:
     if (!opt.secret?.length || !opt.cmd.length) fail('usage: vinac run --secret NAME[=ENV_VAR] [--secret ...] -- COMMAND [ARGS]');
     const wanted = opt.secret.map(s => { const [name, as] = s.split('='); return { name, as: as || name.toUpperCase().replace(/[^A-Z0-9_]/g, '_') }; });
     const api = await connected();
-    const ask = await api.call('POST', '/api/secret-use', { names: wanted.map(w => w.name), command: opt.cmd, cwd: process.cwd() });
+    const ask = await api.call('POST', '/api/secret-use', { names: wanted.map(w => w.name), command: opt.cmd, cwd: process.cwd(), envNames: Object.fromEntries(wanted.map(w => [w.name, w.as])) });
+    if (ask.status === 'granted') {
+      // A standing grant covers this run: VINAC Link starts the program itself and streams its
+      // output (values hidden). The values never reach this process. No stdin; Ctrl-C stops it.
+      console.error(`Allowed by a standing grant (until ${new Date(ask.grant.expiresAt).toLocaleString()}). VINAC Link starts it; output follows.`);
+      let code = 1;
+      for await (const m of api.stream('/api/secret-run', { id: ask.id })) {
+        if (m.out) process.stdout.write(m.out);
+        else if (m.err) process.stderr.write(m.err);
+        else if (m.exit !== undefined) code = m.exit;
+      }
+      await api.daemon?.stop();
+      process.stdout.write('', () => process.exit(code));
+      await new Promise(() => {});
+    }
     console.error(`Waiting for approval on the VINAC Link page (Secrets): ${ask.approvalPage}`);
     let r = { status: 'pending' };
     for (const until = Date.now() + 130_000; r.status === 'pending' && Date.now() < until;) r = await api.call('GET', `/api/secret-use?id=${ask.id}&wait=25`, null, 40_000);
@@ -247,7 +289,8 @@ Usage: vinac <command>        (or: npx vinac-link <command>, or: node connector/
   files       list received files;  file save ID --out DIR  saves one
   git         git send [--to D] [--branch B] [--since REF]  ·  git fetch ID  (branches arrive as vinac/<device>/...)
   group       group list | group set NAME "PC 1,PC 2" | group remove NAME   (then send "to": NAME)
-  audit       the log of what happened (--verify checks it was not edited)
+  audit       the log of what happened (--verify checks it was not edited; --from/--to/--agent/--q filter;
+              --csv exports; --check-report FILE checks a signed report from the page)
   run         run --secret NAME -- COMMAND  runs a program with a secret in its environment, after you approve on the page
   join        join <invite>  pairs with the device whose person made that invite (Pair a device > Invite a device)
 Options: --home DIR  --port N  --name NAME`);

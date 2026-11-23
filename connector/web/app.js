@@ -5,6 +5,8 @@ import { decodeFskFrameV2 } from '/lab/js/modem.js';
 import { BEACON_BYTES, BEACON_TONES, BEACON_BPS, BEACON_FEC, decodeBeacon, fromHex, toHex } from '/web/beacon.js';
 import { SECRET_FEC, SECRET_MIN_BYTES, SECRET_MAX_BYTES, secretFrameLooksValid } from '/web/secret-frame.js';
 import { codedLength } from '/lab/js/fec.js';
+import { qrSvg } from '/web/qr.js';
+import { parseHello, parseSecretFrame, PHONE_SECRET_MIN, HELLO_MIN, HELLO_MAX } from '/web/phone-frame.js';
 
 const TOKEN = document.querySelector('meta[name="ui-token"]').content;
 const $ = id => document.getElementById(id);
@@ -41,7 +43,7 @@ helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !helpModal.hidden) closeHelp(); });
 
 let state = null, lastPaired = null, firstLoad = true;
-let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantOverview = true, mobileMain = false;
+let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantActivity = false, wantOverview = true, mobileMain = false;
 let thread = [], threadKey = '', justOpened = true, search = '', replyTo = null;
 let pending = [];                          // messages typed here that are sending or failed
 let lastSeen = LS.get('lastSeen', {});     // peer id -> time of the last incoming message the person saw
@@ -108,7 +110,7 @@ function render(s) {
 
   // A pairing in progress keeps the pairing screen open; merely waiting to be picked doesn't.
   const pairing = !!(p && VIEW_OF[p.state] && !isWaitingToBePicked(p));
-  const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall'
+  const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall' : wantActivity ? 'activity'
     : selected && !wantOverview ? 'thread' : s.peers.length ? 'overview' : 'empty';
   // Left the pairing screen: stop telling the network this device waits to be picked.
   if (main !== 'pair' && isWaitingToBePicked(p) && !render.stopping) {
@@ -116,7 +118,7 @@ function render(s) {
     api('POST', '/ui/cancel').catch(() => {}).finally(() => { render.stopping = false; });
   }
   app.dataset.main = main;
-  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || ((main === 'thread' || main === 'overview') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
+  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || ((main === 'thread' || main === 'overview') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
 
   renderPairing(p);
@@ -128,6 +130,9 @@ function render(s) {
   $('firewallCount').textContent = s.waitingRequests || '';
   $('firewallCount').title = s.waitingRequests ? `${s.waitingRequests} request(s) waiting for you` : '';
   $('firewallNav').setAttribute('aria-current', String(main === 'firewall'));
+  $('activityNav').setAttribute('aria-current', String(main === 'activity'));
+  if (main === 'activity' && !render.activityShown) loadActivity();
+  render.activityShown = main === 'activity';
   if (main === 'secrets') renderSecrets();
   if (main === 'firewall' || main === 'overview') loadFirewall();
   if (main === 'overview') renderOverview();
@@ -377,26 +382,227 @@ function renderUses() {
   const list = $('useList'); list.replaceChildren();
   for (const u of uses) {
     const li = document.createElement('li'); li.className = 'secret';
-    li.append(text('b', `Use ${u.names.join(', ')}?`));
+    li.append(text('b', `${u.agent ? `${u.agent}: ` : ''}use ${u.names.join(', ')}?`));
     const cmd = text('code', u.command); cmd.className = 'use-cmd';
     const row = document.createElement('div'); row.className = 'row';
-    const yes = button('Approve this run', () => act('POST', '/ui/secret-use/decide', { id: u.id, approve: true }));
+    // Approve once, or also allow this exact command in this folder for a while (a standing grant).
+    const how = document.createElement('select'); how.className = 'use-how'; how.setAttribute('aria-label', 'How long to allow');
+    how.append(new Option('Approve once', ''));
+    if (u.canAllow) for (const [h, label] of [[1, 'Allow for 1 hour'], [8, 'Allow for 8 hours'], [24, 'Allow for 24 hours'], [168, 'Allow for 7 days']]) how.append(new Option(label, String(h)));
+    const more = document.createElement('label'); more.className = 'use-more'; more.hidden = true;
+    const moreBox = document.createElement('input'); moreBox.type = 'checkbox';
+    more.append(moreBox, ' also with more arguments after this command');
+    how.addEventListener('change', () => { more.hidden = !how.value; yes.textContent = how.value ? 'Approve and allow' : 'Approve this run'; });
+    const yes = button('Approve this run', () => act('POST', '/ui/secret-use/decide', { id: u.id, approve: true, ...(how.value ? { allowHours: Number(how.value), prefix: moreBox.checked } : {}) }));
     const no = button('Deny', () => act('POST', '/ui/secret-use/decide', { id: u.id, approve: false }));
     yes.className = 'primary small-btn'; no.className = 'ghost';
-    row.append(yes, no);
-    li.append(row, cmd, text('small', `In ${u.cwd || 'an unknown folder'} · expires in ${u.expiresIn} s · the program gets the value; check that you started this command.`));
+    row.append(yes, how, no);
+    li.append(row, more, cmd, text('small', `In ${u.cwd || 'an unknown folder'} · expires in ${u.expiresIn} s · the program gets the value; check that you started this command.${u.canAllow ? ' Allowing it lets this agent run this exact command in this folder (and its subfolders) with these keys, without asking, until it expires.' : ''}`));
     list.append(li);
   }
 }
 
+// Standing grants ("Allowed runs") and agent identities.
+let newAgentShown = null;
+function renderGrants() {
+  const grants = state.grants || [];
+  $('grantBox').hidden = !grants.length;
+  const list = $('grantList'); list.replaceChildren();
+  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  for (const g of grants) {
+    const li = document.createElement('li'); li.className = 'secret';
+    li.append(text('b', `${g.agentName}: ${g.names.join(', ')}`));
+    const row = document.createElement('div'); row.className = 'row';
+    const rev = button('Revoke', () => act('POST', '/ui/grants/revoke', { id: g.id })); rev.className = 'ghost';
+    row.append(rev);
+    const cmd = text('code', `${g.command}${g.prefix ? ' …' : ''}`); cmd.className = 'use-cmd';
+    li.append(row, cmd, text('small', `In ${g.cwd} and its subfolders · until ${when(g.expiresAt)} · used ${g.uses} time${g.uses === 1 ? '' : 's'}${g.lastUsedAt ? `, last ${when(g.lastUsedAt)}` : ''}`));
+    list.append(li);
+  }
+  const agents = state.agents || [];
+  $('agentsCount').textContent = agents.length ? `(${agents.length})` : '';
+  const al = $('agentList'); al.replaceChildren();
+  for (const a of agents) {
+    const li = document.createElement('li'); li.className = 'secret';
+    li.append(text('b', a.name));
+    const row = document.createElement('div'); row.className = 'row';
+    const del = button('Remove', () => { if (confirm(`Remove "${a.name}"? Its token stops working and its allowed runs end.`)) act('POST', '/ui/agents/remove', { id: a.id }); }); del.className = 'ghost';
+    row.append(del);
+    li.append(row, text('small', `Added ${when(a.createdAt)}${a.lastSeenAt ? ` · last seen ${when(a.lastSeenAt)}` : ' · not used yet'}`));
+    al.append(li);
+  }
+  const box = $('agentToken');
+  box.hidden = !newAgentShown;
+  if (newAgentShown) {
+    box.replaceChildren(
+      text('b', `${newAgentShown.name}: copy this line now. It is shown only once.`),
+      Object.assign(text('code', newAgentShown.env), { className: 'use-cmd' }),
+      text('small', 'Codex: codex mcp add vinac --env VINAC_AGENT_TOKEN=… -- node …/connector/bin/vinac.mjs mcp · Other MCP apps: add it to the vinac server\'s environment · Terminal: set it before vinac run.'),
+    );
+    const copy = button('Copy', async () => { try { await navigator.clipboard.writeText(newAgentShown.env); toast('Copied.'); } catch { toast('Could not copy.'); } });
+    const done = button('Done', () => { newAgentShown = null; renderGrants(); });
+    copy.className = 'primary small-btn'; done.className = 'ghost';
+    const row = document.createElement('div'); row.className = 'row'; row.append(copy, done);
+    box.append(row);
+  }
+}
+
+// ---- Activity log (compliance): search, who did what, CSV, signed report, retention --------
+const EVENT_TEXT = {
+  'pair': f => `Paired with ${f.peer?.name || 'a device'}`, 'unpair': f => `Unpaired ${f.peer?.name || 'a device'}`,
+  'invite.created': () => 'Made an invite', 'phone.paired': f => `Paired the phone ${f.phone}`, 'phone.removed': f => `Removed the phone ${f.phone}`,
+  'msg.in': f => `${f.intent ? `Request ${f.intent}` : 'Message'} from ${f.peer?.name || 'a device'}${f.firewall ? ` (${f.firewall})` : ''}`,
+  'msg.out': f => `${f.intent ? `Request ${f.intent}` : 'Message'} to ${f.peer?.name || 'a device'}`,
+  'msg.queued': f => `Message to ${f.peer?.name || 'a device'} waits (device offline)`, 'msg.cancelled': () => 'Waiting message cancelled',
+  'request.decided': f => `Request ${f.intent || ''} from ${f.peer?.name || 'a device'}: ${f.status}`, 'request.expired': f => `Request ${f.intent || ''} expired`,
+  'secret.in': f => `Received key ${f.name} from ${f.peer?.name || f.phone || 'a device'}${f.offered ? ' (offered)' : ''}`, 'secret.out': f => `Sent key ${f.name} to ${f.peer?.name || 'a device'}`,
+  'secret.added': f => `Added key ${f.name}`, 'secret.accepted': f => `Accepted key ${f.name}`, 'secret.revealed': f => `Revealed key ${f.name} on the page`,
+  'secret.used': f => `${(f.names || []).join(', ')} used by ${f.command || 'a program'}${f.via === 'grant' ? ' (allowed run)' : ' (approved once)'}`,
+  'secret.use.denied': f => `Denied ${(f.names || []).join(', ')} for ${f.command || 'a program'}`,
+  'grant.created': f => `Allowed ${f.agent || 'an agent'} to run ${f.command} with ${(f.names || []).join(', ')} for ${f.hours} h`,
+  'grant.revoked': f => `Revoked the allowed run ${f.command}`, 'agent.added': f => `Added agent ${f.agent}`, 'agent.removed': f => `Removed agent ${f.agent}`,
+  'file.saved': f => `Saved file ${f.name}`, 'mode.changed': f => `Firewall mode: ${f.mode || ''}`, 'rule.changed': f => `Firewall rule changed${f.intent ? `: ${f.intent}` : ''}`,
+  'vault.locked': () => 'Vault locked', 'vault.unlocked': () => 'Vault unlocked', 'vault.passphrase.set': () => 'Vault passphrase set', 'vault.passphrase.removed': () => 'Vault passphrase removed',
+  'retention.changed': f => `Log kept ${f.keepDays ? `${f.keepDays} days` : 'always'}${f.legalHold ? ', legal hold on' : ''}`,
+  'audit.exported': f => `Log exported (${f.entries} entries)`, 'report.created': f => `Signed report made (${f.entries} entries)`, 'audit.pruned': f => `${f.entries} old entries removed (retention)`,
+};
+const WHO_ICON = { person: '●', agent: '◆', device: '▲', service: '○' };
+let auditOffset = 0, auditTimer = null;
+function auditFilters() {
+  const f = { q: $('auditQ').value.trim(), category: $('auditCategory').value, who: $('auditWho').value, agent: $('auditAgent').value, from: $('auditFrom').value, to: $('auditTo').value };
+  return Object.fromEntries(Object.entries(f).filter(([, v]) => v));
+}
+async function loadActivity(more = false) {
+  auditOffset = more ? auditOffset + 200 : 0;
+  const qs = new URLSearchParams({ ...auditFilters(), limit: '200', offset: String(auditOffset) });
+  let r;
+  try { r = await api('GET', `/ui/audit?${qs}`); } catch (e) { toast(e.message); return; }
+  const cat = $('auditCategory');
+  if (cat.options.length === 1) for (const [k, label] of Object.entries(r.categories)) cat.append(new Option(label, k));
+  const ag = $('auditAgent'), keepAg = ag.value;
+  ag.replaceChildren(new Option('Any agent', '')); for (const a of r.agents) ag.append(new Option(a, a)); ag.value = keepAg;
+  const c = r.chain;
+  $('auditChain').className = `audit-chain ${c.ok ? 'ok' : 'bad'}`;
+  $('auditChain').replaceChildren(
+    text('b', c.ok ? `Chain intact · ${c.count.toLocaleString()} entries checked` : 'Chain broken: an entry was changed or removed'),
+    text('small', c.ok ? `Latest fingerprint ${c.head.slice(0, 16)}… · this device ${r.device.fingerprint}${r.retention.anchor ? ` · ${r.retention.anchor.removedEntries} older entries removed by retention` : ''}` : c.problem));
+  $('auditTotal').textContent = `${r.total.toLocaleString()} matching ${r.total === 1 ? 'entry' : 'entries'}${r.total > auditOffset + r.entries.length ? `, showing ${auditOffset + r.entries.length}` : ''}`;
+  const list = $('auditList');
+  if (!more) list.replaceChildren();
+  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'medium' });
+  for (const e of r.entries) {
+    const li = document.createElement('li');
+    if (e.damaged) { li.append(text('b', 'A damaged line')); list.append(li); continue; }
+    const who = text('span', `${WHO_ICON[e.who.kind] || '•'} ${e.who.name}`); who.className = `who who-${e.who.kind}`;
+    const what = text('b', (EVENT_TEXT[e.type] || (() => e.type))(e.fields));
+    const meta = text('small', `${when(e.at)} · ${e.type}${e.fields.agentFp ? ` · ${e.fields.agentFp}` : ''}${e.device ? ` · ${e.device}` : ''}`);
+    li.append(what, who, meta);
+    list.append(li);
+  }
+  if (!r.entries.length && !more) list.append(emptyEl('li', 'key', 'Nothing matches', 'Change the filters, or clear the search.'));
+  $('auditMore').hidden = r.total <= auditOffset + r.entries.length;
+  $('auditKeep').textContent = `· ${r.retention.legalHold ? 'legal hold' : r.retention.keepDays ? `${Math.round(r.retention.keepDays / 30.4)} months` : 'always'}`;
+  $('auditKeepSel').value = String(r.retention.keepDays); $('auditHold').checked = r.retention.legalHold;
+}
+function openActivity() { wantActivity = true; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+$('activityNav').onclick = openActivity;
+$('activityBackBtn').onclick = () => { wantActivity = false; mobileMain = false; render(state); };
+$('auditFilters').addEventListener('input', () => { clearTimeout(auditTimer); auditTimer = setTimeout(() => loadActivity(), 250); });
+$('auditFilters').addEventListener('submit', e => e.preventDefault());
+$('auditMore').onclick = () => loadActivity(true);
+function download(name, type, data) {
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  const a = Object.assign(document.createElement('a'), { href: url, download: name });
+  document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(url), 5000);
+}
+$('auditCsvBtn').onclick = async () => {
+  try {
+    const r = await fetch('/ui/audit/export', { method: 'POST', headers: { 'x-ui-token': TOKEN, 'content-type': 'application/json' }, body: JSON.stringify({ filters: auditFilters() }) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `Error ${r.status}`);
+    download(`vinac-audit-${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv', await r.text());
+    loadActivity();
+  } catch (e) { toast(e.message); }
+};
+$('auditReportBtn').onclick = async () => {
+  const w = window.open('about:blank', '_blank'); // opened now, so it isn't blocked as a pop-up
+  try {
+    const r = await api('POST', '/ui/audit/report', { filters: auditFilters() });
+    download(`vinac-audit-report-${new Date().toISOString().slice(0, 10)}.json`, 'application/json', JSON.stringify(r.report, null, 1));
+    if (w) { w.location.href = r.page; toast('Signed report saved (JSON). The printable page opened in a new tab.'); }
+    else {
+      // A pop-up blocker stopped the new tab: offer the link instead (it works once, for 2 minutes).
+      const a = Object.assign(document.createElement('a'), { href: r.page, target: '_blank', rel: 'noopener', textContent: 'Open the printable report' });
+      $('auditTotal').replaceChildren(text('span', 'Signed report saved (JSON). '), a);
+    }
+    loadActivity();
+  } catch (e) { w?.close(); toast(e.message); }
+};
+$('auditKeepSave').onclick = async () => {
+  try { await api('POST', '/ui/audit/retention', { keepDays: Number($('auditKeepSel').value), legalHold: $('auditHold').checked }); toast('Saved.'); loadActivity(); } catch (e) { toast(e.message); }
+};
+
+// Phone vault: paired phones, and pairing one (QR code out, its sound back, Allow here).
+let phoneKey = '';
+function renderPhones() {
+  const phones = state.phones || [];
+  $('phonesCount').textContent = phones.length ? `(${phones.length})` : '';
+  const when = iso => new Date(iso).toLocaleString([], { dateStyle: 'medium', timeStyle: 'short' });
+  const pl = $('phoneList'); pl.replaceChildren();
+  for (const p of phones) {
+    const li = document.createElement('li'); li.className = 'secret';
+    li.append(text('b', p.name));
+    const row = document.createElement('div'); row.className = 'row';
+    const del = button('Remove', () => { if (confirm(`Remove "${p.name}"? Keys it sends will no longer open here.`)) act('POST', '/ui/phones/remove', { id: p.id }); }); del.className = 'ghost';
+    row.append(del);
+    li.append(row, text('small', `Paired ${when(p.pairedAt)}${p.lastUsedAt ? ` · last key ${when(p.lastUsedAt)}` : ''}`));
+    pl.append(li);
+  }
+  const pp = state.phonePairing;
+  $('phonePair').hidden = !pp; $('phonePairBtn').hidden = !!pp;
+  if (!pp) { if (listenMode === 'phone') stopListening(); phoneKey = ''; return; }
+  $('phonesBox').open = true;
+  if (phoneKey !== pp.link) { phoneKey = pp.link; $('phoneQr').innerHTML = qrSvg(pp.link, { scale: 5 }); }
+  const confirmNow = pp.state === 'confirm';
+  $('phoneConfirm').hidden = !confirmNow; $('phoneMeter').hidden = confirmNow;
+  if (confirmNow) {
+    $('phoneName').textContent = pp.phoneName; $('phoneCode').textContent = pp.code;
+    $('phoneStatus').textContent = 'Heard the phone.';
+  } else if (listenMode !== 'phone' && !listening) {
+    $('phoneStatus').textContent = 'Listening for the phone…';
+    startListening('phone');
+  }
+}
+$('phonePairBtn')?.addEventListener('click', async () => {
+  try { Object.assign(state, await api('POST', '/ui/phone/start', {})); renderPhones(); } catch (e) { toast(e.message); }
+});
+$('phoneCancel')?.addEventListener('click', async () => { stopListening(); await act('POST', '/ui/phone/cancel', {}); });
+$('phoneCopy')?.addEventListener('click', async () => { try { await navigator.clipboard.writeText(state.phonePairing.link); toast('Link copied. Open it on the phone only.'); } catch { toast('Could not copy.'); } });
+$('phoneAllow')?.addEventListener('click', async () => {
+  try { const r = await api('POST', '/ui/phone/confirm', { allow: true }); Object.assign(state, r); toast(`Paired with ${r.pairedPhone.name}. Press Receive by sound here, then Send on the phone.`); renderPhones(); } catch (e) { toast(e.message); }
+});
+$('phoneDeny')?.addEventListener('click', async () => { await act('POST', '/ui/phone/confirm', { allow: false }); });
+
+$('agentAddForm')?.addEventListener('submit', async e => {
+  e.preventDefault();
+  const name = $('agentName').value.trim();
+  if (!name) return;
+  try {
+    const r = await api('POST', '/ui/agents/add', { name });
+    newAgentShown = r.newAgent; $('agentName').value = '';
+    Object.assign(state, r); renderGrants();
+  } catch (err) { toast(err.message); }
+});
+
 function renderSecrets(force = false) {
   const q = ($('secretSearch').value || '').trim().toLowerCase();
-  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock) + JSON.stringify(state.secretRequests || []);
+  const key = JSON.stringify(state.secrets) + shownSecret?.id + JSON.stringify((state.secretUses || []).map(u => u.id)) + q + JSON.stringify(state.vaultLock) + JSON.stringify(state.secretRequests || []) + JSON.stringify(state.grants || []) + JSON.stringify(state.agents || []) + JSON.stringify(state.phones || []) + JSON.stringify(state.phonePairing || null);
   if (key === secretsKey && !force) return;
   secretsKey = key;
   renderVaultLock();
   renderSecretRequests();
   renderUses();
+  renderGrants();
+  renderPhones();
   const list = $('secretList'); list.replaceChildren();
   $('secretSearch').hidden = state.secrets.length < 4 && !q;
   if (!state.secrets.length) {
@@ -531,7 +737,7 @@ function renderVaultLock() {
 }
 function hideSecret() { shownSecret = null; clearTimeout(showSecret.timer); if (state) renderSecrets(true); }
 
-$('secretsNav').onclick = () => { wantSecrets = true; wantPair = false; wantFirewall = false; mobileMain = true; render(state); };
+$('secretsNav').onclick = () => { wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; mobileMain = true; render(state); };
 $('secretsBackBtn').onclick = () => { wantSecrets = false; mobileMain = false; hideSecret(); render(state); };
 
 // ---- firewall: requests (intents) from paired devices ---------------------
@@ -554,16 +760,16 @@ async function downloadFile(fileId, name) {
 const DECISION_LABEL = { allow: 'Allow', ask: 'Ask me', block: 'Block' };
 let fw = null, fwKey = '', fwScope = '*', fwLoading = false;
 
-function openFirewall() { wantFirewall = true; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openFirewall() { wantFirewall = true; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('firewallNav').onclick = openFirewall;
 
 // ---- overview: the dashboard ------------------------------------------------------
 
-function openOverview() { wantOverview = true; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openOverview() { wantOverview = true; wantFirewall = false; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('overviewNav').onclick = openOverview;
 $('overviewBackBtn').onclick = () => { mobileMain = false; render(state); };
 $('ovFirewallLink').onclick = openFirewall;
-$('ovReceiveBtn').onclick = () => { wantSecrets = true; wantFirewall = false; wantPair = false; mobileMain = true; render(state); openSecretModal('receive'); };
+$('ovReceiveBtn').onclick = () => { wantSecrets = true; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); openSecretModal('receive'); };
 const ICON_PATH = {
   devices: '<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M7 18h5M9.5 14v4"/><rect x="17.5" y="8" width="4" height="10" rx="1"/>',
   waiting: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
@@ -655,7 +861,7 @@ function renderOverview() {
     ul.append(li);
   }
 }
-$('firewallBackBtn').onclick = () => { wantFirewall = false; mobileMain = false; render(state); };
+$('firewallBackBtn').onclick = () => { wantFirewall = false; wantActivity = false; mobileMain = false; render(state); };
 
 async function loadFirewall(force = false) {
   if (fwLoading) return;
@@ -978,7 +1184,7 @@ $('notifyBtn').onclick = async () => {
 function select(id) {
   if (id !== selected) { thread = []; threadKey = ''; replyTo = null; search = ''; $('threadSearch').value = ''; $('searchBar').hidden = true; $('replyBox').hidden = true; }
   selected = id; LS.set('selected', id);
-  wantPair = false; wantSecrets = false; wantFirewall = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
+  wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
   threadKey = ''; // reload and scroll to the newest message, even if it was rendered while hidden
   render(state);
   if (!isNarrow()) $('composeText').focus();
@@ -1174,7 +1380,7 @@ $('openNewBtn').onclick = () => {
   const peer = state?.peers.find(x => x.fingerprint === fp);
   if (peer) { lastResult = null; select(peer.id); }
 };
-function openPair() { wantPair = true; wantSecrets = false; wantFirewall = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
+function openPair() { wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
 $('newPairBtn').onclick = openPair;
 $('sidePairBtn').onclick = openPair;
 $('ovPairBtn').onclick = openPair;
@@ -1194,7 +1400,7 @@ let listenMode = null; // 'pair' (beacon) or 'secret'
 
 function syncAudio(p) {
   if (p?.state === 'announcing' && !p.quiet && !playing) playLoop(p.beaconHex);
-  if (listenMode === 'secret') return; // the secret dialog owns the microphone
+  if (listenMode === 'secret' || listenMode === 'phone') return; // the secret dialog (or phone pairing) owns the microphone
   if (p?.state === 'listening' && !listening && !micBlocked) startListening('pair');
   if (p?.state !== 'listening') { micBlocked = false; if (listening) stopListening(); }
 }
@@ -1229,6 +1435,7 @@ async function startListening(mode) {
   } catch (e) {
     listening = false; listenMode = null;
     if (mode === 'secret') { secretFinish('bad', 'The microphone is blocked. Allow it for this page and try again, or ask the sender to use Wi-Fi.'); return; }
+    if (mode === 'phone') { $('phoneStatus').textContent = 'The microphone is blocked. Allow it for this page (it hears the phone\'s pairing sound), then press Cancel and Pair a phone again.'; return; }
     micBlocked = true;
     toast('Microphone blocked. Allow it for this page, or use the code instead.');
     $('listenText').textContent = 'Microphone not available. Use the code below.';
@@ -1256,8 +1463,22 @@ async function tryDecode() {
     for (const c of chunks) { pcm.set(c, o); o += c.length; }
     const sr = engine.sampleRate;
     const secret = listenMode === 'secret';
+    if (listenMode === 'phone') {
+      const r = decodeFskFrameV2(pcm, { sampleRate: sr, rawBps: BEACON_BPS, tones: BEACON_TONES, minLength: HELLO_MIN, maxLength: HELLO_MAX, accept: b => !!parseHello(b) });
+      lastDecode = { at: Date.now(), seconds: +(pcm.length / sr).toFixed(1), result: r ? (r.ok ? (r.fecFailed ? 'damaged' : 'ok') : r.reason) : 'no training' };
+      if (!r?.ok) return;
+      const keep = pcm.slice(Math.min(pcm.length, r.endSample));
+      chunks = keep.length ? [keep] : []; samples = keep.length;
+      if (r.fecFailed) { $('phoneStatus').textContent = 'Heard the phone, but the sound was damaged. Play it again, a little closer…'; return; }
+      try {
+        const got = await api('POST', '/ui/phone/heard', { hex: toHex(r.frameBytes) });
+        stopListening();
+        Object.assign(state, got); renderPhones();
+      } catch (e) { $('phoneStatus').textContent = `${e.message} Still listening…`; }
+      return;
+    }
     const r = decodeFskFrameV2(pcm, secret
-      ? { sampleRate: sr, rawBps: BEACON_BPS, tones: BEACON_TONES, minLength: SECRET_MIN_BYTES, maxLength: SECRET_MAX_BYTES, accept: secretFrameLooksValid }
+      ? { sampleRate: sr, rawBps: BEACON_BPS, tones: BEACON_TONES, minLength: Math.min(SECRET_MIN_BYTES, PHONE_SECRET_MIN), maxLength: SECRET_MAX_BYTES, accept: b => secretFrameLooksValid(b) || !!parseSecretFrame(b) }
       : { sampleRate: sr, rawBps: BEACON_BPS, tones: BEACON_TONES, minLength: BEACON_BYTES, maxLength: BEACON_BYTES, accept: b => decodeBeacon(b).ok });
     lastDecode = { at: Date.now(), seconds: +(pcm.length / sr).toFixed(1), result: r ? (r.ok ? (r.fecFailed ? 'damaged' : 'ok') : r.reason) : 'no training' };
     if (!r?.ok) return;
@@ -1290,7 +1511,7 @@ async function heardSecret(r) {
 
 function drawMeter() {
   const sp = engine.readSpectrum(); if (!sp) return;
-  const bars = $(listenMode === 'secret' ? 'secretMeter' : 'meter').children;
+  const bars = $(listenMode === 'secret' ? 'secretMeter' : listenMode === 'phone' ? 'phoneMeter' : 'meter').children;
   BEACON_TONES.forEach((f, i) => {
     const db = sp.data[Math.round(f / sp.sampleRate * sp.fftSize)] ?? -120;
     bars[i].style.height = `${Math.max(6, Math.min(100, (db + 110) * 1.6))}%`;

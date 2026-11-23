@@ -121,6 +121,12 @@ try {
   await ui(mac, 'POST', '/api/send', { to: 'PC', intent: 'person.secret.request', args: { name: 'STRIPE_TEST_KEY', reason: 'npm start needs it for the shop build' } }, true);
   await ui(mac, 'POST', '/ui/secret/wifi', { to: 'PC', name: 'OPENAI_API_KEY', value: 'sk-demo-not-a-real-key' });
   await snap(pc, 'tour-keys.jpg', `document.getElementById('secretsNav').click()`, 1200);
+  // The activity log (compliance): an agent identity and an allowed run, as a company would see them.
+  const agentTok = (await ui(pc, 'POST', '/ui/agents/add', { name: 'Codex on the Mac' })).newAgent.token;
+  const work = fs.mkdtempSync(path.join(os.tmpdir(), 'vinac-shot-shop-'));
+  const ask = await fetch(`http://127.0.0.1:${pc.uiPort}/api/secret-use`, { method: 'POST', headers: { authorization: `Bearer ${agentTok}`, 'content-type': 'application/json' }, body: JSON.stringify({ names: ['STRIPE_TEST_KEY'], command: ['npm', 'test'], cwd: work }) }).then(r => r.json());
+  await ui(pc, 'POST', '/ui/secret-use/decide', { id: ask.id, approve: true, allowHours: 8 });
+  await snap(pc, 'tour-activity.jpg', `document.getElementById('activityNav').click(); for (let i = 0; i < 40 && document.querySelectorAll('#auditList li').length < 10; i++) await new Promise(r => setTimeout(r, 100));`, 1200);
   close();
   console.log(`screenshots in ${OUT}:\n  ${shots.join('\n  ')}`);
 } finally {

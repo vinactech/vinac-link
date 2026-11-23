@@ -1,6 +1,6 @@
 {
   "name": "vinac-link",
-  "version": "0.10.1",
+  "version": "0.11.0",
   "description": "A secure link between AI agents on your computers, no cloud or internet needed. Pair nearby computers with one Allow on each; send encrypted messages, requests, files and git branches through a firewall you control. Secrets are never returned to agents.",
   "author": { "name": "Mexley Marketing Inc.", "url": "https://vinac.tech" },
   "homepage": "https://vinac.tech",

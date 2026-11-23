@@ -239,6 +239,18 @@ export class Store {
   // ---- secrets and replay protection ----------------------------------------
 
   /** Received secrets: names and wrapped values (never plain). */
+  /** Agent identities (only token hashes) and standing key grants (see grants.js). */
+  agents() { const a = readJson(this.file('agents.json'), { v: 1, agents: [] }); return Array.isArray(a.agents) ? a.agents : []; }
+  saveAgents(agents) { writeAtomic(this.file('agents.json'), JSON.stringify({ v: 1, agents }, null, 1)); }
+  grants() { const g = readJson(this.file('grants.json'), { v: 1, grants: [] }); return Array.isArray(g.grants) ? g.grants : []; }
+  /** Audit retention setting (see compliance.js). */
+  auditSettings() { return readJson(this.file('audit-settings.json'), {}); }
+  saveAuditSettings(s) { writeAtomic(this.file('audit-settings.json'), JSON.stringify(s, null, 1)); }
+  /** Paired phones (phone vault): public key, name, the sealing key as wrapped by the OS key store. */
+  phones() { const p = readJson(this.file('phones.json'), { v: 1, phones: [] }); return Array.isArray(p.phones) ? p.phones : []; }
+  savePhones(phones) { writeAtomic(this.file('phones.json'), JSON.stringify({ v: 1, phones }, null, 1)); }
+  saveGrants(grants) { writeAtomic(this.file('grants.json'), JSON.stringify({ v: 1, grants }, null, 1)); }
+
   secrets() { const s = readJson(this.file('secrets.json'), { items: [] }); return { items: s.items || [] }; }
   saveSecrets(s) { writeAtomic(this.file('secrets.json'), JSON.stringify({ items: s.items }, null, 1)); }
 

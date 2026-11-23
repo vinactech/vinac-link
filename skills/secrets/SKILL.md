@@ -22,6 +22,13 @@ Secret values never pass through you. You guide, and you can ask; the person sen
    **Replacement waiting** until the person presses **Approve**.
 5. An offered secret (`offered: true` in `vinac_secrets`) can't be used until the person accepts it;
    tell them, don't try to work around it.
+6. **Using a key in a program**: `vinac run --secret STRIPE_KEY -- npm test` (in the project folder).
+   The first time, the person approves it on the Secrets page, and can choose **Allow for 1 hour /
+   8 hours / 24 hours / 7 days**. `vinac_secrets` lists those as `allowedRuns` (keys, command,
+   folder, until when): the same command in that folder then runs without asking, started by VINAC
+   Link itself, and its output shows values as `[hidden: NAME]`. Don't change the command or folder
+   to fit a grant, and never try to read the values a run receives. You can't make, extend or revoke
+   grants; ask the person.
 
 Never ask the person to paste a secret into the chat, and never read secret values by other
 means (key store, files in `~/.vinac`, the page or its endpoints). If the person pastes one

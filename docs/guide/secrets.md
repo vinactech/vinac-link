@@ -73,6 +73,53 @@ secret's name, or the variable after `=`). Each approval covers one run, expires
 and is written to the [audit log](cli.md#audit). The value never appears in the terminal, the chat or
 the agent's context, unless the program itself prints it.
 
+### Allow a run for a while (standing grants)
+
+Approving every run gets in the way of an agent that works on its own. Next to **Approve this run**
+you can choose **Allow for 1 hour, 8 hours, 24 hours or 7 days**. That allows the same agent to run
+the same command in the same folder (and its subfolders) with the same keys, without asking, until
+it expires. Tick *also with more arguments after this command* to allow, say, `npm run` followed by
+any script name.
+
+- A run under a grant is **started by VINAC Link itself**: the values go from the key store into
+  that program's environment and nowhere else, so the agent never sees them. Its output comes back
+  with values shown as `[hidden: NAME]`; it gets no keyboard input, and Ctrl-C stops it.
+- **Allowed runs** on the Secrets page lists every grant (agent, keys, command, folder, until when,
+  how often it was used) with **Revoke**. While the vault is locked, grants don't work: you're asked
+  again. Every grant, use and revocation is in the [audit log](cli.md#audit).
+- Whatever the command runs gets the keys. `npm test` runs that folder's `package.json` scripts, and
+  an agent that can edit them can make the command leak a key. Allow only commands and folders you
+  trust, for as short as works.
+
+### Your keys on your phone (phone vault, beta)
+
+Keep keys on your phone and hand one to a computer by sound, with no network between them.
+
+1. **Pair once.** On the computer: **Secrets › Phones › Pair a phone**. Point your phone's camera at
+   the code; it opens the phone vault at vinac.tech/app (the computer's one-time code is after the `#`
+   in that link, which browsers never send to any server). Make the vault there with a passphrase,
+   then press **Play pairing sound** close to the computer. Both screens show the same 6 digits:
+   press **Allow** on the computer.
+2. **Add keys** on the phone (**Add a key**). They are encrypted on the phone with your passphrase
+   (AES-256, key from PBKDF2) and never leave it except as sound.
+3. **Send one:** on the computer, **Receive by sound**; on the phone, **Send** next to the key, then
+   **Play** (10–20 seconds, phone close to the computer). It's sealed for that one computer (X25519,
+   AES-256-GCM); a recording played again is refused.
+
+The phone vault locks after 5 minutes. Add it to your Home Screen so the phone keeps it; if you
+forget the passphrase, its keys can't be opened. **Remove** a phone on the computer (Secrets ›
+Phones) to stop accepting its keys. Like sound pairing, it's in beta while we test more phones.
+
+### Agents on this computer
+
+Under **Secrets › Agents on this computer**, give each agent app its own name, for example "Codex on
+the Mac". You get a line like `VINAC_AGENT_TOKEN=agt_…`, shown once: put it in that app's VINAC Link
+settings (for Codex: `codex mcp add vinac --env VINAC_AGENT_TOKEN=agt_… -- node <folder>/connector/bin/vinac.mjs mcp`;
+for a terminal, set it before `vinac run`). Then the page, the audit log and grants say which agent
+did what, and a grant made from that agent's run covers only that agent. Agents can't add
+themselves. **Remove** ends the token and its grants. (Like every token on your computer, a program
+running as you could read it from that app's settings: identities are for accountability.)
+
 An agent can use `vinac run` too: you see its command on the page before anything happens. Be
 careful what you approve. A program that receives a secret can do anything with it, and a
 same-user program could ask under a harmless-looking command (see [SECURITY.md](../../SECURITY.md)).

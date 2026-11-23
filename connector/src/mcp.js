@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
 import { Daemon, DEFAULT_PORT } from './daemon.js';
 import { env } from './env.js';
+import {macLifecycleAvailable,managedConnect} from './mac-lifecycle.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 export const BIN = path.join(here, '..', 'bin', 'vinac.mjs');
@@ -87,7 +88,7 @@ export const TOOLS = [
   },
   {
     name: 'vinac_secrets',
-    description: 'List the secrets (API keys, tokens) that paired devices sent to this computer: name, sender, when, by sound or Wi-Fi, and whether one is waiting for the person to approve a replacement. Values are never returned. Do not try to read them by other means (the key store, the page, files): only the person reveals them. To receive one, ask the person to press "Receive" on the Secrets page; agents cannot add or send secrets.',
+    description: 'List the secrets (API keys, tokens) that paired devices sent to this computer: name, sender, when, by sound or Wi-Fi, and whether one is waiting for the person to approve a replacement. Values are never returned. Do not try to read them by other means (the key store, the page, files): only the person reveals them. To get one from another device, ask for it (intent person.secret.request); agents cannot add or send secrets. Also lists allowedRuns: commands the person allowed you to run with named keys without asking each time (`vinac run --secret NAME -- COMMAND` in that folder; VINAC Link starts them and hides the values in the output). Only the person makes, extends or revokes them.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
   },
@@ -135,14 +136,21 @@ export class AgentApi {
   /** Uses the running daemon if there is one. Returns false if none answers. */
   async attach() {
     // VINAC_API_TOKEN: a one-run token from the auto-responder (see autoreply.js).
-    this.token = env('API_TOKEN') || this.store.apiToken();
+    // VINAC_AGENT_TOKEN: this agent's own identity, made by the person on the page (Secrets > Agents).
     const info = this.store.daemonInfo();
     if (!info?.uiPort) return false;
+    // Attaching never creates/replaces a token; only the daemon initializes a new profile.
+    try { this.token = env('API_TOKEN') || env('AGENT_TOKEN') || fs.readFileSync(this.store.file('api-token'),'utf8').trim(); }
+    catch { return false; }
     this.base = `http://127.0.0.1:${info.uiPort}`;
     try { await this.call('GET', '/api/status', null, 2000); return true; } catch { return false; }
   }
 
   async connect({ background = this.port !== 0 && env('INPROCESS') !== '1' } = {}) {
+    if(background && macLifecycleAvailable()) {
+      if(env('API_TOKEN') && !await this.attach()) throw Error('VINAC Link is not running (an automatic-reply run never starts it).');
+      return managedConnect(this);
+    }
     if (await this.attach()) return 'existing';
     if (env('API_TOKEN')) throw new Error('VINAC Link is not running (an automatic-reply run never starts it).');
     if (background) {
@@ -150,12 +158,15 @@ export class AgentApi {
       catch (e) { console.error(`[vinac] background start failed (${e.message}); running inside this process`); }
     }
     this.daemon = await new Daemon({ home: this.home, port: this.port, name: this.name }).start();
+    // The daemon has initialized this profile, so its token exists now.
+    this.token = env('API_TOKEN') || env('AGENT_TOKEN') || this.store.apiToken();
     this.base = `http://127.0.0.1:${this.daemon.uiPort}`;
     return 'started';
   }
 
   /** Starts `vinac daemon` as its own process and waits until it answers. */
   async startBackground(timeoutMs = 10_000) {
+    if(macLifecycleAvailable()) return managedConnect(this);
     const log = fs.openSync(path.join(this.store.home, 'daemon.log'), 'a');
     const args = [BIN, 'daemon', '--home', this.store.home, '--port', String(this.port)];
     if (this.name) args.push('--name', this.name);
@@ -184,6 +195,19 @@ export class AgentApi {
     const r = await fetch(`${this.base}/api/file?raw=1&id=${encodeURIComponent(fileId)}`, { headers: { authorization: `Bearer ${this.token}` }, signal: AbortSignal.timeout(120_000) });
     if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
     return { name: decodeURIComponent(r.headers.get('x-file-name') || 'file'), sha256: r.headers.get('x-file-sha256'), bytes: Buffer.from(await r.arrayBuffer()) };
+  }
+
+  /** A run the service starts itself (standing grant): yields its output lines as objects. */
+  async *stream(path, body) {
+    const r = await fetch(this.base + path, { method: 'POST', headers: { authorization: `Bearer ${this.token}`, 'content-type': 'application/json' }, body: JSON.stringify(body) });
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || `HTTP ${r.status}`);
+    const dec = new TextDecoder();
+    let buf = '';
+    for await (const chunk of r.body) {
+      buf += dec.decode(chunk, { stream: true });
+      let nl;
+      while ((nl = buf.indexOf('\n')) >= 0) { const line = buf.slice(0, nl); buf = buf.slice(nl + 1); if (line.trim()) yield JSON.parse(line); }
+    }
   }
 
   async call(method, path, body, timeoutMs = 5000) {

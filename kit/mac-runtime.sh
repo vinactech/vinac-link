@@ -43,7 +43,7 @@ vinac_error_summary() {
   if [ -n "$VINAC_RUNTIME_ERROR" ]; then printf '%s\n' "$VINAC_RUNTIME_ERROR"
   elif /usr/bin/grep -Eqi 'security:|SecKeychain|User interaction is not allowed|errSec' "$1"; then
     printf '%s\n' 'macOS Keychain could not release the device key. Unlock your login keychain and allow the access request, then try again. Your existing keys and pairings have not been reset.'
-  elif /usr/bin/grep -Eqi 'EADDRINUSE|address already in use' "$1"; then
+  elif /usr/bin/grep -Eqi 'VINAC_PORT_CONFLICT|EADDRINUSE|address already in use' "$1"; then
     printf '%s\n' 'Another process is using the VINAC Link ports. Close other VINAC Link copies and try again. No unrelated process was stopped.'
   elif /usr/bin/grep -Eqi 'bad CPU type|incompatible architecture|dyld:' "$1"; then
     printf '%s\n' 'The included runtime could not load. Use the complete macOS installer on macOS 13.5 or newer. See the startup log for the loader error.'
@@ -53,31 +53,53 @@ vinac_error_summary() {
 }
 
 vinac_start() {
-  local dir status=1 message choice
+  local dir status=1 message choice instance attempt=0
+  local args=("$@")
   umask 077
   dir="${VINAC_DIAGNOSTIC_LOG_DIR:-$HOME/Library/Logs/VINAC Link}"
-  if ! /bin/mkdir -p "$dir"; then
-    dir="${TMPDIR:-/tmp}"
-  fi
-  VINAC_STARTUP_LOG="$(/usr/bin/mktemp "$dir/vinac-startup.XXXXXX")" || return 1
-  if vinac_runtime "$VINAC_RESOURCES"; then
-    "$VINAC_NODE" "$VINAC_RESOURCES/connector/bin/vinac.mjs" start "$@" 2>"$VINAC_STARTUP_LOG"
-    status=$?
-  else
-    printf '%s\n' "$VINAC_RUNTIME_ERROR" >"$VINAC_STARTUP_LOG"
-  fi
-  if [ "$status" -eq 0 ]; then /bin/rm -f "$VINAC_STARTUP_LOG"; return 0; fi
-  message="$(vinac_error_summary "$VINAC_STARTUP_LOG")"
-  printf '%s\nStartup log: %s\n' "$message" "$VINAC_STARTUP_LOG" >&2
-  if [ "${VINAC_NO_BROWSER:-${AGENTLINK_NO_BROWSER:-}}" != '1' ]; then
-    choice="$(/usr/bin/osascript - "$message" "$VINAC_STARTUP_LOG" <<'APPLESCRIPT'
-on run args
-  set answer to display alert "VINAC Link could not start" message (item 1 of args) buttons {"OK", "Show startup log"} default button "OK"
-  if button returned of answer is "Show startup log" then return "show"
+  /bin/mkdir -p "$dir" || dir="${TMPDIR:-/tmp}"
+  while [ "$attempt" -lt 3 ]; do
+    attempt=$((attempt+1))
+    VINAC_STARTUP_LOG="$(/usr/bin/mktemp "$dir/vinac-startup.XXXXXX")" || return 1
+    if vinac_runtime "$VINAC_RESOURCES"; then
+      "$VINAC_NODE" "$VINAC_RESOURCES/connector/bin/vinac.mjs" start "${args[@]}" 2>"$VINAC_STARTUP_LOG"
+      status=$?
+    else printf '%s\n' "$VINAC_RUNTIME_ERROR" >"$VINAC_STARTUP_LOG"; status=1
+    fi
+    if [ "$status" -eq 0 ]; then /bin/rm -f "$VINAC_STARTUP_LOG"; return 0; fi
+    message="$(vinac_error_summary "$VINAC_STARTUP_LOG")"
+    printf '%s\nStartup log: %s\n' "$message" "$VINAC_STARTUP_LOG" >&2
+    if [ "${VINAC_NO_BROWSER:-${AGENTLINK_NO_BROWSER:-}}" = '1' ]; then return "$status"; fi
+    instance="$(/usr/bin/sed -nE 's/.*VINAC_INSTANCE=([0-9]+:[0-9]+\.[0-9]+).*/\1/p' "$VINAC_STARTUP_LOG" | /usr/bin/head -1)"
+    if [ -n "$instance" ] && /usr/bin/grep -q VINAC_FORCE_RECOVERY_REQUIRED "$VINAC_STARTUP_LOG"; then
+      choice="$(/usr/bin/osascript - "$instance" <<'APPLESCRIPT'
+on run a
+  set answer to display alert "VINAC Link needs recovery" message ("The verified VINAC instance " & item 1 of a & " did not stop after a graceful request. Force Stop only this exact verified instance? No unrelated process will be terminated.") buttons {"Cancel", "Show startup log", "Force Stop"} default button "Cancel"
+  return button returned of answer
 end run
 APPLESCRIPT
 )"
-    if [ "$choice" = 'show' ]; then /usr/bin/open -a TextEdit "$VINAC_STARTUP_LOG"; fi
-  fi
+      if [ "$choice" = 'Force Stop' ]; then args+=(--recover --force-recovery --recover-instance "$instance"); continue; fi
+    elif [ -n "$instance" ] && /usr/bin/grep -q VINAC_RECOVERY_REQUIRED "$VINAC_STARTUP_LOG"; then
+      choice="$(/usr/bin/osascript - "$instance" <<'APPLESCRIPT'
+on run a
+  set answer to display alert "VINAC Link is not responding" message ("Verified VINAC instance " & item 1 of a & " owns both ports but is not responding. Restart it? Keys, pairings and history are retained.") buttons {"Cancel", "Show startup log", "Restart VINAC"} default button "Cancel"
+  return button returned of answer
+end run
+APPLESCRIPT
+)"
+      if [ "$choice" = 'Restart VINAC' ]; then args+=(--recover --recover-instance "$instance"); continue; fi
+    else
+      choice="$(/usr/bin/osascript - "$message" <<'APPLESCRIPT'
+on run a
+  set answer to display alert "VINAC Link could not start" message (item 1 of a) buttons {"OK", "Show startup log"} default button "OK"
+  return button returned of answer
+end run
+APPLESCRIPT
+)"
+    fi
+    if [ "$choice" = 'Show startup log' ]; then /usr/bin/open -a TextEdit "$VINAC_STARTUP_LOG"; fi
+    return "$status"
+  done
   return "$status"
 }

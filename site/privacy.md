@@ -21,6 +21,10 @@ can find it. This never goes to us or to the internet, and it stops when you lea
 If you choose to connect VINAC Link to third-party AI services (for example a cloud AI agent), those
 services handle your data under their own terms and privacy policies, not ours.
 
+The **phone vault** (vinac.tech/app) runs in your phone's browser. Your keys, your passphrase and
+the computers you pair stay on the phone, encrypted; the app sends nothing to us. The pairing code in
+its link sits after the `#`, which browsers never send to a web server.
+
 ## This website
 
 - **No cookies, no tracking.** We use no analytics, advertising or tracking tools, and we set no

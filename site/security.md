@@ -37,7 +37,8 @@ studied for years:
 | **Human in the loop** | Agents can use the devices you paired, but only a person can pair a device, approve a request, change a rule or reveal a secret. |
 | **Keys stay protected at rest** | Pairing keys and secrets are kept by Windows, macOS or Linux's own key store, and message history is encrypted on disk. With a vault passphrase, secrets are sealed again with a key only your passphrase opens. |
 | **No flood of requests** | At most 25 requests from one device wait for you at a time, and a request nobody decides on expires after 3 days. |
-| **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents. |
+| **A record you can check** | A tamper-evident log of pairings, approvals and secret use, without contents. Search it on the Activity log page, export it, and make reports signed with the device's key that anyone can verify. |
+| **Agents within limits** | An allowed run lets one agent use named keys for one command in one folder until a set time. VINAC Link starts the program itself, so the agent never sees the values; you can revoke it any time. |
 | **A private local page** | The VINAC Link page only answers on your own computer and refuses other websites. |
 | **Quiet on the network** | Only while *Pair a device* is open does a computer announce itself on your local network (its name and a one-time code). That alone can't pair anything, and it stops when you leave the screen. |
 

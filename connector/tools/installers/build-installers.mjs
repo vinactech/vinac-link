@@ -254,6 +254,8 @@ function buildMac(files) {
   // Rosetta shell) and keeps a private startup log with "Show startup log" on failure. The shared
   // helper, kit/mac-runtime.sh, lands in Resources with the other kit files.
   out.push({ name: `${app}/MacOS/VINAC Link`, mode: 0o755, data: fs.readFileSync(path.join(HERE, 'mac-launcher.sh')) });
+  // Native lifecycle evidence/lock helper is compiled on the Mac, before Developer ID signing.
+  for (const f of ['mac-process.c','build-mac-process.sh']) out.push({name: `${app}/Resources/native/${f}`,data: fs.readFileSync(path.join(HERE,'native',f)),mode:f.endsWith('.sh')?0o755:0o644});
   out.push({ name: 'make-dmg.sh', mode: 0o755, data: Buffer.from(`#!/bin/bash
 # Run this on a Mac (in Terminal: sh make-dmg.sh) to make VINAC-Link-${V}.dmg next to it.
 # This signs the app ad hoc (not notarized), so on other Macs people must allow it once in
@@ -262,6 +264,8 @@ function buildMac(files) {
 # System Settings > Privacy & Security > Open Anyway, until Apple Developer signing is added.
 set -e
 cd "$(dirname "$0")"
+# Compile the macOS native helper before any signing. Release builds must Developer ID sign it.
+/bin/bash "VINAC Link.app/Contents/Resources/native/build-mac-process.sh"
 xattr -cr "VINAC Link.app" 2>/dev/null || true
 codesign --force --sign - "VINAC Link.app" 2>/dev/null || codesign --force --deep --sign - "VINAC Link.app"
 rm -rf dmg-stage && mkdir dmg-stage

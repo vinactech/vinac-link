@@ -14,6 +14,7 @@ import path from 'node:path';
 import { createHash } from 'node:crypto';
 
 const FILE = 'audit.jsonl';
+const ANCHOR = 'audit-anchor.json';
 const GENESIS = '0'.repeat(64);
 const MAX_BYTES = 8 * 1024 * 1024; // then the file is rotated to audit-<date>.jsonl, chain continues
 
@@ -44,7 +45,13 @@ export class AuditLog {
       const entry = { at: new Date().toISOString(), type, ...clean(fields) };
       const body = JSON.stringify(entry);
       const hash = hashOf(prev, body);
-      try { if (fs.statSync(this.file).size > MAX_BYTES) fs.renameSync(this.file, path.join(this.home, `audit-${stamp()}.jsonl`)); } catch { /* no file yet */ }
+      // Rotate when the file is big, or when a new month starts (so retention can remove whole months).
+      try {
+        const big = fs.statSync(this.file).size > MAX_BYTES;
+        const first = big ? null : readFirstLine(this.file);
+        const month = first ? JSON.parse(first).at?.slice(0, 7) : null;
+        if (big || (month && month !== entry.at.slice(0, 7))) fs.renameSync(this.file, path.join(this.home, `audit-${stamp()}.jsonl`));
+      } catch { /* no file yet */ }
       fs.appendFileSync(this.file, JSON.stringify({ ...entry, prev, hash }) + '\n', { mode: 0o600 });
       this.last = hash;
       return { ...entry, prev, hash };
@@ -56,9 +63,41 @@ export class AuditLog {
     return readLines(this.file).slice(-n).map(l => { try { return JSON.parse(l); } catch { return { damaged: true }; } });
   }
 
-  /** Checks every line in every file, oldest first. */
+  /** Every entry, oldest first, across rotated files and the current one. */
+  *entries() {
+    for (const f of [...this.rotatedFiles(), this.file]) {
+      for (const l of readLines(f)) { try { yield JSON.parse(l); } catch { yield { damaged: true }; } }
+    }
+  }
+
+  /**
+   * Retention: removes whole rotated files whose newest entry is older than `before` (a Date).
+   * The chain still verifies: anchor.json keeps the hash the first kept line follows, and an
+   * `audit.pruned` entry records what was removed. Returns the number of entries removed.
+   */
+  pruneBefore(before) {
+    const files = this.rotatedFiles();
+    let removed = 0, lastHash = null, until = null;
+    const gone = [];
+    for (const f of files) {
+      const lines = readLines(f);
+      const last = lines.length ? JSON.parse(lines.at(-1)) : null;
+      if (!last || new Date(last.at) >= before) break;
+      removed += lines.length; lastHash = last.hash; until = last.at; gone.push(f);
+    }
+    if (!gone.length) return 0;
+    const anchor = this.anchor();
+    fs.writeFileSync(path.join(this.home, ANCHOR), JSON.stringify({ prev: lastHash, removedUntil: until, removedEntries: (anchor?.removedEntries || 0) + removed }), { mode: 0o600 });
+    for (const f of gone) fs.rmSync(f, { force: true });
+    this.add('audit.pruned', { entries: removed, until });
+    return removed;
+  }
+
+  anchor() { try { return JSON.parse(fs.readFileSync(path.join(this.home, ANCHOR), 'utf8')); } catch { return null; } }
+
+  /** Checks every line in every file, oldest first (from the retention anchor, if older lines were removed). */
   verify() {
-    let prev = GENESIS, count = 0;
+    let prev = this.anchor()?.prev || GENESIS, count = 0;
     for (const f of [...this.rotatedFiles(), this.file]) {
       const lines = readLines(f);
       for (let i = 0; i < lines.length; i++) {
@@ -74,6 +113,11 @@ export class AuditLog {
   }
 }
 
+function readFirstLine(file) {
+  const fd = fs.openSync(file, 'r');
+  try { const b = Buffer.alloc(4096); const n = fs.readSync(fd, b, 0, 4096, 0); const s = b.subarray(0, n).toString('utf8'); const i = s.indexOf('\n'); return i > 0 ? s.slice(0, i) : null; }
+  finally { fs.closeSync(fd); }
+}
 function readLines(file) {
   try { return fs.readFileSync(file, 'utf8').split('\n').filter(Boolean); } catch { return []; }
 }

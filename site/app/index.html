@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VINAC Link · Phone vault</title>
+<meta name="description" content="Keep API keys on your phone and hand one to your computer by sound. Encrypted on the phone; nothing is sent to any server.">
+<meta name="theme-color" content="#0b0b10">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="/app/manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="128x128" href="/brand/icon-128.png">
+<link rel="apple-touch-icon" href="/brand/icon-512.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="VINAC Vault">
+<link rel="stylesheet" href="/app/app.css">
+<script type="module" src="/app/app.js"></script>
+</head>
+<body>
+
+<!-- first time, and locked: one centred card -->
+<main class="auth" id="vCreate" hidden>
+  <img class="auth-icon" src="/brand/icon-128.png" alt="" width="72" height="72">
+  <h1>Your keys, on your phone</h1>
+  <p class="lead">Keep API keys and tokens here, encrypted with a passphrase only you know, and hand one to your computer by sound. Nothing goes to any server.</p>
+  <form id="createForm" class="stack">
+    <label class="field"><span>Name of this phone</span><input id="phoneName" maxlength="20" value="My phone" autocomplete="off" required></label>
+    <label class="field"><span>Passphrase</span><input id="newPass" type="password" minlength="8" autocomplete="new-password" placeholder="8 characters or more" required></label>
+    <label class="field"><span>Passphrase again</span><input id="newPass2" type="password" minlength="8" autocomplete="new-password" required></label>
+    <button class="btn primary block" type="submit">Create the vault</button>
+    <p class="hint">If you forget the passphrase, the keys here can't be opened. Keep copies of important keys elsewhere.</p>
+  </form>
+</main>
+
+<main class="auth" id="vLocked" hidden>
+  <img class="auth-icon" src="/brand/icon-128.png" alt="" width="72" height="72">
+  <h1>Vault locked</h1>
+  <p class="lead" id="lockedLead">Enter your passphrase to open your keys.</p>
+  <form id="unlockForm" class="stack">
+    <label class="field"><span class="sr">Passphrase</span><input id="pass" type="password" autocomplete="current-password" placeholder="Passphrase" required></label>
+    <button class="btn primary block" type="submit">Unlock</button>
+    <p class="status" id="unlockStatus" role="status"></p>
+  </form>
+</main>
+
+<!-- open -->
+<div class="shell" id="vOpen" hidden>
+  <header class="top">
+    <h1 id="title">Keys</h1>
+    <button class="icon-btn" id="lockBtn" type="button" aria-label="Lock the vault">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+    </button>
+  </header>
+
+  <div class="content">
+    <section class="pair-banner" id="pairCard" hidden>
+      <div class="pb-head"><span class="pb-dot"></span><b>Pair with <span id="pairName"></span></b></div>
+      <p id="pairIntro">Hold the phone close to that computer, volume up, then play the sound. The computer is listening for it.</p>
+      <p class="code" id="pairCode" hidden></p>
+      <div class="btn-row">
+        <button class="btn primary" id="pairPlay" type="button">Play pairing sound</button>
+        <button class="btn" id="pairDone" type="button" hidden>The computer says Paired</button>
+        <button class="btn quiet" id="pairCancel" type="button">Cancel</button>
+      </div>
+      <p class="status" id="pairStatus" role="status"></p>
+    </section>
+
+    <section id="tabKeys">
+      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="keySearch" type="search" placeholder="Search keys" aria-label="Search keys" autocomplete="off"></label>
+      <ul class="list" id="keyList"></ul>
+    </section>
+
+    <section id="tabComputers" hidden>
+      <ul class="list" id="computerList"></ul>
+      <div class="note">
+        <b>Pair a computer</b>
+        <p>On the computer: <b>Secrets › Phones › Pair a phone</b>. Then point this phone's camera at the code it shows.</p>
+      </div>
+    </section>
+
+    <p class="foot">Encrypted on this phone (AES-256, PBKDF2). Keys leave it only as sound, sealed for one paired computer. Add this page to your Home Screen so the phone keeps it.</p>
+  </div>
+
+  <button class="fab" id="addKeyBtn" type="button" aria-label="Add a key"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+
+  <nav class="tabs" aria-label="Sections">
+    <button class="tab" id="tabKeysBtn" type="button" aria-current="page" aria-label="Keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg><span>Keys</span></button>
+    <button class="tab" id="tabComputersBtn" type="button" aria-label="Computers"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"/><path d="M2 19h20"/></svg><span>Computers</span></button>
+  </nav>
+</div>
+
+<!-- bottom sheets -->
+<div class="scrim" id="scrim" hidden></div>
+
+<section class="sheet" id="sheetAdd" hidden aria-labelledby="addTitle">
+  <div class="grip"></div>
+  <h2 id="addTitle">Add a key</h2>
+  <form id="addKeyForm" class="stack">
+    <label class="field"><span>Name</span><input id="keyName" maxlength="40" pattern="[A-Za-z0-9_.\-]{1,40}" placeholder="STRIPE_KEY" autocapitalize="characters" autocomplete="off" spellcheck="false" required></label>
+    <label class="field"><span>Value</span><input id="keyValue" type="password" maxlength="200" autocomplete="off" spellcheck="false" required></label>
+    <button class="btn primary block" type="submit">Save</button>
+    <button class="btn quiet block" id="addKeyCancel" type="button">Cancel</button>
+  </form>
+</section>
+
+<section class="sheet" id="sheetKey" hidden aria-labelledby="keyTitle">
+  <div class="grip"></div>
+  <div class="key-head"><span class="avatar big" id="keyAvatar"></span><div><h2 id="keyTitle"></h2><small id="keyAdded"></small></div></div>
+  <div class="value-box"><code id="keyValueShown">••••••••••••</code><button class="btn small" id="keyShow" type="button">Show</button></div>
+  <button class="btn primary block" id="keySend" type="button">Send to a computer</button>
+  <button class="btn danger block" id="keyDelete" type="button">Delete from this phone</button>
+</section>
+
+<section class="sheet" id="sheetSend" hidden aria-labelledby="sendTitle">
+  <div class="grip"></div>
+  <h2 id="sendTitle">Send <span id="sendName"></span></h2>
+  <label class="field" id="sendToRow"><span>To</span><select id="sendTo"></select></label>
+  <ol class="steps">
+    <li>On the computer: <b>Secrets › Receive by sound</b>.</li>
+    <li>Hold the phone close to it, volume up, and press <b>Play</b>. It takes 10–20 seconds.</li>
+  </ol>
+  <button class="btn primary block" id="sendPlay" type="button">Play</button>
+  <button class="btn quiet block" id="sendCancel" type="button">Close</button>
+  <p class="status" id="sendStatus" role="status"></p>
+</section>
+
+<div class="toast" id="toast" role="status" hidden></div>
+</body>
+</html>

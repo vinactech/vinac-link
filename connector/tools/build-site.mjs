@@ -31,6 +31,7 @@ export const PAGES = [
   ['docs/guide/offline.md', '/docs/guide/offline.html', 'Offline use', 'Guide'],
   ['docs/guide/agents.md', '/docs/guide/agents.html', 'Connecting agents', 'Guide'],
   ['docs/guide/auto-mode.md', '/docs/guide/auto-mode.html', 'Auto mode', 'Guide'],
+  ['docs/guide/compliance.md', '/docs/guide/compliance.html', 'Activity log and compliance', 'Guide'],
   ['docs/guide/cli.md', '/docs/guide/cli.html', 'Command line', 'Guide'],
   ['docs/guide/troubleshooting.md', '/docs/guide/troubleshooting.html', 'Troubleshooting', 'Guide'],
   ['openclaw/README.md', '/docs/openclaw.html', 'OpenClaw', 'Guide'],
@@ -260,6 +261,19 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   // poster.jpg) is a social-media clip now and stays out of the site.
   for (const f of ['demo.mp4', 'poster.jpg']) fs.rmSync(path.join(OUT, 'media', f), { force: true });
   const demoFile = ['walkthrough.mp4'].find(f => fs.existsSync(path.join(SITE, 'media', f)));
+
+  // The phone vault web app (/app/): its page plus the modules it shares with the computer's page
+  // (phone formats and crypto, the sound modem). Same origin, no outside code.
+  if (fs.existsSync(path.join(SITE, 'app'))) {
+    const APP = path.join(OUT, 'app');
+    fs.cpSync(path.join(SITE, 'app'), APP, { recursive: true });
+    fs.writeFileSync(path.join(APP, 'sw.js'), fs.readFileSync(path.join(SITE, 'app', 'sw.js'), 'utf8').replaceAll('{{version}}', version));
+    fs.mkdirSync(path.join(APP, 'web'), { recursive: true });
+    for (const f of ['phone-crypto.js', 'phone-frame.js', 'beacon.js', 'secret-frame.js']) fs.copyFileSync(path.join(ROOT, 'connector', 'web', f), path.join(APP, 'web', f));
+    fs.mkdirSync(path.join(APP, 'lab', 'js'), { recursive: true });
+    for (const f of ['audio.js', 'modem.js', 'frame.js', 'fec.js', 'bytes.js', 'crypto.js', 'logos.js']) fs.copyFileSync(path.join(ROOT, 'lab', 'js', f), path.join(APP, 'lab', 'js', f));
+    fs.cpSync(path.join(ROOT, 'lab', 'worklets'), path.join(APP, 'lab', 'worklets'), { recursive: true });
+  }
 
   if (fs.existsSync(path.join(SITE, 'logos'))) fs.cpSync(path.join(SITE, 'logos'), path.join(OUT, 'logos'), { recursive: true, filter: f => !f.endsWith('.md') });
 

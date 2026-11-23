@@ -16,6 +16,7 @@ on your computers. It needs no cloud and no internet, and nothing important happ
 - [Offline use](guide/offline.md): local models, files, git and records without the internet
 - [Connecting agents](guide/agents.md): Claude Code, Codex, MCP apps, OpenClaw; tool reference
 - [Auto mode](guide/auto-mode.md): live notes in Claude Code, auto-reply per device, OpenClaw front desk
+- [Activity log and compliance](guide/compliance.md): search the record, CSV exports, signed reports, retention
 - [Command line](guide/cli.md): including the audit log and `vinac run`
 - [Troubleshooting and FAQ](guide/troubleshooting.md)
 

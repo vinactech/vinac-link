@@ -1,3 +1,4 @@
+import {ownInstanceProof} from './mac-lifecycle.js';
 // The VINAC Link daemon: one per device. It holds the identity key, runs the
 // pairing exchange with other devices over the local network, carries
 // messages and secrets between paired devices, and serves the page where a
@@ -39,7 +40,11 @@ import { createHash } from 'node:crypto';
 import { LOGOS_VERSION, isIntent, catalog, riskOf, ARG_SHAPES } from './logos.js';
 import { Firewall } from './firewall.js';
 import { env } from './env.js';
-import { AutoResponder, REPLY_INTENTS } from './autoreply.js';
+import { AutoResponder, REPLY_INTENTS, extraProgramDirs } from './autoreply.js';
+import { Agents, Grants, GRANT_HOURS, startRun } from './grants.js';
+import { Phones } from './phones.js';
+import { query as auditQuery, toCsv, buildReport, reportHtml, applyRetention, RETENTION_CHOICES, DEFAULT_RETENTION, CATEGORIES } from './compliance.js';
+import { PHONE_SECRET } from '../web/phone-frame.js';
 import { AuditLog } from './audit.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -219,6 +224,9 @@ export class Daemon {
     this.peerSecretLimiter = new RateLimiter(10);
     this.vaultFails = [];                              // times of wrong vault passphrases (5 a minute at most)
     this.vault = new Vault({ load: () => this.store.vault(), save: r => this.store.saveVault(r) });
+    this.agents = new Agents(this.store);   // agent identities (tokens made on the page)
+    this.grants = new Grants(this.store);   // standing key grants: runs the service starts itself
+    this.phones = new Phones(this.store);   // phone vault: paired phones that send keys by sound
     this.chunkLimiter = new RateLimiter(600);       // file parts per device per minute
     this.audit = new AuditLog(this.store.home);
     this.secretUses = new Map();   // `vinac run` requests: id -> { names, command, cwd, status, expires, values? }
@@ -240,7 +248,8 @@ export class Daemon {
     await listen(this.lan, this.port, this.lanHost);
     await listen(this.ui, this.uiPort, '127.0.0.1');
     this.port = this.lan.address().port; this.uiPort = this.ui.address().port; // when 0 was asked for
-    this.store.saveDaemonInfo({ pid: process.pid, port: this.port, uiPort: this.uiPort, address: this.address });
+    const ownProof=ownInstanceProof(this.store.home);
+    this.store.saveDaemonInfo({ pid: process.pid, port: this.port, uiPort: this.uiPort, address: this.address, version: APP_VERSION, ...(ownProof?{instance:{start:ownProof.start,exe:ownProof.exe,uid:ownProof.uid}}:{}) });
     this.log(`device "${this.me.name}" ${this.me.fpText} (${this.me.keystore}) · network ${this.address}:${this.port} · page ${this.uiUrl}`);
     if (this.me.keystore === 'file') this.log('WARNING: development mode, keys are in a plain file (VINAC_KEYSTORE=file).');
     this.checkPeers();
@@ -249,6 +258,10 @@ export class Daemon {
       this.nearbyTimer = setInterval(() => this.announceNearby(), 1500);
       this.nearbyTimer.unref?.();
     }
+    // Audit retention (whole months older than the setting; never while a legal hold is on), daily.
+    this.retain();
+    this.retentionTimer = setInterval(() => this.retain(), 86_400_000);
+    this.retentionTimer.unref?.();
     return this;
   }
 
@@ -318,7 +331,7 @@ export class Daemon {
     this.stopPolling();
     this.auto.stop();
     clearTimeout(this.peerTimer);
-    clearInterval(this.nearbyTimer);
+    clearInterval(this.nearbyTimer); clearInterval(this.retentionTimer);
     this.discovery?.stop();
     for (const w of this.waiters) w();
     for (const w of this.eventWaiters) w();
@@ -1150,7 +1163,7 @@ export class Daemon {
     this.audit.add('msg.cancelled', { peer: m.peer, id: m.id });
   }
 
-  async sendOne(peer, { text, replyTo, intent, args }, by = 'agent', { auto = false, transfer = null, queue = true } = {}) {
+  async sendOne(peer, { text, replyTo, intent, args }, by = 'agent', { auto = false, transfer = null, queue = true, agent = null } = {}) {
     if (intent != null && intent !== '' && !isIntent(intent)) throw httpError(400, `"${intent}" is not a known intent. Use vinac_intents for the list, or send plain text.`);
     if (!intent && args != null) throw httpError(400, 'args need an intent.');
     // reqArgs: what is kept in history; sendArgs: what travels (a shared file's bytes only travel).
@@ -1190,7 +1203,7 @@ export class Daemon {
     }
     const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by };
     this.store.saveMessages([...this.store.messages(), rec]);
-    this.audit.add('msg.out', { peer, id: inner.id, intent, by, chars: body.length, ...(reqArgs?.size ? { fileBytes: reqArgs.size } : {}), ...(auto ? { auto: true } : {}) });
+    this.audit.add('msg.out', { peer, id: inner.id, intent, by, chars: body.length, ...(reqArgs?.size ? { fileBytes: reqArgs.size } : {}), ...(auto ? { auto: true } : {}), ...(agent ? { agent: agent.name, agentFp: agent.fp } : {}) });
     this.log(`message → ${peer.name} (${body.length} chars${intent ? `, request ${intent}` : ''})`);
     return {
       sent: true, delivered: true, ...this.messageView(rec),
@@ -1299,8 +1312,13 @@ export class Daemon {
 
   // ---- `vinac run`: secrets into a program's environment, approved per run ---
 
-  /** A program (through the agent API) asks to use secrets; the person decides on the page. */
-  askSecretUse({ names, command, cwd }) {
+  /**
+   * A program (through the agent API) asks to use secrets. If a standing grant made by the person
+   * covers it (same agent, names, command, folder; vault unlocked), the answer is 'granted' and the
+   * service will start the program itself (POST /api/secret-run). Otherwise the person decides on
+   * the page, as before.
+   */
+  askSecretUse({ names, command, cwd, envNames }, agent = null) {
     if (!Array.isArray(names) || !names.length || names.length > 10) throw httpError(400, 'Name 1 to 10 secrets.');
     if (!Array.isArray(command) || !command.length || command.length > 100) throw httpError(400, 'Give the command to run.');
     const items = this.store.secrets().items;
@@ -1309,10 +1327,61 @@ export class Daemon {
     for (const [k, u] of this.secretUses) if (u.expires < Date.now()) this.secretUses.delete(k);
     if ([...this.secretUses.values()].filter(u => u.status === 'pending').length >= 5) throw httpError(429, 'Too many runs are waiting for approval.');
     const id = randomBytes(8).toString('hex');
-    const cmd = command.map(String).join(' ').replace(/[\u0000-\u001f]/g, ' ').slice(0, 400);
-    this.secretUses.set(id, { id, names: wanted, command: cmd, cwd: String(cwd ?? '').slice(0, 300), status: 'pending', at: new Date().toISOString(), expires: Date.now() + SECRET_USE_TTL_MS });
+    const argv = command.map(a => String(a).slice(0, 2000));
+    const cmd = argv.join(' ').replace(/[\u0000-\u001f]/g, ' ').slice(0, 400);
+    const folder = String(cwd ?? '').slice(0, 300);
+    const as = {};
+    for (const n of wanted) { const v = envNames?.[n]; as[n] = typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(v) ? v : n.toUpperCase().replace(/[^A-Z0-9_]/g, '_'); }
+    const u = { id, names: wanted, argv, command: cmd, cwd: folder, envNames: as, agentId: agent?.id ?? null, agentName: agent?.name ?? null, agentFp: agent?.fp ?? null, status: 'pending', at: new Date().toISOString(), expires: Date.now() + SECRET_USE_TTL_MS };
+    const grant = this.vault.protected && !this.vault.unlocked ? null : this.grants.match({ agentId: u.agentId, names: wanted, command: cmd, cwd: folder });
+    if (grant) {
+      Object.assign(u, { status: 'granted', grant: grant.id, expires: Date.now() + 60_000 });
+      this.secretUses.set(id, u);
+      return { id, status: 'granted', grant: { id: grant.id, expiresAt: grant.expiresAt }, note: 'Allowed by a standing grant: VINAC Link starts the program itself (POST /api/secret-run); the values never pass through the agent.' };
+    }
+    this.secretUses.set(id, u);
     this.changed();
     return { id, status: 'pending', approvalPage: `${this.uiUrl}#secrets`, note: 'The person must approve this run on the VINAC Link page (Secrets) within 2 minutes.' };
+  }
+
+  /**
+   * A run allowed by a standing grant: the service starts the program with the values in its
+   * environment and streams its (redacted) output back as lines of JSON. The values never leave
+   * the service. The caller must be the agent the grant names; one run per answer, within a minute.
+   */
+  secretRun(id, agent, res) {
+    const u = this.secretUses.get(String(id));
+    if (!u || u.status !== 'granted' || u.expires < Date.now()) throw httpError(404, 'No allowed run with that id (ask again with vinac run).');
+    if ((u.agentId ?? null) !== (agent?.id ?? null)) throw httpError(403, 'That run belongs to another agent.');
+    const grant = this.grants.match({ agentId: u.agentId, names: u.names, command: u.command, cwd: u.cwd });
+    if (!grant || grant.id !== u.grant) throw httpError(403, 'The grant for this run was revoked or has expired.');
+    if (this.vault.protected && !this.vault.unlocked) throw httpError(423, 'VAULT_LOCKED: unlock the vault on this device first.');
+    if (!fs.existsSync(u.cwd) || !fs.statSync(u.cwd).isDirectory()) throw httpError(400, `The folder ${u.cwd} doesn't exist.`);
+    this.secretUses.delete(u.id);
+    const store = this.store.secrets();
+    const values = {};
+    const now = new Date().toISOString();
+    for (const n of u.names) {
+      const s = store.items.filter(x => x.name === n && !x.pending && !x.offered).at(-1);
+      if (!s) throw httpError(404, `No usable secret called "${n}" any more.`);
+      values[n] = this.readValue(s).toString('utf8'); s.lastUsedAt = now;
+    }
+    this.store.saveSecrets(store);
+    this.grants.used(grant.id);
+    this.audit.add('secret.used', { names: u.names, command: u.command.slice(0, 120), via: 'grant', grant: grant.id, agent: u.agentName || 'default', agentFp: u.agentFp });
+    this.changed();
+    res.writeHead(200, { 'content-type': 'application/x-ndjson; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff' });
+    const line = o => { if (!res.writableEnded) res.write(`${JSON.stringify(o)}\n`); };
+    line({ started: true, command: u.command, cwd: u.cwd });
+    const run = startRun({
+      argv: u.argv, cwd: u.cwd, values, envNames: u.envNames, extraDirs: extraProgramDirs(),
+      onData: (stream, text) => line(stream === 'stdout' ? { out: text } : { err: text }),
+      onExit: code => { line({ exit: code }); res.end(); },
+    });
+    for (const k of Object.keys(values)) values[k] = null;
+    // The caller pressed Ctrl-C or went away (the response closes before it finished): stop the program.
+    // (Not req's 'close': that fires as soon as the request body has been read.)
+    res.on('close', () => { if (!res.writableFinished) run.stop(); });
   }
 
   /** The waiting program polls; an approved run gets the values once. */
@@ -1329,6 +1398,8 @@ export class Daemon {
     }
     if (u.status === 'pending' && u.expires < Date.now()) u.status = 'expired';
     if (u.status === 'pending') return { status: 'pending' };
+    // Allowed by a standing grant: never handed out here; the service runs it (POST /api/secret-run).
+    if (u.status === 'granted') return { status: 'granted', note: 'Start it with POST /api/secret-run (vinac run does this); the values stay in VINAC Link.' };
     this.secretUses.delete(u.id);
     if (u.status !== 'approved') return { status: u.status };
     const store = this.store.secrets();
@@ -1339,23 +1410,99 @@ export class Daemon {
       if (s) { values[n] = this.readValue(s).toString('utf8'); s.lastUsedAt = now; }
     }
     this.store.saveSecrets(store);
-    this.audit.add('secret.used', { names: u.names, command: u.command.slice(0, 120) });
+    this.audit.add('secret.used', { names: u.names, command: u.command.slice(0, 120), via: 'approved', agent: u.agentName || 'default', agentFp: u.agentFp });
     return { status: 'approved', values };
   }
 
-  decideSecretUse(id, approve) {
+  /**
+   * The person approves or denies one run. `allowHours` (1, 8, 24 or 168) also makes a standing
+   * grant from it: the same agent, keys, command and folder, for that long; `prefix` lets the
+   * command take further arguments.
+   */
+  decideSecretUse(id, approve, { allowHours, prefix = false } = {}) {
     if (approve && this.vault.protected && !this.vault.unlocked) throw httpError(423, 'VAULT_LOCKED: unlock the vault on this device first.');
     const u = this.secretUses.get(String(id));
     if (!u || u.status !== 'pending' || u.expires < Date.now()) throw httpError(404, 'That request is no longer waiting.');
+    let grant = null;
+    if (approve && allowHours != null) {
+      if (!GRANT_HOURS.includes(Number(allowHours))) throw httpError(400, `Allow for ${GRANT_HOURS.join(', ')} hours.`);
+      if (!path.isAbsolute(u.cwd)) throw httpError(400, 'This run did not say which folder it runs in, so it can only be approved once.');
+      grant = this.grants.add({ agentId: u.agentId, agentName: u.agentName, names: u.names, command: u.command, cwd: u.cwd, hours: Number(allowHours), prefix: prefix === true });
+      this.audit.add('grant.created', { grant: grant.id, names: grant.names, command: grant.command.slice(0, 120), prefix: grant.prefix, cwd: grant.cwd, hours: Number(allowHours), agent: grant.agentName, agentFp: u.agentFp });
+    }
     u.status = approve ? 'approved' : 'denied';
     u.expires = Date.now() + 30_000; // the waiting program collects it soon
-    if (!approve) this.audit.add('secret.use.denied', { names: u.names, command: u.command.slice(0, 120) });
+    if (!approve) this.audit.add('secret.use.denied', { names: u.names, command: u.command.slice(0, 120), agent: u.agentName || 'default' });
     for (const w of this.useWaiters) w();
+    return grant;
+  }
+
+  // ---- compliance: the audit log on the page, exports, signed reports, retention ----------
+
+  auditSettings() { return { ...DEFAULT_RETENTION, ...this.store.auditSettings() }; }
+
+  retain() {
+    try {
+      const n = applyRetention(this.audit, this.auditSettings());
+      if (n) this.log(`audit retention: removed ${n} entries older than the setting`);
+    } catch (e) { this.log(`audit retention failed: ${e.message}`); }
+  }
+
+  setRetention({ keepDays, legalHold }) {
+    const days = Number(keepDays);
+    if (!RETENTION_CHOICES.includes(days)) throw httpError(400, `Keep for ${RETENTION_CHOICES.filter(Boolean).join(', ')} days, or 0 for always.`);
+    const s = { keepDays: days, legalHold: legalHold === true };
+    this.store.saveAuditSettings(s);
+    this.audit.add('retention.changed', { keepDays: s.keepDays, legalHold: s.legalHold });
+    this.retain();
+    return s;
+  }
+
+  auditView(q) {
+    const f = {};
+    for (const k of ['from', 'to', 'category', 'who', 'agent', 'device', 'q']) { const v = q.get(k); if (v) f[k] = String(v).slice(0, 100); }
+    const r = auditQuery(this.audit, f, { limit: Math.min(1000, Number(q.get('limit')) || 200), offset: Math.max(0, Number(q.get('offset')) || 0) });
+    const chain = this.audit.verify();
+    return {
+      ...r, filters: f, categories: Object.fromEntries(Object.entries(CATEGORIES).map(([k, v]) => [k, v.label])),
+      chain: chain.ok ? { ok: true, count: chain.count, head: chain.head } : { ok: false, count: chain.count, problem: `${chain.file} line ${chain.line}: ${chain.problem}` },
+      retention: { ...this.auditSettings(), choices: RETENTION_CHOICES, anchor: this.audit.anchor() },
+      device: { name: this.me.name, fingerprint: this.me.fpText },
+    };
+  }
+
+  /** A signed report (JSON) for the filters; also kept for 2 minutes as a printable page. */
+  auditReport(filters = {}) {
+    const f = {};
+    for (const k of ['from', 'to', 'category', 'who', 'agent', 'device', 'q']) if (filters[k]) f[k] = String(filters[k]).slice(0, 100);
+    const report = buildReport({ audit: this.audit, device: { name: this.me.name, fingerprint: this.me.fpText }, privateKey: this.me.privateKey, publicRaw: this.me.publicRaw, filters: f });
+    this.audit.add('report.created', { entries: report.count, from: f.from, to: f.to });
+    const id = randomBytes(16).toString('hex');
+    this.reports ||= new Map();
+    for (const [k, v] of this.reports) if (v.expires < Date.now()) this.reports.delete(k);
+    this.reports.set(id, { html: reportHtml(report), expires: Date.now() + 120_000 });
+    return { report, page: `/audit-report/${id}` };
+  }
+
+  /** The printable report page: a one-time link (2 minutes) the page opens in a new tab. */
+  serveReport(res, id) {
+    const r = this.reports?.get(id);
+    if (!r || r.expires < Date.now()) throw httpError(404, 'That report link has expired. Make the report again.');
+    this.reports.delete(id);
+    res.writeHead(200, { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store', 'x-content-type-options': 'nosniff',
+      'content-security-policy': "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; frame-ancestors 'none'", 'x-frame-options': 'DENY' });
+    res.end(r.html);
+  }
+
+  revokeGrant(id) {
+    const g = this.grants.revoke(id);
+    this.audit.add('grant.revoked', { grant: g.id, names: g.names, command: g.command.slice(0, 120), agent: g.agentName });
+    return g;
   }
 
   secretUsesView() {
     return [...this.secretUses.values()].filter(u => u.status === 'pending' && u.expires > Date.now())
-      .map(u => ({ id: u.id, names: u.names, command: u.command, cwd: u.cwd, at: u.at, expiresIn: Math.round((u.expires - Date.now()) / 1000) }));
+      .map(u => ({ id: u.id, names: u.names, command: u.command, cwd: u.cwd, agent: u.agentName, canAllow: path.isAbsolute(u.cwd), at: u.at, expiresIn: Math.round((u.expires - Date.now()) / 1000) }));
   }
 
   /** The person approves or rejects a request that waits for them. */
@@ -1540,6 +1687,7 @@ export class Daemon {
   receiveSecret(bytes, via) {
     if (via === 'sound' && !this.receiving()) throw httpError(409, 'NOT_RECEIVING: the person on that device must press "Receive a secret" first.');
     const b = Buffer.from(bytes);
+    if (via === 'sound' && b[0] === PHONE_SECRET) return this.receivePhoneSecret(b);
     if (!secretFrameLooksValid(b)) throw httpError(400, 'That did not sound like a complete VINAC Link secret. Try again.');
     if (!b.subarray(5, 9).equals(this.me.fp.subarray(0, 4))) throw httpError(403, 'That secret was sealed for a different device.');
     const fromPrefix = b.subarray(1, 5).toString('hex');
@@ -1592,6 +1740,32 @@ export class Daemon {
       if (via === 'sound') this.ackSecret(peer, id, sha256('frame', b).toString('hex')).catch(() => {}); // over Wi-Fi the receipt does this
       return { duplicate: false, id, name, from, keystore: w.kind, pending: !!item.pending, offered: !!item.offered };
     } finally { plain.fill(0); }
+  }
+
+  /**
+   * A key from a paired phone (phone vault), heard while the person listens (Receive by sound).
+   * The person is here and chose to receive, so it's accepted; the same name from the same phone
+   * replaces the older copy.
+   */
+  receivePhoneSecret(b) {
+    const { phone, name, value } = this.phones.open(b);
+    try {
+      const s = this.store.secrets();
+      const from = { id: `phone-${phone.id}`, name: phone.name, phone: true };
+      const old = s.items.filter(x => x.from?.id === from.id && x.name === name);
+      if (s.items.length - old.length >= MAX_SECRETS) throw httpError(507, `This device already holds ${MAX_SECRETS} secrets. Delete some first.`);
+      const id = randomBytes(8).toString('hex');
+      const label = `agentlink.secret.${id}`;
+      const w = this.wrapValue(label, value); // fails closed; sealed to the vault when it has a passphrase
+      for (const o of old) forget(o.keystore, o.keyLabel);
+      s.items = s.items.filter(x => !old.includes(x));
+      s.items.push({ id, name, from, receivedAt: new Date().toISOString(), via: 'sound', keystore: w.kind, keyLabel: label, wrapped: w.stored, ...(w.vault ? { vault: true } : {}) });
+      this.store.saveSecrets(s);
+      this.log(`secret "${name}" ← phone ${phone.name} by sound`);
+      this.audit.add('secret.in', { phone: phone.name, name, via: 'sound', ...(old.length ? { replacement: true } : {}) });
+      this.changed();
+      return { duplicate: false, id, name, from, keystore: w.kind, pending: false, offered: false };
+    } finally { value.fill(0); }
   }
 
   async ackSecret(peer, id, digest) {
@@ -1851,6 +2025,7 @@ export class Daemon {
       if (['cross-site', 'same-site'].includes(req.headers['sec-fetch-site'])) throw httpError(403, 'Forbidden origin');
       if (url.pathname.startsWith('/api/')) return await this.routeApi(req, res, url);
       if (url.pathname.startsWith('/ui/')) return await this.routeUi(req, res, url);
+      if (url.pathname.startsWith('/audit-report/')) return this.serveReport(res, url.pathname.slice(14));
       return this.serveStatic(req, res, url);
     } catch (e) {
       if (!e.status) this.log('error:', e.message);
@@ -1864,7 +2039,7 @@ export class Daemon {
       device: this.device(), pairing: this.pairingView({ forHuman: true }), peers: this.peers(), conversations: this.conversations(),
       secrets: this.secretsView(), receiving: this.receiving() ? Math.round((this.receiveUntil - Date.now()) / 1000) : 0,
       waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), vaultLock: this.vault.view(),
-      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), ...extra,
+      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), agents: this.agents.view(), grants: this.grants.view(), phones: this.phones.view(), phonePairing: this.phones.pairingView(), ...extra,
     });
     if (req.method === 'POST' && url.pathname === '/ui/send-file') {
       // The person attaches a file in a conversation (raw bytes; name and device in the query).
@@ -1875,7 +2050,41 @@ export class Daemon {
     const body = req.method === 'POST' ? await readJsonBody(req) : {};
     switch (`${req.method} ${url.pathname}`) {
       case 'GET /ui/state': break;
-      case 'POST /ui/secret-use/decide': this.decideSecretUse(body.id, body.approve === true); break;
+      case 'POST /ui/secret-use/decide': return sendJson(res, 200, state({ grant: this.decideSecretUse(body.id, body.approve === true, { allowHours: body.allowHours ?? undefined, prefix: body.prefix === true }) }));
+      case 'POST /ui/grants/revoke': this.revokeGrant(body.id); break;
+      // Compliance: search the audit log, export it, a signed report, retention.
+      case 'GET /ui/audit': return sendJson(res, 200, this.auditView(url.searchParams));
+      case 'POST /ui/audit/retention': return sendJson(res, 200, { retention: this.setRetention(body) });
+      case 'POST /ui/audit/report': return sendJson(res, 200, this.auditReport(body.filters || {}));
+      case 'POST /ui/audit/export': {
+        const f = body.filters || {};
+        const r = auditQuery(this.audit, Object.fromEntries(Object.entries(f).filter(([, v]) => v)), { limit: 1_000_000 });
+        this.audit.add('audit.exported', { format: 'csv', entries: r.total });
+        res.writeHead(200, { 'content-type': 'text/csv; charset=utf-8', 'content-disposition': `attachment; filename="vinac-audit-${new Date().toISOString().slice(0, 10)}.csv"`, 'cache-control': 'no-store' });
+        return res.end(toCsv(r.entries.reverse()));
+      }
+      // Phone vault: pair a phone (QR link out, its sound back, Allow here), list and remove.
+      case 'POST /ui/phone/start': return sendJson(res, 200, state({ phonePairing: this.phones.start(this.me.name) }));
+      case 'POST /ui/phone/heard': return sendJson(res, 200, state({ phonePairing: this.phones.hello(fromHex(String(body.hex || ''))) }));
+      case 'POST /ui/phone/confirm': {
+        const phone = this.phones.confirm(body.allow === true);
+        if (phone) this.audit.add('phone.paired', { phone: phone.name });
+        return sendJson(res, 200, state({ pairedPhone: phone, phonePairing: null }));
+      }
+      case 'POST /ui/phone/cancel': this.phones.cancel(); break;
+      case 'POST /ui/phones/remove': { const p = this.phones.remove(body.id); this.audit.add('phone.removed', { phone: p.name }); break; }
+      case 'POST /ui/agents/add': {
+        const r = this.agents.add(body.name);
+        this.audit.add('agent.added', { agent: r.agent.name, agentFp: r.agent.fingerprint });
+        return sendJson(res, 200, state({ newAgent: { ...r.agent, token: r.token, env: `VINAC_AGENT_TOKEN=${r.token}` } }));
+      }
+      case 'POST /ui/agents/remove': {
+        const a = this.agents.remove(body.id);
+        // Its grants go with it.
+        for (const g of this.grants.view(a.id)) this.grants.revoke(g.id);
+        this.audit.add('agent.removed', { agent: a.name });
+        break;
+      }
       case 'POST /ui/groups': this.setGroup(body.name, body.members ?? null); break;
       case 'POST /ui/secret/seal': {
         const { peer, id, frame, name } = this.sealSecret(body);
@@ -1957,10 +2166,20 @@ export class Daemon {
 
   async routeApi(req, res, url) {
     const auth = String(req.headers.authorization || '');
+    // The agent this request comes from: null for this computer's default agent token, or an
+    // identity the person added on the page (its own token, kept only as a hash).
+    let agent = null;
     if (!tagsEqual(Buffer.from(auth), Buffer.from(`Bearer ${this.apiToken}`))) {
-      const run = auth.startsWith('Bearer run_') ? this.auto.runFor(auth.slice(7)) : null;
-      if (!run) throw httpError(401, 'Bad token');
-      return this.routeAutoRun(req, res, url, run);
+      agent = auth.startsWith('Bearer agt_') ? this.agents.byToken(auth.slice(7)) : null;
+      if (!agent) {
+        const run = auth.startsWith('Bearer run_') ? this.auto.runFor(auth.slice(7)) : null;
+        if (!run) throw httpError(401, 'Bad token');
+        return this.routeAutoRun(req, res, url, run);
+      }
+    }
+    if (req.method === 'POST' && url.pathname === '/api/secret-run') {
+      const body = await readJsonBody(req, 4 * 1024);
+      return this.secretRun(body.id, agent, res);
     }
     if (req.method === 'POST' && url.pathname === '/api/send-file') {
       // `vinac send-file` / `vinac git send`: the CLI reads the file (as the agent's own
@@ -1978,7 +2197,7 @@ export class Daemon {
       case 'POST /api/groups':
         return sendJson(res, 200, { groups: this.setGroup(body.name, body.members ?? null) });
       case 'POST /api/secret-use':
-        return sendJson(res, 200, this.askSecretUse(body));
+        return sendJson(res, 200, this.askSecretUse(body, agent));
       case 'GET /api/secret-use':
         return sendJson(res, 200, await this.secretUseResult(url.searchParams.get('id'), url.searchParams.get('wait')));
       case 'GET /api/status':
@@ -2002,9 +2221,13 @@ export class Daemon {
           note: 'Send a request with vinac_send { intent, args }. The receiving device\'s firewall (set by its person) decides whether its agent sees it, after approval, or never. Use plain text for anything else.',
         });
       case 'POST /api/send':
-        return sendJson(res, 200, await this.send(body, 'agent'));
+        return sendJson(res, 200, await this.send(body, 'agent', agent ? { agent } : {}));
       case 'GET /api/secrets':
-        return sendJson(res, 200, { secrets: this.secretsView(), note: 'Names only. Agent tools never return values; the person reveals them on the VINAC Link page.' });
+        return sendJson(res, 200, {
+          secrets: this.secretsView(), agent: agent ? agent.name : 'this computer\'s default agent token',
+          allowedRuns: this.grants.view(agent?.id ?? null).map(({ names, command, prefix, cwd, expiresAt }) => ({ names, command, prefix, folder: cwd, expiresAt })),
+          note: 'Names only. Agent tools never return values; the person reveals them on the VINAC Link page. allowedRuns: commands the person allowed you to run with these keys without asking each time (vinac run --secret NAME -- COMMAND, in that folder); VINAC Link starts them itself.',
+        });
       case 'GET /api/inbox':
         return sendJson(res, 200, await this.inbox({ wait: url.searchParams.get('wait'), all: url.searchParams.get('all') === '1', peek: url.searchParams.get('peek') === '1' }));
       case 'GET /api/events':

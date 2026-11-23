@@ -42,8 +42,13 @@ test('site: builds every page with no leftover placeholders, no outside requests
   const out = tempHome('site');
   const r = build({ out, withKit: false });
   assert.equal(r.missing.length, 0);
-  const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html')).map(f => path.join(out, f));
+  // The phone vault app (/app/) is its own small page, checked below.
+  const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !f.replaceAll('\\', '/').startsWith('app/')).map(f => path.join(out, f));
   assert.equal(files.length, PAGES.length + PLAIN.length + 2); // + home + 404
+  const appPage = fs.readFileSync(path.join(out, 'app', 'index.html'), 'utf8');
+  assert.doesNotMatch(appPage, /<(script|img|link)[^>]+(src|href)="https?:/i, 'the phone vault loads nothing from other sites');
+  for (const f of ['app/app.js', 'app/sw.js', 'app/web/phone-crypto.js', 'app/web/phone-frame.js', 'app/lab/js/audio.js', 'app/lab/worklets/vinac-tx-processor.js']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  assert.doesNotMatch(fs.readFileSync(path.join(out, 'app', 'sw.js'), 'utf8'), /\{\{version\}\}/);
   for (const f of ['privacy.html', 'terms.html', 'about.html']) assert.ok(fs.existsSync(path.join(out, f)), f);
   for (const f of files) {
     const html = fs.readFileSync(f, 'utf8');

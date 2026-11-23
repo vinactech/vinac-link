@@ -37,6 +37,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>
           <span>Secrets</span><span class="count" id="secretsCount"></span>
         </button>
+        <button class="navbtn" id="activityNav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M10 12h5M10 15.5h5M10 8.5h2"/></svg>
+          <span>Activity log</span>
+        </button>
       </nav>
 
       <div class="side-section">
@@ -203,8 +207,88 @@
             <h3 class="fw-h">Programs asking to use a secret</h3>
             <ul class="secret-list" id="useList"></ul>
           </div>
+          <div id="grantBox" hidden>
+            <h3 class="fw-h">Allowed runs</h3>
+            <p class="fw-note">These commands may use the named keys without asking each time, until they expire. VINAC Link starts them itself, so the agent never sees the values. Whatever the command runs gets the keys: allow only commands and folders you trust.</p>
+            <ul class="secret-list" id="grantList"></ul>
+          </div>
           <ul class="secret-list" id="secretList"></ul>
+          <details class="agents-box" id="phonesBox">
+            <summary><b>Phones</b> <span id="phonesCount"></span> <span class="betatag">beta</span></summary>
+            <p class="fw-note">Keep keys on your phone and hand one to this computer by sound, with no network. Pair once: scan the code with your phone's camera, play the sound it makes near this computer, check the 6 digits and press Allow. To receive a key later, press <b>Receive by sound</b> here, then <b>Send</b> on the phone.</p>
+            <ul class="secret-list" id="phoneList"></ul>
+            <div class="phone-pair" id="phonePair" hidden>
+              <div class="phone-qr" id="phoneQr"></div>
+              <div class="phone-steps">
+                <ol>
+                  <li>Point your phone's camera at this code and open the link (the phone vault opens in its browser).</li>
+                  <li>On the phone, choose its name and press <b>Play pairing sound</b>, close to this computer.</li>
+                  <li>Check that both screens show the same 6 digits, then press <b>Allow</b> here.</li>
+                </ol>
+                <p class="phone-status" id="phoneStatus">Listening for the phone…</p>
+                <div class="meter" id="phoneMeter" aria-hidden="true"><i></i><i></i><i></i><i></i></div>
+                <div class="phone-confirm" id="phoneConfirm" hidden>
+                  <p>Does <b id="phoneName"></b> show <b class="phone-code" id="phoneCode"></b>?</p>
+                  <div class="row"><button class="primary small-btn" id="phoneAllow" type="button">Same code: Allow</button><button class="ghost" id="phoneDeny" type="button">Different: cancel</button></div>
+                </div>
+                <p class="fine-print">The link carries a one-time code for this computer only, after the # (it never reaches any server). It works for 10 minutes. <button class="linkish" id="phoneCopy" type="button">Copy the link</button> · <button class="linkish" id="phoneCancel" type="button">Cancel</button></p>
+              </div>
+            </div>
+            <button class="ghost small-btn" id="phonePairBtn" type="button">Pair a phone</button>
+          </details>
+          <details class="agents-box" id="agentsBox">
+            <summary><b>Agents on this computer</b> <span id="agentsCount"></span></summary>
+            <p class="fw-note">Give each agent app its own name, so the audit log and allowed runs say which agent did what. Add one, then put its line in that app's VINAC Link settings (environment). Agents can't add themselves.</p>
+            <ul class="secret-list" id="agentList"></ul>
+            <form class="agent-add" id="agentAddForm">
+              <input id="agentName" maxlength="40" placeholder="For example: Codex on the Mac" aria-label="Agent name" autocomplete="off">
+              <button class="ghost small-btn" type="submit">Add agent</button>
+            </form>
+            <div class="agent-token" id="agentToken" hidden></div>
+          </details>
           <p class="foot">VINAC Link's agent tools show names only. Without a passphrase, values are protected by this device's key store, which other programs running as you can ask for. With a passphrase, they can't read them while the vault is locked. Until VINAC Link's security audit, use test or low-risk keys.</p>
+        </div>
+      </section>
+
+      <!-- activity log: the audit log for compliance (search, export, signed report, retention) -->
+      <section class="view secrets-view" data-main="activity">
+        <header class="thread-head plain">
+          <button class="icon back" id="activityBackBtn" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="head-text"><b>Activity log</b><small>Who did what on this device: pairings, requests, approvals, keys used, settings. Never contents or values.</small></div>
+          <div class="vault-actions">
+            <button class="ghost small-btn" id="auditCsvBtn">Export CSV</button>
+            <button class="primary small-btn" id="auditReportBtn">Signed report</button>
+          </div>
+        </header>
+        <div class="pair-body">
+          <div class="audit-chain" id="auditChain"></div>
+          <form class="audit-filters" id="auditFilters">
+            <input type="search" id="auditQ" placeholder="Search: a key name, a command, an intent…" aria-label="Search the log" autocomplete="off">
+            <select id="auditCategory" aria-label="Kind of event"><option value="">All events</option></select>
+            <select id="auditWho" aria-label="Who">
+              <option value="">Anyone</option><option value="person">The person (this page)</option><option value="agent">Agents</option><option value="device">Other devices</option><option value="service">VINAC Link</option>
+            </select>
+            <select id="auditAgent" aria-label="Agent"><option value="">Any agent</option></select>
+            <label class="audit-date">From <input type="date" id="auditFrom"></label>
+            <label class="audit-date">To <input type="date" id="auditTo"></label>
+          </form>
+          <p class="fw-note" id="auditTotal"></p>
+          <ul class="audit-list" id="auditList"></ul>
+          <button class="ghost small-btn" id="auditMore" hidden>Show more</button>
+          <details class="agents-box">
+            <summary><b>Keep the log for</b> <span id="auditKeep"></span></summary>
+            <p class="fw-note">Older months are removed when they pass this age; a removal is itself logged and the chain still verifies. A legal hold keeps everything, whatever the setting. Export or make a signed report first if you need the old entries.</p>
+            <div class="row">
+              <select id="auditKeepSel" aria-label="Keep the log for">
+                <option value="90">3 months</option><option value="365">1 year</option><option value="730">2 years</option><option value="2555">7 years</option><option value="0">Always</option>
+              </select>
+              <label class="use-more"><input type="checkbox" id="auditHold"> Legal hold (remove nothing)</label>
+              <button class="ghost small-btn" id="auditKeepSave" type="button">Save</button>
+            </div>
+          </details>
+          <p class="foot">The log is hash-chained: each line includes the fingerprint of the one before, so a changed or removed line is detected. A signed report adds this device's signature (its key fingerprint is shown above); anyone can check it with <code>vinac audit --check-report report.json</code>. For a full copy kept elsewhere, export regularly.</p>
         </div>
       </section>
 

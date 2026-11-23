@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { defaultHome } from './store.js';
 import { detectKeystore } from './keystore.js';
 import { VERSION } from './mcp.js';
+import {macLifecycleAvailable,managedStop,readOnlyStartupDiagnostics} from './mac-lifecycle.js';
 
 /** Reads the running daemon's address and the agent token without creating anything. */
 function local(home) {
@@ -58,7 +59,12 @@ export async function doctor({ home = defaultHome() } = {}) {
 
   const status = await get(home, '/api/status', 2500);
   if (!status) {
-    add(false, 'Background service', 'Not running. It starts the first time an agent uses VINAC Link, or run: vinac daemon');
+    if(macLifecycleAvailable()){
+      try{
+        const d=await readOnlyStartupDiagnostics(home);
+        add(false,'Background service',d.state==='FREE'?'Not running. Open VINAC Link to start it.':d.state==='UNRESPONSIVE_OWN'?`Verified VINAC PID ${d.proof.pid} is not responding; version unknown. Open VINAC Link for explicit Restart / Force Stop choices. Executable ${d.proof.exe}`:`Ports are occupied by an unverified or unrelated listener; no process was stopped. Run diagnose-startup for PID/port details.`);
+      }catch{add(false,'Background service','Unable to inspect safely. Run diagnose-startup; no process was stopped.');}
+    }else add(false, 'Background service', 'Not running. It starts the first time an agent uses VINAC Link, or run: vinac daemon');
   } else {
     const v = status.version;
     add(true, `Background service running (pid ${status.pid})`, `page ${status.approvalPage}`);
@@ -128,7 +134,8 @@ export function formatChecks(checks) {
 }
 
 /** Stops the background service started for this home folder. */
-export async function stopDaemon({ home = defaultHome() } = {}) {
+export async function stopDaemon({ home = defaultHome(), force = false, expectedInstance } = {}) {
+  if(macLifecycleAvailable()) return managedStop(home,{force,expectedInstance});
   const status = await get(home, '/api/status', 2000);
   if (!status?.pid) return { stopped: false, message: 'VINAC Link is not running.' };
   try { process.kill(status.pid); } catch (e) { return { stopped: false, message: `Could not stop pid ${status.pid}: ${e.message}` }; }
