@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>VINAC Link · Team console</title>
+<meta name="description" content="See the computers on your VINAC Link account and your team's, invite teammates and read their signed monthly activity summaries.">
+<meta name="robots" content="noindex">
+<meta name="theme-color" content="#0b0b10">
+<link rel="icon" type="image/png" sizes="32x32" href="/brand/favicon-32.png">
+<link rel="stylesheet" href="/console/console.css">
+<script type="module" src="/console/console.js"></script>
+</head>
+<body>
+
+<header class="bar">
+  <a class="brand" href="/"><img src="/brand/icon-128.png" alt="" width="28" height="28"><span>VINAC Link</span><em>Team console</em><i class="beta">beta</i></a>
+  <div class="who" id="who" hidden><span id="whoEmail"></span><button class="btn small quiet" id="signOut" type="button">Sign out</button></div>
+</header>
+
+<!-- signed out: email, then the code from the email -->
+<main class="auth" id="vSignIn" hidden>
+  <h1>Team console</h1>
+  <p class="lead">Your computers and your team's in one place. Sign in with the email you use in VINAC Link (Account); we email you a code, no password.</p>
+  <form id="emailForm" class="stack">
+    <label class="field"><span>Email</span><input id="email" type="email" autocomplete="email" maxlength="200" placeholder="you@example.com" required></label>
+    <button class="btn primary" type="submit">Send me a sign-in code</button>
+  </form>
+  <form id="codeForm" class="stack" hidden>
+    <p class="hint">Code sent to <b id="codeTo"></b>. It works for 15 minutes.</p>
+    <label class="field"><span>Code from the email</span><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="12345678" required></label>
+    <button class="btn primary" type="submit">Sign in</button>
+    <button class="btn quiet" id="otherEmail" type="button">Use another email</button>
+  </form>
+  <p class="fine">The console runs in this browser and talks only to VINAC Link's account service (Supabase, stored in Canada). It shows names, fingerprints and "last seen" of linked computers, and the counts teammates chose to share. Never messages, keys or files: those never leave the computers.</p>
+</main>
+
+<main class="console" id="vMain" hidden>
+  <section class="card" id="invitesForMe" hidden>
+    <h2>Invitations for you</h2>
+    <ul class="list" id="myInvites"></ul>
+  </section>
+
+  <section class="card">
+    <h2>Your computers</h2>
+    <p class="sub">Linked from VINAC Link (Account → Link this computer). "Online" means seen in the last 20 minutes.</p>
+    <ul class="list" id="myDevices"></ul>
+  </section>
+
+  <section class="card">
+    <div class="card-head"><h2>Teams</h2></div>
+    <ul class="list" id="teamList"></ul>
+    <form id="newTeamForm" class="inline">
+      <input id="newTeamName" maxlength="60" placeholder="New team name" aria-label="New team name" required>
+      <button class="btn small" type="submit">Create team</button>
+    </form>
+  </section>
+
+  <section class="card" id="teamPanel" hidden>
+    <div class="card-head">
+      <h2 id="teamName"></h2>
+      <div class="btn-row">
+        <button class="btn small quiet" id="renameTeam" type="button" hidden>Rename</button>
+        <button class="btn small danger" id="deleteTeam" type="button" hidden>Delete team</button>
+        <button class="btn small quiet" id="leaveTeam" type="button" hidden>Leave team</button>
+      </div>
+    </div>
+
+    <h3>Members</h3>
+    <ul class="list" id="members"></ul>
+
+    <div id="inviteBox" hidden>
+      <h3>Invite a teammate</h3>
+      <form id="inviteForm" class="inline">
+        <input id="inviteEmail" type="email" maxlength="200" placeholder="teammate@example.com" aria-label="Teammate's email" required>
+        <select id="inviteRole" aria-label="Role"><option value="member">Member</option><option value="admin">Admin</option></select>
+        <button class="btn small" type="submit">Invite</button>
+      </form>
+      <p class="sub">They sign in here with that email to accept (within 14 days). Admins can invite and remove members; only owners change roles or delete the team.</p>
+      <ul class="list" id="pendingInvites"></ul>
+    </div>
+
+    <h3>Team computers</h3>
+    <ul class="list" id="teamDevices"></ul>
+
+    <h3>Shared activity summaries</h3>
+    <p class="sub">Monthly counts a member chose to share from a computer's page (Account → Share summary), signed by that computer. Checked here against the computer's public key.</p>
+    <ul class="list" id="reports"></ul>
+  </section>
+</main>
+
+<div class="toast" id="toast" role="status" hidden></div>
+<noscript><p class="fine">The Team console needs JavaScript.</p></noscript>
+</body>
+</html>

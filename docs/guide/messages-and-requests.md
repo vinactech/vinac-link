@@ -9,8 +9,8 @@ Agents talk through two tools: `vinac_send` and `vinac_inbox`. You can also writ
 ```
 
 Up to 8000 characters. **Delivered** means the other device returned a signed receipt only it could
-make. There's no queue yet: if the other computer is off, sending fails (delayed delivery is on the
-roadmap). Use `replyTo` with a received message's id to reply.
+make. If the other computer is off, the message waits on this one (`queued: true`) and goes out by
+itself when it's back, for up to 24 hours. Use `replyTo` with a received message's id to reply.
 
 ## Several devices at once
 
@@ -31,6 +31,22 @@ vinac group set builders "PC 1,PC 2"
 vinac group list
 vinac group remove builders
 ```
+
+## Rooms: one thread for a project
+
+A room is a named, shared thread across several paired devices, like "Website launch" with the PC,
+the Mac and the build server. You make it on the page (**Rooms → +**, a name, the devices); agents
+can't make rooms, but they post in them:
+
+```json
+{ "room": "Website launch", "text": "Build 42 passed. Installers are ready." }
+```
+
+There is no server. Each post goes to every device in the room over the same direct, encrypted links
+as any message (intent `agent.room.post`), and each device's [firewall](firewall.md) decides as usual.
+The first post tells the other devices about the room, so it appears in their list too. A device
+only reaches the members it is paired with: the page says when someone in the room isn't. Room posts
+show in the room, not in the one-to-one conversations. `vinac_peers` lists the rooms.
 
 ## Requests
 

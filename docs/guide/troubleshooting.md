@@ -43,7 +43,8 @@ new version updates a running older one by itself.
 You opened VINAC Link from the disk image. Press **Install / Update**: it copies the app into
 Applications (checking its signature first, keeping the old copy until the new one starts) and
 runs it from there. Your keys, pairings and history stay as they are. You can eject the disk image
-afterwards.
+afterwards. Since 0.13, opening the copy in Applications no longer asks again: if it's the same
+signed version that is already installed, it simply starts (or shows) that copy.
 
 **macOS: it won't start, or says VINAC Link is not responding**
 Run `vinac diagnose-startup` (Terminal, in the app's folder) to see what holds the ports; it changes
@@ -74,8 +75,13 @@ Without a router, connect the two computers to the same hotspot or with a cable;
 
 ## FAQ
 
-**Is there a server?** No. Devices talk directly. Delivery on a USB stick, and later an optional
-relay, are on the roadmap; both would only ever carry sealed messages.
+**Is there a server?** Not unless you want one. Devices talk directly. An optional
+[relay](accounts.md#the-relay) (with an account, off until you turn it on) carries sealed messages
+between your own computers on different networks; it can't read them.
+
+**The relay is on but a computer still isn't reachable** Both computers must be paired with each
+other, linked to the same account, and have the relay switched on. Under **Account → Relay**, *On ·
+connected* means it's ready; otherwise the reason is shown there and VINAC Link retries by itself.
 
 **Does it need the internet?** No. See [offline use](offline.md).
 

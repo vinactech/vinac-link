@@ -85,6 +85,7 @@
   </div>
 
   <div class="scene" id="s-thread"><div class="win"><div class="cam"><img src="../site/media/tour-thread.jpg" alt=""></div></div></div>
+  <div class="scene" id="s-room"><div class="win"><div class="cam"><img src="../site/media/tour-room.jpg" alt=""></div></div></div>
   <div class="scene" id="s-modes"><div class="win"><div class="cam"><img src="../site/media/app-firewall-dark.jpg" alt="">
     <div class="hl" id="hl-modes" style="left:446px;top:166px;width:266px;height:56px;opacity:0"></div>
   </div></div></div>
@@ -94,8 +95,8 @@
   </div></div></div>
   <div class="scene" id="s-secrets"><div class="win"><div class="cam"><img src="../site/media/tour-secrets.jpg" alt=""></div></div></div>
   <div class="scene" id="s-keys"><div class="win"><div class="cam"><img src="../site/media/tour-keys.jpg" alt="">
-    <div class="approved" id="sent" style="left:1130px;top:346px;width:140px;height:34px;opacity:0">Sent</div>
-    <div class="toast" id="toast2" style="opacity:0;left:864px;top:630px;bottom:auto">Sent to Mac. It's ready to use there.</div>
+    <div class="approved" id="sent" style="left:1136px;top:216px;width:140px;height:34px;opacity:0">Sent</div>
+    <div class="toast" id="toast2" style="opacity:0;left:864px;top:470px;bottom:auto">Sent to Mac. It's ready to use there.</div>
   </div></div></div>
 
   <!-- the build runs -->
@@ -156,22 +157,23 @@ const S = [
   { id: 's-compare', a: 25, b: 33.6, step: '2 · PAIR', c1: 'Same 6 digits on both screens? Allow on both.', c2: 'Only a person can finish pairing. No agent can.' },
   { id: 's-agent', a: 33, b: 41.6, step: '3 · ASK', c1: 'Now your agents can ask each other,', c2: 'across vendors: Claude Code, Codex, OpenClaw, local models.' },
   { id: 's-thread', a: 41, b: 48.6, step: '3 · ASK', c1: 'Every request names its intent,', c2: 'and you can follow every conversation.' },
-  { id: 's-modes', a: 48, b: 55.6, step: '4 · DECIDE', c1: 'Pick a mode: Restricted, Standard or Auto.', c2: 'High-risk requests stay blocked in every mode.' },
-  { id: 's-firewall', a: 55, b: 65.6, step: '4 · DECIDE', c1: 'Anything that matters waits for you.', c2: 'Approve it once, or for an hour. Or reject it.' },
-  { id: 's-secrets', a: 65, b: 74.6, step: '5 · KEYS', c1: 'Keys move from vault to vault, never through a chat.', c2: 'Lock the vault with a passphrase. Agents only see names.' },
-  { id: 's-keys', a: 74, b: 83.6, step: '5 · KEYS', c1: 'Missing a key? The other computer asks for it.', c2: 'One click sends it. Keys nobody asked for wait for your Accept.' },
-  { id: 's-run', a: 83, b: 92.6, step: '5 · KEYS', c1: 'You approve the exact command. The program gets the key.', c2: 'The agent never sees it, even if the program prints it.' },
-  { id: 's-overview', a: 92, b: 100.6, step: '6 · ANYWHERE', c1: 'Online or offline: Wi‑Fi, a hotspot, a cable or Tailscale.', c2: 'If a device is off, messages wait and go out when it is back.' },
-  { id: 's-end', a: 100, b: 107 },
+  { id: 's-room', a: 48, b: 56.6, step: '3 · ASK', c1: 'One room for a project, across several devices.', c2: 'Each post goes straight to every device, through its firewall.' },
+  { id: 's-modes', a: 56, b: 63.6, step: '4 · DECIDE', c1: 'Pick a mode: Restricted, Standard or Auto.', c2: 'High-risk requests stay blocked in every mode.' },
+  { id: 's-firewall', a: 63, b: 73.6, step: '4 · DECIDE', c1: 'Anything that matters waits for you.', c2: 'Approve it once, or for an hour. Or reject it.' },
+  { id: 's-secrets', a: 73, b: 82.6, step: '5 · KEYS', c1: 'Keys move from vault to vault, never through a chat.', c2: 'Lock the vault with a passphrase. Agents only see names.' },
+  { id: 's-keys', a: 82, b: 91.6, step: '5 · KEYS', c1: 'Missing a key? The other computer asks for it.', c2: 'One click sends it. Keys nobody asked for wait for your Accept.' },
+  { id: 's-run', a: 91, b: 100.6, step: '5 · KEYS', c1: 'You approve the exact command. The program gets the key.', c2: 'The agent never sees it, even if the program prints it.' },
+  { id: 's-overview', a: 100, b: 108.6, step: '6 · ANYWHERE', c1: 'Online or offline: Wi‑Fi, a hotspot, a cable or Tailscale.', c2: 'On different networks, an optional relay passes on sealed messages.' },
+  { id: 's-end', a: 108, b: 115 },
 ];
-window.DURATION = 107;
-window.POSTER = 103.5;
+window.DURATION = 115;
+window.POSTER = 111.5;
 
 function renderInstall(t) {
   let out = `<span class="mut">$</span> ${typed('curl -fsSL https://vinac.tech/install.sh | sh', t, 5.3, 24)}`;
   if (t < 7.3) out += '<span class="caret"></span>';
   out += lines(t, [
-    [7.6, '<span class="mut">Downloading VINAC-Link-0.10.0.dmg ...</span>'],
+    [7.6, '<span class="mut">Downloading VINAC-Link-0.13.0.dmg ...</span>'],
     [8.6, '<span class="ok">Checksum OK. Signed and notarized by Apple.</span>'],
     [9.6, 'Installed: /Applications/VINAC Link.app'],
     [10.6, '<span class="mut">Next: pair a second computer in the VINAC Link window.</span>'],
@@ -189,14 +191,14 @@ function renderAgent(t) {
   $('agent-text').innerHTML = out;
 }
 function renderRun(t) {
-  let out = `<span class="mut">$</span> ${typed('vinac run --secret STRIPE_TEST_KEY -- npm start', t, 83.8, 26)}`;
-  if (t < 85.6) out += '<span class="caret"></span>';
+  let out = `<span class="mut">$</span> ${typed('vinac run --secret STRIPE_TEST_KEY -- npm start', t, 91.8, 26)}`;
+  if (t < 93.6) out += '<span class="caret"></span>';
   out += lines(t, [
-    [85.9, '<span class="mut">Waiting for approval on the VINAC Link page (Secrets) ...</span>'],
-    [87.4, '<span class="ok">Approved on the page.</span>'],
-    [88.3, '<span class="mut">&gt; shop@1.0.0 start</span>'],
-    [89.0, 'Listening on http://localhost:3000'],
-    [89.9, 'Stripe key: <span class="acc">[hidden: STRIPE_TEST_KEY]</span>'],
+    [93.9, '<span class="mut">Waiting for approval on the VINAC Link page (Secrets) ...</span>'],
+    [95.4, '<span class="ok">Approved on the page.</span>'],
+    [96.3, '<span class="mut">&gt; shop@1.0.0 start</span>'],
+    [97, 'Listening on http://localhost:3000'],
+    [97.9, 'Stripe key: <span class="acc">[hidden: STRIPE_TEST_KEY]</span>'],
   ]);
   $('run-text').innerHTML = out;
 }
@@ -207,20 +209,21 @@ const CAM = {
   's-pair': [{ t: 16.6, x: 720, y: 450, z: 1 }, { t: 18.6, x: 862, y: 360, z: 1.4 }, { t: 25.4, x: 880, y: 360, z: 1.45 }],
   's-compare': [{ t: 25, x: 860, y: 300, z: 1.25 }, { t: 27.4, x: 864, y: 240, z: 1.9 }, { t: 31, x: 864, y: 240, z: 1.9 }, { t: 33.4, x: 840, y: 300, z: 1.35 }],
   's-thread': [{ t: 41, x: 720, y: 450, z: 1 }, { t: 43.4, x: 700, y: 400, z: 1.4 }, { t: 48.4, x: 700, y: 480, z: 1.45 }],
-  's-modes': [{ t: 48, x: 720, y: 450, z: 1 }, { t: 50.4, x: 640, y: 220, z: 1.7 }, { t: 55.4, x: 640, y: 225, z: 1.75 }],
-  's-firewall': [{ t: 55, x: 760, y: 420, z: 1.15 }, { t: 57.4, x: 900, y: 600, z: 1.3 }, { t: 65.4, x: 900, y: 600, z: 1.32 }],
-  's-secrets': [{ t: 65, x: 720, y: 450, z: 1 }, { t: 67.4, x: 720, y: 430, z: 1.35 }, { t: 74.4, x: 720, y: 460, z: 1.38 }],
-  's-keys': [{ t: 74, x: 720, y: 450, z: 1 }, { t: 76.4, x: 880, y: 400, z: 1.45 }, { t: 83.4, x: 880, y: 410, z: 1.48 }],
-  's-overview': [{ t: 92, x: 720, y: 450, z: 1.05 }, { t: 100.4, x: 760, y: 420, z: 1.15 }],
+  's-room': [{ t: 48, x: 720, y: 450, z: 1 }, { t: 50.4, x: 760, y: 300, z: 1.4 }, { t: 56.4, x: 760, y: 320, z: 1.42 }],
+  's-modes': [{ t: 56, x: 720, y: 450, z: 1 }, { t: 58.4, x: 640, y: 220, z: 1.7 }, { t: 63.4, x: 640, y: 225, z: 1.75 }],
+  's-firewall': [{ t: 63, x: 760, y: 420, z: 1.15 }, { t: 65.4, x: 900, y: 600, z: 1.3 }, { t: 73.4, x: 900, y: 600, z: 1.32 }],
+  's-secrets': [{ t: 73, x: 720, y: 450, z: 1 }, { t: 75.4, x: 720, y: 430, z: 1.35 }, { t: 82.4, x: 720, y: 460, z: 1.38 }],
+  's-keys': [{ t: 82, x: 720, y: 450, z: 1 }, { t: 84.4, x: 900, y: 320, z: 1.45 }, { t: 91.4, x: 900, y: 330, z: 1.48 }],
+  's-overview': [{ t: 100, x: 720, y: 450, z: 1.05 }, { t: 108.4, x: 760, y: 420, z: 1.15 }],
 };
 // pointer: [{t, x, y}] in screen pixels of the given scene; clicks: times
 const PTR = {
   's-pair': { keys: [{ t: 19, x: 1100, y: 560 }, { t: 21.2, x: 1060, y: 312 }], clicks: [21.6] },
   's-compare': { keys: [{ t: 30.4, x: 980, y: 420 }, { t: 32.2, x: 788, y: 312 }], clicks: [32.6] },
-  's-keys': { keys: [{ t: 78, x: 1100, y: 560 }, { t: 80.2, x: 1161, y: 363 }], clicks: [80.6] },
-  's-modes': { keys: [{ t: 51.2, x: 820, y: 320 }, { t: 53, x: 668, y: 196 }], clicks: [] },
-  's-firewall': { keys: [{ t: 58.2, x: 1200, y: 680 }, { t: 60.6, x: 1021, y: 541 }], clicks: [61] },
-  's-secrets': { keys: [{ t: 69, x: 980, y: 600 }, { t: 71.4, x: 720, y: 694 }], clicks: [71.8] },
+  's-keys': { keys: [{ t: 86, x: 1100, y: 560 }, { t: 88.2, x: 1164, y: 234 }], clicks: [88.6] },
+  's-modes': { keys: [{ t: 59.2, x: 820, y: 320 }, { t: 61, x: 668, y: 196 }], clicks: [] },
+  's-firewall': { keys: [{ t: 66.2, x: 1200, y: 680 }, { t: 68.6, x: 1021, y: 541 }], clicks: [69] },
+  's-secrets': { keys: [{ t: 77, x: 980, y: 600 }, { t: 79.4, x: 720, y: 694 }], clicks: [79.8] },
 };
 
 function renderAt(t) {
@@ -256,12 +259,12 @@ function renderAt(t) {
 
   // highlights and the approval result
   $('hl-digits').style.opacity = (clamp((t - 27.6) / 0.5) * clamp((30.8 - t) / 0.5)).toFixed(3);
-  $('hl-modes').style.opacity = (clamp((t - 50.6) / 0.5) * clamp((55.2 - t) / 0.4)).toFixed(3);
-  const ap = clamp((t - 61.2) / 0.3);
+  $('hl-modes').style.opacity = (clamp((t - 58.6) / 0.5) * clamp((63.2 - t) / 0.4)).toFixed(3);
+  const ap = clamp((t - 69.2) / 0.3);
   $('approved').style.opacity = ap.toFixed(3);
-  $('toast').style.opacity = (ap * clamp((65.2 - t) / 0.4)).toFixed(3);
-  $('sent').style.opacity = clamp((t - 80.8) / 0.3).toFixed(3);
-  $('toast2').style.opacity = (clamp((t - 80.8) / 0.3) * clamp((83.2 - t) / 0.4)).toFixed(3);
+  $('toast').style.opacity = (ap * clamp((73.2 - t) / 0.4)).toFixed(3);
+  $('sent').style.opacity = clamp((t - 88.8) / 0.3).toFixed(3);
+  $('toast2').style.opacity = (clamp((t - 88.8) / 0.3) * clamp((91.2 - t) / 0.4)).toFixed(3);
 }
 
 window.ready = Promise.all([...document.images].map(i => i.complete ? 0 : new Promise(r => { i.onload = i.onerror = r; }))).then(() => document.fonts.ready).then(() => renderAt(0));

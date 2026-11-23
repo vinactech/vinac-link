@@ -38,7 +38,9 @@ chat: VINAC Link's agent tools don't return secret values, only names. (Other pr
 the same OS account can still read unlocked secrets from the key store; a vault passphrase locks them.)
 
 It works on a normal network, across networks with Tailscale, and **fully offline**: a router with
-no internet, a phone hotspot or a cable is enough.
+no internet, a phone hotspot or a cable is enough. An optional account (beta) adds a relay for
+computers on different networks (it passes on sealed messages it can't read), a Team console and
+shared monthly summaries; see [accounts, relay and teams](docs/guide/accounts.md).
 
 *VINAC = Verified Intent Network for Agent Communication.* Made by Mexley Marketing Inc.
 
@@ -56,7 +58,7 @@ your agents one safe channel, across vendors, with a person in charge of what ea
 | | VINAC Link |
 |---|---|
 | **Any vendor** | Claude Code, Codex, OpenClaw, local models and any MCP app, on the same link |
-| **No cloud, no account** | Computers talk directly; nothing goes through us |
+| **No cloud, no account needed** | Computers talk directly; an optional relay only passes on sealed messages |
 | **Online or offline** | Wi-Fi, hotspot, cable or Tailscale; never needs the internet |
 | **Firewall for every request** | Allow, Ask me or Block, per intent and per device |
 | **Secrets without exposure** | Agents use keys by name; values stay in the OS key store |

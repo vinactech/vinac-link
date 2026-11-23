@@ -42,9 +42,9 @@ export const COMMANDS = {
     if (!MODES.includes(p.mode)) throw new BadRequest('mode must be "announce" or "listen"');
     return { mode: p.mode };
   }],
-  'vinac.send': ['vinac_send', ['to', 'text', 'replyTo', 'intent', 'args'], p => {
+  'vinac.send': ['vinac_send', ['to', 'room', 'text', 'replyTo', 'intent', 'args'], p => {
     if (p.args != null && (typeof p.args !== 'object' || Array.isArray(p.args))) throw new BadRequest('args must be an object');
-    return { to: optStr(p.to, 'to', 200), text: optStr(p.text, 'text', 8000), replyTo: optStr(p.replyTo, 'replyTo', 64), intent: optStr(p.intent, 'intent', 80), args: p.args ?? undefined };
+    return { to: optStr(p.to, 'to', 200), room: optStr(p.room, 'room', 100), text: optStr(p.text, 'text', 8000), replyTo: optStr(p.replyTo, 'replyTo', 64), intent: optStr(p.intent, 'intent', 80), args: p.args ?? undefined };
   }],
   'vinac.file': ['vinac_file', ['id'], p => ({ id: optStr(p.id, 'id', 64) || (() => { throw new BadRequest('id is required'); })() })],
   'vinac.inbox': ['vinac_inbox', ['waitSeconds', 'all'], p => {

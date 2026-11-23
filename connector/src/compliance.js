@@ -19,6 +19,8 @@ export const CATEGORIES = {
   files: { label: 'Files', types: ['file.saved'] },
   settings: { label: 'Settings and vault', types: ['mode.changed', 'rule.changed', 'autoreply.changed', 'temporary.cleared', 'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed'] },
   log: { label: 'The log itself', types: ['audit.exported', 'audit.pruned', 'report.created'] },
+  rooms: { label: 'Rooms', types: ['room.created', 'room.left', 'room.joined'] },
+  account: { label: 'Account', types: ['account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared'] },
 };
 const CATEGORY_OF = Object.fromEntries(Object.entries(CATEGORIES).flatMap(([c, { types }]) => types.map(t => [t, c])));
 export const categoryOf = type => CATEGORY_OF[type] || 'other';
@@ -26,7 +28,7 @@ export const categoryOf = type => CATEGORY_OF[type] || 'other';
 // Decisions and settings only a person can make, on this device's page.
 const BY_PERSON = new Set(['pair', 'invite.created', 'phone.paired', 'phone.removed', 'request.decided', 'secret.added', 'secret.accepted', 'secret.revealed',
   'secret.use.denied', 'grant.created', 'grant.revoked', 'agent.added', 'agent.removed', 'mode.changed', 'rule.changed', 'autoreply.changed', 'temporary.cleared',
-  'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed', 'audit.exported', 'report.created', 'secret.out']);
+  'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed', 'audit.exported', 'report.created', 'secret.out', 'account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared', 'room.created', 'room.left']);
 
 /** { kind: 'person' | 'agent' | 'device' | 'service', name } */
 export function actorOf(e) {
@@ -34,7 +36,7 @@ export function actorOf(e) {
   if (BY_PERSON.has(e.type)) return { kind: 'person', name: 'the person (this page)' };
   if (e.type === 'msg.out') return e.by === 'person' ? { kind: 'person', name: 'the person (this page)' } : { kind: 'agent', name: e.agent || 'agent' };
   if (e.type === 'msg.in' && e.agent) return { kind: 'device', name: `${e.peer?.name || 'a paired device'} › agent ${e.agent}` };
-  if (e.type === 'msg.in' || e.type === 'secret.in' || e.type === 'unpair') return { kind: 'device', name: e.peer?.name || e.phone || 'a paired device' };
+  if (e.type === 'msg.in' || e.type === 'secret.in' || e.type === 'unpair' || e.type === 'room.joined') return { kind: 'device', name: e.peer?.name || e.phone || 'a paired device' };
   if (e.type === 'file.saved') return { kind: 'agent', name: e.agent || 'agent' };
   return { kind: 'service', name: 'VINAC Link' };
 }
@@ -137,6 +139,39 @@ export function checkReport(report) {
     }
     return { ok: true, device: report.device, count: report.count, generatedAt: report.generatedAt, chainOk: report.chain.ok };
   } catch (e) { return { ok: false, problem: `Not a VINAC Link report (${e.message}).` }; }
+}
+
+// ---- team summary (0.13): what may be shared with a team, signed ------------------------------
+
+export const TEAM_SUMMARY_LABEL = 'VINAC Link team summary v1';
+
+/**
+ * One month's activity as counts only: by category, by who acted, approvals, denials, grants, and
+ * how many agents and keys were involved (never their names, never contents). `payload` is the exact
+ * text that is signed with the device's identity key and stored; the console checks it.
+ */
+export function teamSummary({ audit, device, privateKey, team, period }) {
+  if (!/^\d{4}-(0[1-9]|1[0-2])$/.test(String(period))) throw Object.assign(new Error('Pick a month (YYYY-MM).'), { status: 400 });
+  const [y, m] = period.split('-').map(Number);
+  const from = new Date(Date.UTC(y, m - 1, 1)).toISOString(), to = new Date(Date.UTC(y, m, 1) - 1).toISOString();
+  const s = { total: 0, byCategory: {}, byWho: {}, approvals: 0, denials: 0, grants: { created: 0, revoked: 0 }, agents: 0, keysUsed: 0 };
+  const agents = new Set(), keys = new Set();
+  for (const e of audit.entries()) {
+    if (e.damaged || e.at < from || e.at > to) continue;
+    s.total++;
+    const c = categoryOf(e.type), w = actorOf(e).kind;
+    s.byCategory[c] = (s.byCategory[c] || 0) + 1;
+    s.byWho[w] = (s.byWho[w] || 0) + 1;
+    if (e.agent) agents.add(e.agent);
+    if (e.type === 'secret.used') for (const n of e.names || []) keys.add(n);
+    if (e.type === 'grant.created') s.grants.created++;
+    if (e.type === 'grant.revoked') s.grants.revoked++;
+    if (e.type === 'request.decided') { if (e.status === 'approved') s.approvals++; else s.denials++; }
+    if (e.type === 'secret.use.denied') s.denials++;
+  }
+  s.agents = agents.size; s.keysUsed = keys.size;
+  const payload = JSON.stringify({ label: TEAM_SUMMARY_LABEL, team, device: { name: device.name, fingerprint: device.fingerprint }, period, from, to, generatedAt: new Date().toISOString(), chainOk: audit.verify().ok, summary: s });
+  return { payload, signature: Buffer.from(sign(privateKey, payload)).toString('base64url'), summary: s };
 }
 
 // ---- retention ---------------------------------------------------------------------------

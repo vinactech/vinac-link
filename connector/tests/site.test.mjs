@@ -43,7 +43,21 @@ test('site: builds every page with no leftover placeholders, no outside requests
   const r = build({ out, withKit: false });
   assert.equal(r.missing.length, 0);
   // The phone vault app (/app/) is its own small page, checked below.
-  const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !f.replaceAll('\\', '/').startsWith('app/')).map(f => path.join(out, f));
+  const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !/^(app|console)\//.test(f.replaceAll('\\', '/'))).map(f => path.join(out, f));
+  // The Team console (/console/): talks to the account service only, under its own CSP; the rest of the
+  // site keeps connect-src 'self'.
+  const con = fs.readFileSync(path.join(out, 'console', 'index.html'), 'utf8');
+  assert.doesNotMatch(con, /<(script|img|link)[^>]+(src|href)="https?:/i, 'the console loads nothing from other sites');
+  const conJs = fs.readFileSync(path.join(out, 'console', 'console.js'), 'utf8');
+  assert.doesNotMatch(conJs, /\{\{\w+\}\}/);
+  assert.match(conJs, /const CLOUD_URL = 'https:\/\/[a-z0-9]+\.supabase\.co'/);
+  assert.match(conJs, /const CLOUD_KEY = 'sb_publishable_/, 'only the publishable key');
+  assert.doesNotMatch(conJs, /sb_secret_|service_role|innerHTML/, 'no secret key, no HTML from data');
+  const conCsp = fs.readFileSync(path.join(out, 'console', '.htaccess'), 'utf8');
+  assert.match(conCsp, /connect-src 'self' https:\/\/[a-z0-9]+\.supabase\.co;/);
+  assert.match(conCsp, /script-src 'self';/); assert.match(conCsp, /frame-ancestors 'none'/);
+  assert.match(fs.readFileSync(path.join(out, '.htaccess'), 'utf8'), /connect-src 'self';/, 'the rest of the site talks to no one');
+  assert.doesNotMatch(fs.readFileSync(path.join(out, 'sitemap.xml'), 'utf8'), /console/);
   assert.equal(files.length, PAGES.length + PLAIN.length + 2 + FR_PLAIN.length + 1); // + home + 404, + the French pages and home
   // French pages: French, with the language switch and hreflang twins, and no English page left behind.
   for (const u of ['/fr/', ...FR_PLAIN.map(p => p[1])]) {

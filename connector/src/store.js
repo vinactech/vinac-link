@@ -108,6 +108,9 @@ export class Store {
     return kp;
   }
 
+  /** Writes a small JSON file in the home folder (user-only, atomic). */
+  writeJson(name, obj) { writeAtomic(this.file(name), JSON.stringify(obj, null, 1)); }
+
   peers() { return readJson(this.file('peers.json'), []); }
   savePeers(list) { writeAtomic(this.file('peers.json'), JSON.stringify(list, null, 2)); }
 
@@ -228,6 +231,10 @@ export class Store {
   /** Groups: name -> paired device ids (an address book; see Daemon.targets). */
   groups() { const g = readJson(this.file('groups.json'), { v: 1, groups: {} }); return g.groups && typeof g.groups === 'object' ? g.groups : {}; }
   saveGroups(groups) { writeAtomic(this.file('groups.json'), JSON.stringify({ v: 1, groups }, null, 1)); }
+
+  /** Shared project rooms: [{ id, name, members: [peer ids], createdAt, by: 'me' | peer id }]. */
+  rooms() { const r = readJson(this.file('rooms.json'), { v: 1, rooms: [] }); return Array.isArray(r.rooms) ? r.rooms : []; }
+  saveRooms(rooms) { writeAtomic(this.file('rooms.json'), JSON.stringify({ v: 1, rooms }, null, 1)); }
 
   /** Removes stored files that no message refers to any more (history keeps the last 500). */
   pruneFiles(keepIds) {

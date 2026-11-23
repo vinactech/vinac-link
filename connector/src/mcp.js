@@ -42,17 +42,18 @@ export const TOOLS = [
   },
   {
     name: 'vinac_peers',
-    description: 'List the devices this computer is paired with: name, key fingerprint, when and how they were paired.',
+    description: 'List the devices this computer is paired with (name, key fingerprint, when and how they were paired), and the shared project rooms this computer is in (name and member devices).',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
   },
   {
     name: 'vinac_send',
-    description: 'Send a message to the AI agent on a paired device. The message is encrypted so only that device can read it, and it arrives in that device\'s VINAC Link inbox. `to` is the device name, id or fingerprint from vinac_peers (may be left out when only one device is paired); it can also be "all", a group name, or several names separated by commas (one result per device). Set replyTo to the id of a received message when answering it. To ask the other device to DO something, also set `intent` (an intent from vinac_intents) and `args`: the other device\'s firewall then lets its agent see the request, holds it for its person\'s approval, or blocks it. If the other device is off or unreachable, a message or request waits on this device (queued: true) and is sent automatically when it is back, for up to 24 hours; files are not queued.',
+    description: 'Send a message to the AI agent on a paired device. The message is encrypted so only that device can read it, and it arrives in that device\'s VINAC Link inbox. `to` is the device name, id or fingerprint from vinac_peers (may be left out when only one device is paired); it can also be "all", a group name, or several names separated by commas (one result per device). Set replyTo to the id of a received message when answering it. To ask the other device to DO something, also set `intent` (an intent from vinac_intents) and `args`: the other device\'s firewall then lets its agent see the request, holds it for its person\'s approval, or blocks it. If the other device is off or unreachable, a message or request waits on this device (queued: true) and is sent automatically when it is back, for up to 24 hours; files are not queued. To post in a shared project room (listed by vinac_peers), set `room` to its name instead of `to`: the text goes to every device in the room, each through its own firewall. Rooms are made by the person on the page, not by agents.',
     inputSchema: {
       type: 'object',
       properties: {
         to: { type: 'string', description: 'Paired device name, id or fingerprint; or "all", a group, or names separated by commas.' },
+        room: { type: 'string', description: 'A shared project room\'s name or id (instead of to): posts the text to every device in it.' },
         text: { type: 'string', description: 'The message, up to 8000 characters. Optional when intent is set.' },
         replyTo: { type: 'string', description: 'Id of the received message this answers.' },
         intent: { type: 'string', description: 'Optional intent (see vinac_intents). Everyday ones: "agent.question.ask" {question}, "agent.status.update" {status}, "agent.review.request" {summary, diff?}, "agent.task.handoff" {task, details?}, "document.file.share" {name, text|base64}.' },
@@ -238,7 +239,7 @@ export class AgentApi {
       case 'vinac_unpair': return this.call('POST', '/api/unpair', { id: String(args.id || '') });
       case 'vinac_secrets': return this.call('GET', '/api/secrets');
       case 'vinac_send':
-        return this.call('POST', '/api/send', { to: args.to, text: args.text, replyTo: args.replyTo, intent: args.intent, args: args.args }, 15_000);
+        return this.call('POST', '/api/send', { to: args.to, room: args.room, text: args.text, replyTo: args.replyTo, intent: args.intent, args: args.args }, args.room ? 60_000 : 15_000);
       case 'vinac_intents': return this.call('GET', '/api/intents');
       case 'vinac_file': return this.call('GET', `/api/file?id=${encodeURIComponent(String(args.id || ''))}`);
       // Not an MCP tool (not in TOOLS): what's new, without text and without marking

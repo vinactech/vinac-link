@@ -9,6 +9,9 @@ import crypto from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { render } from './markdown.mjs';
+import { CLOUD_URL, CLOUD_KEY } from '../src/cloud.js';
+
+export const CONSOLE_CSP = `default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' ${CLOUD_URL}; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'`;
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const SITE = path.join(ROOT, 'site');
@@ -33,6 +36,7 @@ export const PAGES = [
   ['docs/guide/agents.md', '/docs/guide/agents.html', 'Connecting agents', 'Guide'],
   ['docs/guide/auto-mode.md', '/docs/guide/auto-mode.html', 'Auto mode', 'Guide'],
   ['docs/guide/compliance.md', '/docs/guide/compliance.html', 'Activity log and compliance', 'Guide'],
+  ['docs/guide/accounts.md', '/docs/guide/accounts.html', 'Accounts, relay, teams', 'Guide'],
   ['docs/guide/cli.md', '/docs/guide/cli.html', 'Command line', 'Guide'],
   ['docs/guide/troubleshooting.md', '/docs/guide/troubleshooting.html', 'Troubleshooting', 'Guide'],
   ['openclaw/README.md', '/docs/openclaw.html', 'OpenClaw', 'Guide'],
@@ -345,6 +349,16 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     fs.mkdirSync(path.join(APP, 'lab', 'js'), { recursive: true });
     for (const f of ['audio.js', 'modem.js', 'frame.js', 'fec.js', 'bytes.js', 'crypto.js', 'logos.js']) fs.copyFileSync(path.join(ROOT, 'lab', 'js', f), path.join(APP, 'lab', 'js', f));
     fs.cpSync(path.join(ROOT, 'lab', 'worklets'), path.join(APP, 'lab', 'worklets'), { recursive: true });
+  }
+
+  // The Team console (/console/): the one page that talks to another site, the account service. Its own
+  // CSP allows exactly that origin for fetch and nothing else; every other page keeps connect-src 'self'.
+  if (fs.existsSync(path.join(SITE, 'console'))) {
+    const CON = path.join(OUT, 'console');
+    fs.mkdirSync(CON, { recursive: true });
+    for (const f of ['index.html', 'console.css']) fs.copyFileSync(path.join(SITE, 'console', f), path.join(CON, f));
+    fs.writeFileSync(path.join(CON, 'console.js'), fs.readFileSync(path.join(SITE, 'console', 'console.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
+    fs.writeFileSync(path.join(CON, '.htaccess'), `# Team console: may fetch from the account service (Supabase), nothing else from outside.\n<IfModule mod_headers.c>\n  Header always set Content-Security-Policy "${CONSOLE_CSP}"\n  Header always set X-Robots-Tag "noindex, nofollow"\n  Header set Cache-Control "no-cache"\n</IfModule>\n`);
   }
 
   if (fs.existsSync(path.join(SITE, 'logos'))) fs.cpSync(path.join(SITE, 'logos'), path.join(OUT, 'logos'), { recursive: true, filter: f => !f.endsWith('.md') });

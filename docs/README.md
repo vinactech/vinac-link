@@ -18,12 +18,13 @@ on your computers. It needs no cloud and no internet, and nothing important happ
 - [Connecting agents](guide/agents.md): Claude Code, Codex, MCP apps, OpenClaw; tool reference
 - [Auto mode](guide/auto-mode.md): live notes in Claude Code, auto-reply per device, OpenClaw front desk
 - [Activity log and compliance](guide/compliance.md): search the record, CSV exports, signed reports, retention
+- [Accounts, relay and teams (beta)](guide/accounts.md): optional; your computers in one place, the relay, the Team console
 - [Command line](guide/cli.md): including the audit log and `vinac run`
 - [Troubleshooting and FAQ](guide/troubleshooting.md)
 
 ## Intents
 - [Intents](intents/README.md): names, risk levels, versions, adding intents
-- [Catalog](intents/catalog.md): all 160 intents (generated from the code)
+- [Catalog](intents/catalog.md): all 161 intents (generated from the code)
 
 ## Reference
 - [Security](../SECURITY.md): how VINAC Link protects you, and how to report a problem

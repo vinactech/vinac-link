@@ -44,7 +44,7 @@
     <figure class="schematic stage3d">
       <svg viewBox="0 0 1200 600" role="img" aria-labelledby="schem-title schem-desc">
         <title id="schem-title">How VINAC Link works</title>
-        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once: both screens show the same 6 digits, and a person presses Allow on both. Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline.</desc>
+        <desc id="schem-desc">Two computers, a PC and a Mac, each with an AI agent and a key store, joined directly by the VINAC Link. Step 1: they pair once: both screens show the same 6 digits, and a person presses Allow on both. Step 2: keys and tokens travel straight into the other computer's key store. Step 3: every request passes your rules, and a person approves anything that matters. Cloud AI is optional and online; local models work fully offline. Computers on different networks can use an optional relay that only passes on sealed messages.</desc>
         <defs>
           <linearGradient id="h3-chip" x1="0" x2="1" y1="0" y2="1"><stop offset="0" stop-color="#5b74ff"/><stop offset="1" stop-color="#a16bf2"/></linearGradient>
           <linearGradient id="h3-link" gradientUnits="userSpaceOnUse" x1="405" x2="795" y1="0" y2="0"><stop offset="0" stop-color="#5b74ff"/><stop offset=".55" stop-color="#8a7dff"/><stop offset="1" stop-color="#b06cf2"/></linearGradient>
@@ -197,10 +197,20 @@
         <text class="h3-small" x="700" y="432" text-anchor="middle">You approve</text>
 
         <!-- offline -->
-        <g>
+        <g transform="translate(-235 0)">
           <rect x="370" y="522" width="460" height="46" rx="23" fill="#0f2a1b" stroke="#3ddc84" stroke-opacity=".45"/>
           <path d="M404 545h12m0-8h12v16h-12zm24 0h12v16h-12zm12 8h12M434 539v12" fill="none" stroke="#3ddc84" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"/>
           <text class="h3-small h3-strong" x="482" y="551">Local models: everything works offline</text>
+        </g>
+        <!-- different networks: the optional relay -->
+        <g transform="translate(245 0)">
+          <rect x="370" y="522" width="460" height="46" rx="23" fill="#151a3d" stroke="#8c9bff" stroke-opacity=".5"/>
+          <g fill="none" stroke="#a9b4ff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="405" cy="551" r="4.5"/><circle cx="455" cy="551" r="4.5"/>
+            <path d="M410 547 Q430 527 450 547" stroke-dasharray="3 5"/>
+          </g>
+          <rect x="423" y="531" width="14" height="11" rx="2.5" fill="#a9b4ff"/><path d="M426 532v-3.5a4 4 0 0 1 8 0v3.5" fill="none" stroke="#a9b4ff" stroke-width="2.2"/>
+          <text class="h3-small h3-strong" x="482" y="551">Different networks: optional sealed relay</text>
         </g>
       </svg>
     </figure>
@@ -260,7 +270,7 @@
           <a class="link" href="/docs/guide/firewall.html">Set your own rules →</a>
         </div>
         <div class="panel-visual">
-          <img class="dark-shot" src="/media/app-overview-dark.jpg" width="1440" height="900" loading="lazy" alt="The VINAC Link overview: one paired device online, two requests waiting for approval, four messages received today, nothing blocked.">
+          <img class="dark-shot" src="/media/app-overview-dark.jpg" width="1440" height="900" loading="lazy" alt="The VINAC Link overview: two paired devices online, two requests waiting for approval, four messages received today, nothing blocked.">
         </div>
       </div>
 
@@ -319,15 +329,16 @@
     <p class="sub center">One real job, start to finish: your code comes from GitHub, your keys come from your own computer, and no key ever passes through a chat.</p>
     <ol class="story">
       <li><span class="st-tag avail">Available</span><h3>Pair the two computers</h3><p>Each lists the other. Compare 6 digits, press Allow on both. Once.</p></li>
-      <li><span class="st-tag avail">Available</span><h3>Agents talk and hand off work</h3><p>Questions, reviews, task hand-offs, files and git branches, encrypted, on your network or over Tailscale. Your firewall checks every request.</p></li>
+      <li><span class="st-tag avail">Available</span><h3>Agents talk and hand off work</h3><p>Questions, reviews, task hand-offs, files and git branches, encrypted, on your network, over Tailscale or through the optional relay. Your firewall checks every request.</p></li>
       <li><span class="st-tag avail">Available</span><h3>Move the keys the project needs</h3><p>The Mac asks for the key it needs; one click on the PC sends it from the vault straight into the Mac's key store. VINAC Link's agent tools show only its name.</p></li>
       <li><span class="st-tag avail">Available</span><h3>Run the build with them</h3><p><code>vinac run --secret STRIPE_KEY -- npm start</code>. You approve the exact command, once or for a few hours; the program gets the value, the agent doesn't.</p></li>
       <li><span class="st-tag next">Next</span><h3>One-step project hand-off</h3><p>VINAC Link reads <code>.env.example</code>, shows which keys are missing on the Mac, and sends them all with one approval.</p></li>
     </ol>
     <div class="status-row">
-      <div><span class="st-tag avail">Available</span><p>Pairing with one Allow on each computer, or an invite · one-click key requests · allowed runs, so agents can use keys on their own within your limits · a tamper-evident activity log with signed reports · messages and requests, sent later if a device is off · intent firewall with Restricted / Standard / Auto modes · secrets vault with a passphrase lock · files and git · approved runs · offline on Wi-Fi, hotspot or cable · Tailscale</p></div>
+      <div><span class="st-tag avail">Available</span><p>Pairing with one Allow on each computer, or an invite · one-click key requests · allowed runs, so agents can use keys on their own within your limits · a tamper-evident activity log with signed reports · messages and requests, sent later if a device is off · intent firewall with Restricted / Standard / Auto modes · secrets vault with a passphrase lock · files and git · approved runs · offline on Wi-Fi, hotspot or cable · Tailscale · shared project rooms · in English and French</p></div>
       <div><span class="st-tag beta">Beta</span><p>Pairing and moving keys by sound, and the phone vault (keys on your phone, handed to a computer by sound): work today with no network, still being tested on more phones, speakers and microphones</p></div>
-      <div><span class="st-tag next">Next</span><p>One-step project hand-off · independent security audit · a relay for computers on different networks</p></div>
+      <div><span class="st-tag beta">Beta</span><p>Optional accounts: a relay for computers on different networks (sealed, off until you turn it on) · the Team console at vinac.tech/console · signed monthly summaries shared with a team</p></div>
+      <div><span class="st-tag next">Next</span><p>One-step project hand-off · independent security audit · approvals from your phone</p></div>
     </div>
   </div>
 </section>
@@ -336,7 +347,7 @@
   <div class="wrap narrow center">
     <p class="kicker">Demo</p>
     <h2>See it in under 2 minutes</h2>
-    <p class="sub">The real app, start to finish: install, pair with one Allow, let agents ask each other, approve what matters, and move keys without the chat.</p>
+    <p class="sub">The real app, start to finish: install, pair with one Allow, let agents ask each other, share a room across devices, approve what matters, and move keys without the chat.</p>
     {{demo}}
   </div>
 </section>
@@ -352,7 +363,7 @@
           <h3>Built in</h3>
           <ul class="checks">
             <li>End-to-end encryption, with fresh keys for every session</li>
-            <li>No servers in between: we never see your traffic or keys</li>
+            <li>Direct between your computers: we never see your traffic or keys</li>
             <li>Keys kept in your operating system's own secure key store</li>
             <li>Human in the loop: only you can pair devices, approve requests or change your rules</li>
           </ul>
@@ -437,7 +448,7 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
     <p class="kicker center">FAQ</p>
     <h2 class="center">Questions</h2>
     <div class="faq">
-      <details><summary>Do I need an account or a server?</summary><p>No. The two computers talk directly over whatever network connects them: Wi-Fi, a hotspot, a cable, or Tailscale. There is no server in between and no sign-up.</p></details>
+      <details><summary>Do I need an account or a server?</summary><p>No. The two computers talk directly over whatever network connects them: Wi-Fi, a hotspot, a cable, or Tailscale. There is no server in between and no sign-up. An optional account adds a relay for computers on different networks, and a Team console; everything else works without it.</p></details>
       <details><summary>Some AI tools can already message their other sessions. Why VINAC Link?</summary><p>Built-in messaging usually works within one vendor's tools and goes through that vendor's cloud and account. VINAC Link connects agents from any vendor (Claude Code, Codex, OpenClaw and local models) directly between your own computers, with no account or cloud in between, and works fully offline. It also adds what plain messaging leaves out: a firewall that checks every request, keys and tokens kept out of chats (VINAC Link's agent tools don't return secret values), and a person who approves what matters.</p></details>
       <details><summary>What about A2A and other agent standards?</summary><p>Standards such as A2A connect companies' cloud services to each other. VINAC Link is for the agents on your own computers, including ones that are never online. We plan to make VINAC Link work with A2A, so the two fit together rather than compete.</p></details>
       <details><summary>Does it work online and offline?</summary><p>Both. The link between your computers never needs the internet: Wi-Fi without internet, a hotspot or a cable is enough. Cloud agents such as Claude Code, Codex or Cursor need the internet for their own AI model; local models in LM Studio, Ollama, Goose or Open WebUI can run with no internet at all. You only need a connection once, to download VINAC Link, and you can copy the package over on a USB stick instead.</p></details>
@@ -471,7 +482,7 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
     <div class="card news-card">
       <p class="kicker">Newsletter</p>
       <h2>Stay in the loop</h2>
-      <p class="sub">New releases, the security audit, the phone vault and the relay: a short email a few times a year. No tracking in our emails.</p>
+      <p class="sub">New releases, the security audit, the phone vault and team features: a short email a few times a year. No tracking in our emails.</p>
       <form class="signup-form" action="/subscribe.php" method="post" data-ok="Thank you. You're on the list; we write a few times a year.">
         <div class="signup-row">
           <label class="sr-only" for="signup-email">Email</label>
@@ -520,7 +531,7 @@ claude plugin install vinac-link@vinac</code></pre><button class="copy" type="bu
       <label>Topic
         <select name="topic">
           <option value="General question">General question</option>
-          <option value="Relay waitlist" data-topic="relay">Relay waitlist</option>
+          <option value="Accounts and relay (beta)" data-topic="relay">Accounts and relay (beta)</option>
           <option value="Teams and organisations" data-topic="teams">Teams and organisations</option>
           <option value="Partnership">Partnership</option>
           <option value="Press">Press</option>

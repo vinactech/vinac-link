@@ -49,6 +49,76 @@ $('helpClose').onclick = closeHelp;
 helpModal.addEventListener('click', e => { if (e.target === helpModal) closeHelp(); });
 document.addEventListener('keydown', e => { if (e.key === 'Escape' && !helpModal.hidden) closeHelp(); });
 
+// Optional account (beta): only this page can sign in, link this computer or sign out.
+const accountModal = $('accountModal');
+function renderAccount(a) {
+  $('accountEmailForm').hidden = a.signedIn || !!a.pendingEmail;
+  $('accountCodeForm').hidden = a.signedIn || !a.pendingEmail;
+  $('accountSignedIn').hidden = !a.signedIn;
+  $('accountPendingEmail').textContent = a.pendingEmail || '';
+  $('accountEmailShown').textContent = a.email || '';
+  $('accountLinkState').textContent = a.linked ? `Linked to this account since ${new Date(a.device.linkedAt).toLocaleDateString(locale(), { dateStyle: 'medium' })}` : 'Not linked';
+  $('accountLink').hidden = a.linked; $('accountUnlink').hidden = !a.linked;
+  $('accountRelayRow').hidden = $('accountRelayHint').hidden = !a.linked;
+  $('accountRelay').checked = !!a.relay;
+  const rs = a.relayStatus || { state: 'off' };
+  $('accountRelayState').textContent = !a.relay ? 'Off' : rs.state === 'connected' ? 'On · connected' : rs.state === 'error' ? `On · ${rs.error || 'not connected'}` : 'On · connecting…';
+}
+$('accountRelay').onchange = async () => {
+  const on = $('accountRelay').checked;
+  if (await accountDo('POST', '/ui/account/relay', { on })) {
+    toast(on ? 'Relay on.' : 'Relay off.');
+    if (on) setTimeout(() => { if (!accountModal.hidden) accountDo('GET', '/ui/account'); }, 2000);
+  } else $('accountRelay').checked = !on;
+};
+async function loadAccountDevices() {
+  const ul = $('accountDevices'); ul.replaceChildren();
+  try {
+    const { devices } = await api('GET', '/ui/account/devices');
+    if (!devices.length) { const li = document.createElement('li'); li.className = 'none'; li.textContent = 'No computers linked yet.'; ul.append(li); return; }
+    for (const d of devices) {
+      const li = document.createElement('li'); li.className = 'secret';
+      const name = document.createElement('b'); name.textContent = d.name; name.setAttribute('translate', 'no');
+      const meta = document.createElement('small');
+      meta.textContent = [d.fingerprint, { win32: 'Windows', darwin: 'macOS', linux: 'Linux' }[d.platform] || '', d.app_version ? `v${d.app_version}` : ''].filter(Boolean).join(' · ');
+      li.append(name, meta); ul.append(li);
+    }
+  } catch (e) { const li = document.createElement('li'); li.className = 'none'; li.textContent = e.message; ul.append(li); }
+}
+async function loadAccountTeams(a) {
+  const box = $('accountTeams');
+  if (!a.linked) { box.hidden = true; return; }
+  try {
+    const { teams } = await api('GET', '/ui/account/teams');
+    box.hidden = false;
+    $('shareTeam').replaceChildren(...teams.map(t => new Option(t.name, t.id)));
+    $('shareTeam').disabled = $('shareBtn').disabled = !teams.length;
+    if (!teams.length) $('shareTeam').replaceChildren(new Option('No teams yet', ''));
+    const months = [0, 1].map(k => { const d = new Date(); d.setUTCDate(1); d.setUTCMonth(d.getUTCMonth() - k); return d.toISOString().slice(0, 7); });
+    $('sharePeriod').replaceChildren(...months.map((m, i) => new Option(`${new Date(`${m}-15`).toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}${i ? '' : ' (so far)'}`, m)));
+  } catch { box.hidden = true; }
+}
+$('shareBtn').onclick = async () => {
+  try {
+    const r = await api('POST', '/ui/account/share', { team: $('shareTeam').value, period: $('sharePeriod').value });
+    toast(`Shared with ${r.team}: ${r.summary.total} events counted.`);
+  } catch (e) { toast(e.message); }
+};
+async function accountDo(method, path, body) {
+  try { const { account } = await api(method, path, body); renderAccount(account); if (account.signedIn) { loadAccountDevices(); loadAccountTeams(account); } return account; }
+  catch (e) { toast(e.message); return null; }
+}
+$('accountNav').onclick = async () => { accountModal.hidden = false; const a = await accountDo('GET', '/ui/account'); if (a && !a.signedIn && !a.pendingEmail) $('accountEmail').focus(); };
+$('accountClose').onclick = () => { accountModal.hidden = true; };
+accountModal.addEventListener('click', e => { if (e.target === accountModal) accountModal.hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !accountModal.hidden) accountModal.hidden = true; });
+$('accountEmailForm').onsubmit = async e => { e.preventDefault(); const a = await accountDo('POST', '/ui/account/start', { email: $('accountEmail').value }); if (a?.pendingEmail) { toast('Code sent. Check your email.'); $('accountCode').focus(); } };
+$('accountCodeForm').onsubmit = async e => { e.preventDefault(); const code = $('accountCode').value; $('accountCode').value = ''; const a = await accountDo('POST', '/ui/account/verify', { code }); if (a?.signedIn) toast('Signed in.'); };
+$('accountOtherEmail').onclick = () => { $('accountCodeForm').hidden = true; $('accountEmailForm').hidden = false; $('accountEmail').focus(); };
+$('accountLink').onclick = async () => { if (await accountDo('POST', '/ui/account/link', {})) toast('This computer is linked to your account.'); };
+$('accountUnlink').onclick = async () => { if (await accountDo('POST', '/ui/account/unlink', {})) toast('Unlinked.'); };
+$('accountSignOut').onclick = async () => { if (await accountDo('POST', '/ui/account/signout', {})) toast('Signed out on this computer.'); };
+
 let state = null, lastPaired = null, firstLoad = true;
 let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantActivity = false, wantOverview = true, mobileMain = false;
 let thread = [], threadKey = '', justOpened = true, search = '', replyTo = null;
@@ -117,19 +187,22 @@ function render(s) {
 
   // A pairing in progress keeps the pairing screen open; merely waiting to be picked doesn't.
   const pairing = !!(p && VIEW_OF[p.state] && !isWaitingToBePicked(p));
+  if (roomOpen && !roomById(roomOpen)) roomOpen = null;
   const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall' : wantActivity ? 'activity'
-    : selected && !wantOverview ? 'thread' : s.peers.length ? 'overview' : 'empty';
+    : roomOpen ? 'room' : selected && !wantOverview ? 'thread' : s.peers.length ? 'overview' : 'empty';
   // Left the pairing screen: stop telling the network this device waits to be picked.
   if (main !== 'pair' && isWaitingToBePicked(p) && !render.stopping) {
     render.stopping = true;
     api('POST', '/ui/cancel').catch(() => {}).finally(() => { render.stopping = false; });
   }
   app.dataset.main = main;
-  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || ((main === 'thread' || main === 'overview') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
+  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
 
   renderPairing(p);
   renderConvos();
+  renderRooms();
+  if (main === 'room') { renderRoomHead(); loadRoom(); markRoomSeen(); }
   const uses = s.secretUses || [];
   $('secretsCount').textContent = uses.length ? `${uses.length} waiting` : s.secrets.length || '';
   for (const u of uses) if (!seenUses.has(u.id)) { seenUses.add(u.id); toast(`A program asks to use ${u.names.join(', ')}. Open Secrets to approve or deny.`); }
@@ -192,7 +265,7 @@ function renderHead() {
   const peer = peerById(selected); if (!peer) return;
   avatar($('headAvatar'), peer);
   $('headName').textContent = peer.name;
-  $('headStatus').textContent = `${peer.online === true ? 'Online' : peer.online === false ? 'Offline' : 'Checking…'} · ${peer.fingerprint}`;
+  $('headStatus').textContent = `${peer.online === true ? (peer.reachedVia === 'relay' ? 'Online via relay' : 'Online') :peer.online === false ? 'Offline' : 'Checking…'} · ${peer.fingerprint}`;
   const banner = $('banner');
   if (!peer.canMessage) { banner.hidden = false; banner.textContent = 'This device was paired before messaging existed. Remove it and pair again to send messages.'; }
   else if (peer.online === false) { banner.hidden = false; banner.textContent = `${peer.name} seems to be offline. Messages and requests wait here and go out by themselves when it's back (up to 24 hours). Files and secrets need it online.`; }
@@ -242,7 +315,7 @@ function renderThread() {
 
 const KEY_SVG = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>';
 
-function messageEl(m, cont, q) {
+function messageEl(m, cont, q, { room = false } = {}) {
   if (m.kind === 'secret') {
     // A secret was sent or received. The note never holds the value.
     const el = document.createElement('div'); el.className = 'note'; el.dataset.id = m.id;
@@ -267,10 +340,11 @@ function messageEl(m, cont, q) {
     if (m.agent) tag.title = `Agent ${m.agent.name} · ${m.agent.fp}${out ? '' : `, as ${m.peer.name} says`}`;
     who.append(tag);
   }
+  if (m.via === 'relay') { const v = document.createElement('span'); v.className = 'tag relay'; v.textContent = 'via relay'; v.title = 'Sealed end to end; passed through the account service because no direct link worked.'; who.append(v); }
   if (who.childElementCount) el.append(who);
 
   const bubble = document.createElement('div'); bubble.className = 'bubble';
-  if (m.intent) {
+  if (m.intent && !room) {
     const r = text('span', `Request · ${m.intent}`); r.className = 'request';
     if (m.args) r.title = JSON.stringify(m.args, null, 1);
     bubble.append(r);
@@ -302,6 +376,7 @@ function messageEl(m, cont, q) {
     const q = text('span', '· Waiting to send: device offline'); q.className = 'queued'; q.title = 'Sent automatically when the device is back, for up to 24 hours.';
     meta.append(q, button('Cancel', async () => { try { render(await api('POST', '/ui/outbox/cancel', { id: m.id })); loadThread?.(); } catch (e) { toast(e.message); } }));
   } else if (out && m.undelivered) { const f = text('span', '· Not delivered'); f.className = 'fail'; f.title = m.undelivered; meta.append(f); }
+  else if (out && room && m.to) meta.append(text('span', `· Delivered to ${m.to.join(', ')}`));
   else if (out) meta.append(text('span', '· Delivered'));
   else if (m.firewall && !['allowed', 'approved'].includes(m.firewall.status)) {
     const f = button(`· ${FW_LABEL[m.firewall.status]}`, () => openFirewall());
@@ -311,9 +386,10 @@ function messageEl(m, cont, q) {
 
   if (!m.status) {
     const tools = document.createElement('div'); tools.className = 'tools';
-    tools.append(iconButton('reply', 'Reply', () => startReply(m)), iconButton('copy', 'Copy text', async () => {
+    const copy = iconButton('copy', 'Copy text', async () => {
       try { await navigator.clipboard.writeText(m.text); toast('Copied.'); } catch { toast('Could not copy.'); }
-    }));
+    });
+    if (room) tools.append(copy); else tools.append(iconButton('reply', 'Reply', () => startReply(m)), copy);
     el.append(tools);
   }
   return el;
@@ -517,7 +593,7 @@ async function loadActivity(more = false) {
   $('auditKeep').textContent = `· ${r.retention.legalHold ? 'legal hold' : r.retention.keepDays ? `${Math.round(r.retention.keepDays / 30.4)} months` : 'always'}`;
   $('auditKeepSel').value = String(r.retention.keepDays); $('auditHold').checked = r.retention.legalHold;
 }
-function openActivity() { wantActivity = true; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openActivity() { roomOpen = null; wantActivity = true; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('activityNav').onclick = openActivity;
 $('activityBackBtn').onclick = () => { wantActivity = false; mobileMain = false; render(state); };
 $('auditFilters').addEventListener('input', () => { clearTimeout(auditTimer); auditTimer = setTimeout(() => loadActivity(), 250); });
@@ -751,7 +827,7 @@ function renderVaultLock() {
 }
 function hideSecret() { shownSecret = null; clearTimeout(showSecret.timer); if (state) renderSecrets(true); }
 
-$('secretsNav').onclick = () => { wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; mobileMain = true; render(state); };
+$('secretsNav').onclick = () => { roomOpen = null; wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; mobileMain = true; render(state); };
 $('secretsBackBtn').onclick = () => { wantSecrets = false; mobileMain = false; hideSecret(); render(state); };
 
 // ---- firewall: requests (intents) from paired devices ---------------------
@@ -774,16 +850,16 @@ async function downloadFile(fileId, name) {
 const DECISION_LABEL = { allow: 'Allow', ask: 'Ask me', block: 'Block' };
 let fw = null, fwKey = '', fwScope = '*', fwLoading = false;
 
-function openFirewall() { wantFirewall = true; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openFirewall() { roomOpen = null; wantFirewall = true; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('firewallNav').onclick = openFirewall;
 
 // ---- overview: the dashboard ------------------------------------------------------
 
-function openOverview() { wantOverview = true; wantFirewall = false; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openOverview() { roomOpen = null; wantOverview = true; wantFirewall = false; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('overviewNav').onclick = openOverview;
 $('overviewBackBtn').onclick = () => { mobileMain = false; render(state); };
 $('ovFirewallLink').onclick = openFirewall;
-$('ovReceiveBtn').onclick = () => { wantSecrets = true; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
+$('ovReceiveBtn').onclick = () => { roomOpen = null; wantSecrets = true; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
 const ICON_PATH = {
   devices: '<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M7 18h5M9.5 14v4"/><rect x="17.5" y="8" width="4" height="10" rx="1"/>',
   waiting: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
@@ -829,7 +905,7 @@ function renderOverview() {
     const av = document.createElement('span'); av.className = 'avatar'; avatar(av, peer);
     const info = document.createElement('div'); info.className = 'devrow-text';
     info.append(text('b', peer.name), text('small', `${peer.fingerprint}${peer.address ? ` · ${peer.address}` : ''}`));
-    const st = text('span', peer.online === true ? 'Online' : peer.online === false ? 'Offline' : 'Checking'); st.className = `pill ${peer.online === true ? 'ok' : peer.online === false ? '' : 'muted'}`;
+    const st = text('span', peer.online === true ? (peer.reachedVia === 'relay' ? 'Online via relay' : 'Online') : peer.online === false ? 'Offline' : 'Checking'); st.className = `pill ${peer.online === true ? 'ok' : peer.online === false ? '' : 'muted'}`;
     const last = text('small', c?.last ? `Last message ${shortWhen(c.last.sentAt)}` : `Paired ${new Date(peer.pairedAt).toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`); last.className = 'devrow-when';
     row.append(av, info, last, st);
     row.onclick = () => select(peer.id);
@@ -1142,7 +1218,7 @@ function renderInfo() {
   const c = convoOf(peer.id);
   avatar($('infoAvatar'), peer);
   $('infoName').textContent = peer.name;
-  $('infoStatus').textContent = peer.online === true ? 'Online now' : peer.online === false ? 'Offline' : 'Checking…';
+  $('infoStatus').textContent = peer.online === true ? (peer.reachedVia === 'relay' ? 'Online now, via relay' : 'Online now') : peer.online === false ? 'Offline' : 'Checking…';
   $('infoFp').textContent = peer.fingerprint;
   $('infoAddr').textContent = peer.address || 'Unknown';
   $('infoPaired').textContent = `${new Date(peer.pairedAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })} · by ${peer.via}`;
@@ -1193,11 +1269,144 @@ $('notifyBtn').onclick = async () => {
   notifyOn = true; LS.set('notify', true); syncNotifyButton(); toast('You will be notified about new messages while this page is in the background.');
 };
 
+// ---- shared project rooms: one thread for a project across several paired devices ----------
+let roomOpen = null, roomMsgs = [], roomKey = '', roomJustOpened = false;
+const roomById = id => (state?.rooms || []).find(r => r.id === id);
+const roomUnread = r => r.incoming.filter(x => x.at > (lastSeen[`room:${r.id}`] || '')).length;
+
+function renderRooms() {
+  const nav = $('roomList'); nav.replaceChildren();
+  const rooms = [...(state.rooms || [])].sort((a, b) => (b.last?.sentAt || b.createdAt).localeCompare(a.last?.sentAt || a.createdAt));
+  if (!rooms.length) {
+    const none = document.createElement('p'); none.className = 'none';
+    none.textContent = state.peers.length > 1 ? 'No rooms yet. A room is one thread for a project across several devices.' : 'Pair two or more devices to make a room.';
+    nav.append(none); return;
+  }
+  for (const r of rooms) {
+    const unread = roomUnread(r), last = r.last;
+    const b = document.createElement('button');
+    b.className = `convo${unread ? ' unread' : ''}`;
+    b.setAttribute('aria-current', String(r.id === roomOpen && app.dataset.main === 'room'));
+    const av = document.createElement('span'); av.className = 'avatar room-av'; av.textContent = '#';
+    const name = document.createElement('b'); name.textContent = r.name; name.setAttribute('translate', 'no');
+    const when = document.createElement('time'); when.textContent = last ? shortWhen(last.sentAt) : '';
+    const prev = document.createElement('span'); prev.className = 'preview';
+    prev.textContent = last ? `${last.direction === 'sent' ? (last.by === 'agent' ? 'Your agent: ' : 'You: ') : `${last.peer.name}: `}${flat(last.text)}` : `${r.members.length + 1} devices in this room`;
+    b.append(av, name, when, prev);
+    if (unread) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = unread > 99 ? '99+' : unread; b.append(badge); }
+    b.onclick = () => openRoom(r.id);
+    nav.append(b);
+  }
+}
+
+function openRoom(id) {
+  if (id !== roomOpen) { roomMsgs = []; roomKey = ''; }
+  roomOpen = id; wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantOverview = false; mobileMain = true; roomJustOpened = true;
+  render(state);
+  if (!isNarrow()) $('roomText').focus();
+}
+
+function renderRoomHead() {
+  const r = roomById(roomOpen); if (!r) return;
+  $('roomName').textContent = r.name;
+  $('roomMembers').textContent = `You, ${r.members.map(m => m.name).join(', ')}`;
+  const banner = $('roomBanner');
+  const missing = r.notPairedHere?.length || 0;
+  banner.hidden = !missing;
+  banner.textContent = missing ? `${missing} member${missing > 1 ? 's' : ''} of this room ${missing > 1 ? 'are' : 'is'} not paired with this computer: your posts don't reach ${missing > 1 ? 'them' : 'it'}.` : '';
+}
+
+async function loadRoom() {
+  const r = roomById(roomOpen); if (!r) return;
+  const key = `${r.id}:${r.last?.id}:${r.incoming.length}`;
+  if (key === roomKey) return;
+  roomKey = key;
+  try {
+    const { messages } = await api('GET', `/ui/rooms/messages?id=${encodeURIComponent(r.id)}`);
+    if (roomOpen !== r.id) return;
+    roomMsgs = messages; renderRoomThread();
+  } catch (e) { roomKey = ''; toast(e.message); }
+}
+
+function renderRoomThread() {
+  const box = $('roomThread');
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  box.replaceChildren();
+  const r = roomById(roomOpen);
+  if (!roomMsgs.length) box.append(emptyEl('div', 'bubbles', 'Start the room', `Write the first post below, or ask an agent to post with vinac_send and room "${r?.name || ''}".`));
+  let prev = null;
+  for (const m of roomMsgs) {
+    if (!prev || !sameDay(prev.sentAt, m.sentAt)) { const day = document.createElement('div'); day.className = 'day'; day.textContent = dayLabel(m.sentAt); box.append(day); prev = null; }
+    const cont = prev && prev.direction === m.direction && prev.peer.id === m.peer.id && prev.by === m.by && new Date(m.sentAt) - new Date(prev.sentAt) < GROUP_MS;
+    box.append(messageEl(m, cont, '', { room: true }));
+    prev = m;
+  }
+  if (roomJustOpened || atBottom) box.scrollTop = box.scrollHeight;
+  roomJustOpened = false;
+}
+
+function markRoomSeen() {
+  const r = roomById(roomOpen);
+  if (!r || document.visibilityState !== 'visible' || (isNarrow() && !mobileMain)) return;
+  const latest = r.incoming.at(-1)?.at;
+  if (latest && latest > (lastSeen[`room:${r.id}`] || '')) { lastSeen[`room:${r.id}`] = latest; LS.set('lastSeen', lastSeen); renderRooms(); }
+}
+
+const roomText = $('roomText');
+roomText.addEventListener('input', () => { roomText.style.height = 'auto'; roomText.style.height = `${Math.min(180, roomText.scrollHeight + 2)}px`; });
+roomText.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey && !e.isComposing) { e.preventDefault(); $('roomComposer').requestSubmit(); } });
+$('roomComposer').onsubmit = async e => {
+  e.preventDefault();
+  const body = roomText.value.trim(), r = roomById(roomOpen);
+  if (!body || !r) return;
+  roomText.value = ''; roomText.style.height = 'auto';
+  try {
+    const s = await api('POST', '/ui/send', { room: r.id, text: body });
+    const res = s.sent;
+    const failed = res.results.filter(x => !x.sent && !x.queued);
+    if (failed.length) toast(`Not delivered to ${failed.map(x => x.to).join(', ')}.`);
+    roomJustOpened = true; roomKey = ''; render(s);
+  } catch (err) { roomText.value = body; toast(err.message); }
+};
+$('roomBackBtn').onclick = () => { mobileMain = false; render(state); };
+$('roomLeaveBtn').onclick = async () => {
+  const r = roomById(roomOpen); if (!r) return;
+  if (!confirm(`Leave "${r.name}" on this computer? Its posts stay in your history; other devices aren't told.`)) return;
+  try { const s = await api('POST', '/ui/rooms/leave', { id: r.id }); roomOpen = null; render(s); toast('You left the room.'); } catch (e) { toast(e.message); }
+};
+
+// New room: a name and the paired devices in it (only the person makes rooms).
+const roomModal = $('roomModal');
+$('newRoomBtn').onclick = () => {
+  const peers = (state?.peers || []).filter(p => p.canMessage);
+  if (!peers.length) { toast('Pair a device first.'); return; }
+  $('roomPick').replaceChildren(...peers.map(p => {
+    const l = document.createElement('label'); l.className = 'room-pick-item';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.value = p.id; c.checked = peers.length <= 3;
+    const n = document.createElement('span'); n.textContent = p.name; n.setAttribute('translate', 'no');
+    l.append(c, n); return l;
+  }));
+  $('roomNameInput').value = '';
+  roomModal.hidden = false; $('roomNameInput').focus();
+};
+$('roomModalClose').onclick = () => { roomModal.hidden = true; };
+roomModal.addEventListener('click', e => { if (e.target === roomModal) roomModal.hidden = true; });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !roomModal.hidden) roomModal.hidden = true; });
+$('roomForm').onsubmit = async e => {
+  e.preventDefault();
+  const members = [...$('roomPick').querySelectorAll('input:checked')].map(c => c.value);
+  if (!members.length) { toast('Pick at least one device.'); return; }
+  try {
+    const s = await api('POST', '/ui/rooms', { name: $('roomNameInput').value, members });
+    roomModal.hidden = true; state = s; toast(`Room ${s.room.name} created.`); openRoom(s.room.id);
+  } catch (err) { toast(err.message); }
+};
+
 // ---- conversation actions --------------------------------------------------
 
 function select(id) {
   if (id !== selected) { thread = []; threadKey = ''; replyTo = null; search = ''; $('threadSearch').value = ''; $('searchBar').hidden = true; $('replyBox').hidden = true; }
-  selected = id; LS.set('selected', id);
+  selected = id; LS.set('selected', id); roomOpen = null;
   wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
   threadKey = ''; // reload and scroll to the newest message, even if it was rendered while hidden
   render(state);
@@ -1394,7 +1603,7 @@ $('openNewBtn').onclick = () => {
   const peer = state?.peers.find(x => x.fingerprint === fp);
   if (peer) { lastResult = null; select(peer.id); }
 };
-function openPair() { wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
+function openPair() { roomOpen = null; wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
 $('newPairBtn').onclick = openPair;
 $('sidePairBtn').onclick = openPair;
 $('ovPairBtn').onclick = openPair;

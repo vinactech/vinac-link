@@ -27,6 +27,26 @@ function verifyOwnedBundle(app){
   const r=spawnSync('/usr/bin/codesign',['-dv','--verbose=4',app],{encoding:'utf8',timeout:3000});
   if(r.status!==0||!r.stderr.includes('TeamIdentifier=GC4QJCRB4P'))throw Error('VINAC_INSTALL_UNEXPECTED_SIGNER');
 }
+// Only reuse an already-installed copy when both complete signed bundles are
+// the exact same owner-signed release. A version string alone is insufficient.
+export function sameInstalledRelease(source,target,version){
+  try{
+    verifyOwnedBundle(source);verifyOwnedBundle(target);
+    if(bundleInfo(source).CFBundleShortVersionString!==version||bundleInfo(target).CFBundleShortVersionString!==version)return false;
+    const hash=app=>{
+      const r=spawnSync('/usr/bin/codesign',['-dv','--verbose=4',app],{encoding:'utf8',timeout:3000});
+      if(r.status!==0)throw Error('VINAC_INSTALL_SIGNATURE_UNAVAILABLE');
+      const h=r.stderr.match(/^CDHash=([0-9a-f]{40,64})$/mi)?.[1];
+      if(!h)throw Error('VINAC_INSTALL_SIGNATURE_UNAVAILABLE');return h;
+    };
+    return hash(source)===hash(target);
+  }catch{return false;}
+}
+export function canReuseInstalledState(s,installedRuntime,version){
+  if(s.state==='FREE')return true;
+  if(s.state!=='HEALTHY'||!s.verified||s.version!==version)return false;
+  try{return fs.realpathSync(s.proof.exe)===fs.realpathSync(installedRuntime);}catch{return false;}
+}
 export async function ask(message,choices){
   const script='on run a\nset opts to items 2 thru -1 of a\nset answer to display alert "VINAC Link" message (item 1 of a) buttons opts default button (item 1 of opts)\nreturn button returned of answer\nend run\n';
   const child=execFile('/usr/bin/osascript',['-',message,...choices],{maxBuffer:4096},()=>{});
@@ -88,8 +108,6 @@ export async function maybeInstallFromVolume({api,version,explicitHome=false,noO
   if(process.platform!=='darwin'||!(bundle.startsWith('/Volumes/')||bundle.includes('/AppTranslocation/'))||explicitHome||process.env.VINAC_NO_BROWSER==='1')return false;
   let parent='/Applications';try{fs.accessSync(parent,fs.constants.W_OK);}catch{parent=path.join(os.homedir(),'Applications');}
   const target=path.join(parent,'VINAC Link.app');
-  const answer=await ask(`Install or update VINAC Link ${version} in ${parent}, then start the installed copy? Running a long-lived service from this installer volume is not supported. Existing keys, pairings and history are retained.`,['Cancel','Install / Update']);
-  if(answer!=='Install / Update')throw Error('VINAC_INSTALL_CANCELLED: no service was started from the disk image.');
   const launch=async app=>{
     const arch=process.arch==='arm64'?'arm64':'x64',resources=path.join(app,'Contents/Resources');
     const args=[path.join(resources,'connector/bin/vinac.mjs'),'start','--home',api.store.home,'--port',String(api.port),'--no-open'];
@@ -97,6 +115,19 @@ export async function maybeInstallFromVolume({api,version,explicitHome=false,noO
     if(!await api.attach())throw Error('Installed service did not become responsive.');
     if(!noOpen)openPage((await api.call('GET','/api/status')).approvalPage);
   };
+  // macOS may translocate even a launcher opened from Applications. Reuse an
+  // identical verified installed release instead of presenting Install again.
+  if(sameInstalledRelease(bundle,target,version)){
+    const arch=process.arch==='arm64'?'arm64':'x64';
+    const installedRuntime=path.join(target,'Contents/Resources/node',arch,'bin/node');
+    const state=await inspectInstance(api);
+    if(canReuseInstalledState(state,installedRuntime,version)){
+      await launch(target);
+      console.log(`VINAC Link is using the installed copy at ${target}.`);return true;
+    }
+  }
+  const answer=await ask(`Install or update VINAC Link ${version} in ${parent}, then start the installed copy? Running a long-lived service from this installer volume is not supported. Existing keys, pairings and history are retained.`,['Cancel','Install / Update']);
+  if(answer!=='Install / Update')throw Error('VINAC_INSTALL_CANCELLED: no service was started from the disk image.');
   const result=await withLaunchLock(api.store.home,()=>installTransaction({source:bundle,target,
     beforeReplace:()=>prepareReplacement(api,version,ask),launch,
     afterFailure:()=>prepareReplacement(api,version,ask)}),{timeout:45000,lockName:'.install.lock'});

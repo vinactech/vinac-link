@@ -11,7 +11,7 @@ const FROM = 'hello@vinac.tech';            // a mailbox on this domain, so the 
 const SITE = 'https://vinac.tech';
 const MAX_PER_HOUR = 5;
 const MIN_SECONDS = 3;                       // people need longer than this to fill in the form
-const TOPICS = ['General question', 'Relay waitlist', 'Teams and organisations', 'Partnership', 'Press', 'Security', 'Supporting the project'];
+const TOPICS = ['General question', 'Accounts and relay (beta)', 'Teams and organisations', 'Partnership', 'Press', 'Security', 'Supporting the project'];
 
 $wantsJson = str_contains($_SERVER['HTTP_ACCEPT'] ?? '', 'application/json');
 

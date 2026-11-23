@@ -35,10 +35,10 @@ async function start(name) {
   return d;
 }
 /** After the demo messages: show ordinary home-network addresses instead of 127.0.0.1 (display only). */
-function homeNetworkLook(d, ownAddress, peerAddress) {
+function homeNetworkLook(d, ownAddress, peerAddresses) {
   d.address = ownAddress;
   const peers = d.store.peers();
-  for (const p of peers) p.address = peerAddress;
+  for (const p of peers) p.address = peerAddresses[p.name] || p.address;
   d.store.savePeers(peers);
 }
 async function ui(d, method, p, body, auth) {
@@ -64,7 +64,7 @@ async function pair(A, B) {
 
 const pc = await start('PC');
 const mac = await start('Mac');
-let browser;
+let browser, server;
 try {
   const { cdp, shoot, close } = await openBrowser();
   const shots = [];
@@ -94,16 +94,19 @@ try {
   await ui(pc, 'POST', '/ui/confirm', { code: b.pairing.showCode });
   await ui(mac, 'POST', '/ui/confirm', { code: a.pairing.showCode });
   await until(async () => (await ui(pc, 'GET', '/ui/state')).pairing?.state === 'paired' && (await ui(mac, 'GET', '/ui/state')).pairing?.state === 'paired');
+  // A third computer for the rooms picture, paired with both (before the display-only addresses).
+  server = await start('Build Server');
+  await pair(pc, server); await pair(mac, server);
   const send = (from, msg) => ui(from, 'POST', '/api/send', msg, true);
-  await send(pc, { text: 'Which branch has the auth refactor?', intent: 'agent.question.ask', args: { question: 'Which branch has the auth refactor?' } });
-  await send(mac, { text: 'It is on feature/auth-v2. Tests pass on the Mac.' });
-  await send(mac, { text: 'Build green on macOS: 412 tests passed.', intent: 'agent.status.update', args: { status: 'Build green on macOS: 412 tests passed.' } });
+  await send(pc, { to: 'Mac', text: 'Which branch has the auth refactor?', intent: 'agent.question.ask', args: { question: 'Which branch has the auth refactor?' } });
+  await send(mac, { to: 'PC', text: 'It is on feature/auth-v2. Tests pass on the Mac.' });
+  await send(mac, { to: 'PC', text: 'Build green on macOS: 412 tests passed.', intent: 'agent.status.update', args: { status: 'Build green on macOS: 412 tests passed.' } });
   await send(mac, {
-    text: 'Please review the auth refactor before I merge it.', intent: 'agent.review.request',
+    to: 'PC', text: 'Please review the auth refactor before I merge it.', intent: 'agent.review.request',
     args: { summary: 'Please review the auth refactor before I merge it.', branch: 'feature/auth-v2', files: 'src/auth.js, src/session.js' },
   });
-  await send(mac, { text: 'Update the README install steps for Linux.', intent: 'agent.task.handoff', args: { task: 'Update the README install steps for Linux.', branch: 'docs/linux' } });
-  homeNetworkLook(pc, '192.168.1.24', '192.168.1.31:47800');
+  await send(mac, { to: 'PC', text: 'Update the README install steps for Linux.', intent: 'agent.task.handoff', args: { task: 'Update the README install steps for Linux.', branch: 'docs/linux' } });
+  homeNetworkLook(pc, '192.168.1.24', { Mac: '192.168.1.31:47800', 'Build Server': '192.168.1.40:47800' });
   // The shown address is made up, so the reachability check would say "offline": keep the demo Mac online.
   pc.setOnline = id => pc.online.set(id, { online: true, at: Date.now() });
   for (const p of pc.store.peers()) pc.setOnline(p.id);
@@ -127,11 +130,19 @@ try {
   const ask = await fetch(`http://127.0.0.1:${pc.uiPort}/api/secret-use`, { method: 'POST', headers: { authorization: `Bearer ${agentTok}`, 'content-type': 'application/json' }, body: JSON.stringify({ names: ['STRIPE_TEST_KEY'], command: ['npm', 'test'], cwd: work }) }).then(r => r.json());
   await ui(pc, 'POST', '/ui/secret-use/decide', { id: ask.id, approve: true, allowHours: 8 });
   await snap(pc, 'tour-activity.jpg', `document.getElementById('activityNav').click(); for (let i = 0; i < 40 && document.querySelectorAll('#auditList li').length < 10; i++) await new Promise(r => setTimeout(r, 100));`, 1200);
+  // A shared project room, made on the Mac (the PC's peer addresses above are display-only, so the
+  // PC only receives here). Posts from the Mac's person and agent and from the build server's agent.
+  const room = (await ui(mac, 'POST', '/ui/rooms', { name: 'Website launch', members: ['PC', 'Build Server'] })).room;
+  await ui(mac, 'POST', '/ui/send', { room: room.id, text: 'Kicking off the launch room: build first, then the copy review.' });
+  await send(server, { room: room.id, text: 'Build 42 passed: all tests green. Installers are in build/installers/out.' });
+  await send(mac, { room: room.id, text: 'Copy review done on the Mac. Two typos fixed on the French home page.' });
+  await until(async () => ((await ui(pc, 'GET', '/ui/state')).rooms || []).some(r => r.incoming?.length >= 3));
+  await snap(pc, 'tour-room.jpg', `document.querySelector('#roomList .convo').click()`, 1200);
   close();
   console.log(`screenshots in ${OUT}:\n  ${shots.join('\n  ')}`);
 } finally {
   browser?.kill();
-  await pc.stop(); await mac.stop();
+  await pc.stop(); await mac.stop(); await server?.stop();
 }
 
 // ---- headless browser over the DevTools protocol ---------------------------------

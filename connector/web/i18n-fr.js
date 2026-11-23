@@ -307,6 +307,51 @@ const exact = {
   'Search messages': 'Chercher des messages', 'Search the log': 'Chercher dans le journal', 'Search: a key name, a command, an intent…': 'Chercher : un nom de clé, une commande, une intention…',
   'Nothing matches.': 'Aucun résultat.', 'No paired devices yet. Pair one to start a conversation.': 'Aucun appareil jumelé pour l\'instant. Jumelez-en un pour commencer une conversation.',
   'Your vault is empty': 'Votre coffre est vide',
+  // ---- account (beta) ----
+  'Account': 'Compte',
+  'Optional. VINAC Link works fully without an account. An account lets you see your computers in one place, reach them across networks through the relay, and share them with a team.':
+    'Facultatif. VINAC Link fonctionne entièrement sans compte. Un compte vous permet de voir vos ordinateurs au même endroit, de les joindre d\'un réseau à l\'autre par le relais et de les partager avec une équipe.',
+  'Email': 'Courriel', 'you@example.com': 'vous@exemple.com', 'Send me a sign-in code': 'M\'envoyer un code de connexion',
+  'We email you a code from no-reply@vinac.tech. No password.': 'Nous vous envoyons un code par courriel depuis no-reply@vinac.tech. Aucun mot de passe.',
+  'Code sent to': 'Code envoyé à', '. It works for 15 minutes.': '. Il est valide 15 minutes.',
+  'Code from the email': 'Code reçu par courriel', '12345678': '12345678', 'Sign in': 'Se connecter', 'Use another email': 'Utiliser une autre adresse',
+  'Signed in as': 'Connecté en tant que', 'Link this computer': 'Lier cet ordinateur', 'Unlink': 'Délier', 'Not linked': 'Non lié',
+  'Computers on this account': 'Ordinateurs de ce compte', 'Sign out on this computer': 'Se déconnecter sur cet ordinateur',
+  'No computers linked yet.': 'Aucun ordinateur lié pour l\'instant.',
+  'Linking sends this computer\'s name, key fingerprint and public key, its system and VINAC Link version to the account service (Supabase, stored in Canada). Never messages, keys, files or the activity log. With the relay on, sealed messages pass through it; it sees which computers talk and when, never what they say. Agents can\'t sign in, link computers or turn on the relay.':
+    'Lier cet ordinateur envoie son nom, l\'empreinte et la clé publique de sa clé, son système et sa version de VINAC Link au service de comptes (Supabase, hébergé au Canada). Jamais les messages, les clés, les fichiers ni le journal d\'activité. Avec le relais activé, les messages scellés y transitent : il voit quels ordinateurs communiquent et quand, jamais ce qu\'ils disent. Les agents ne peuvent ni se connecter, ni lier des ordinateurs, ni activer le relais.',
+  'Relay': 'Relais', 'Use when a direct link fails': 'Utiliser quand le lien direct échoue',
+  'When a computer paired with this one and linked to this account can\'t be reached on the same network or through Tailscale, messages go through the account service instead. They stay sealed end to end, so the service can\'t read them. Pairing never goes through it. Up to 200 KB at a time.':
+    'Quand un ordinateur jumelé avec celui-ci et lié à ce compte est injoignable sur le même réseau ou par Tailscale, les messages passent par le service de comptes. Ils restent scellés de bout en bout : le service ne peut pas les lire. Le jumelage n\'y passe jamais. Jusqu\'à 200 Ko à la fois.',
+  'Off': 'Désactivé', 'On · connected': 'Activé · connecté', 'On · connecting…': 'Activé · connexion…', 'Relay on.': 'Relais activé.', 'Relay off.': 'Relais désactivé.',
+  'via relay': 'par le relais', 'Online via relay': 'En ligne par le relais', 'Online now, via relay': 'En ligne, par le relais',
+  'Sealed end to end; passed through the account service because no direct link worked.': 'Scellé de bout en bout ; passé par le service de comptes faute de lien direct.',
+  'Link this computer to your account first.': 'Liez d\'abord cet ordinateur à votre compte.',
+  'Teams': 'Équipes', 'Teams are made and managed in the': 'Les équipes se créent et se gèrent dans la', 'Team console': 'Console d\'équipe',
+  '. You can share this computer\'s monthly activity summary with a team: counts only (messages, requests, approvals, key uses), signed by this computer. Never contents, names of keys or agents, or the log itself.':
+    '. Vous pouvez partager le résumé mensuel d\'activité de cet ordinateur avec une équipe : des totaux seulement (messages, demandes, approbations, utilisations de clés), signés par cet ordinateur. Jamais le contenu, le nom des clés ou des agents, ni le journal lui-même.',
+  'Rooms': 'Salons', 'New room': 'Nouveau salon', 'Name': 'Nom', 'Devices in the room': 'Appareils du salon', 'Create room': 'Créer le salon',
+  'A room is a shared thread for one project across your paired devices. Each post goes straight to every device in it, encrypted, through that device\'s firewall. Their agents can read and post too.':
+    'Un salon est un fil commun pour un projet entre vos appareils jumelés. Chaque message part directement vers chaque appareil du salon, chiffré, en passant par son pare-feu. Leurs agents peuvent lire et écrire aussi.',
+  'Website launch': 'Lancement du site', 'Post in this room': 'Écrire dans ce salon', 'Post': 'Publier', 'Post (Enter)': 'Publier (Entrée)',
+  'Leave this room': 'Quitter ce salon', 'You left the room.': 'Vous avez quitté le salon.', 'Pick at least one device.': 'Choisissez au moins un appareil.',
+  'Each post goes straight to every device in the room, encrypted, through each one\'s firewall. No server keeps it.':
+    'Chaque message part directement vers chaque appareil du salon, chiffré, en passant par le pare-feu de chacun. Aucun serveur ne le garde.',
+  'No rooms yet. A room is one thread for a project across several devices.': 'Aucun salon pour l\'instant. Un salon est un fil commun pour un projet entre plusieurs appareils.',
+  'Pair two or more devices to make a room.': 'Jumelez au moins deux appareils pour créer un salon.', 'Start the room': 'Lancez le salon',
+  'Give the room a name.': 'Donnez un nom au salon.', 'Pick 1 to 20 paired devices.': 'Choisissez de 1 à 20 appareils jumelés.', 'A room with that name exists already.': 'Un salon porte déjà ce nom.',
+  'Share summary': 'Partager le résumé', 'No teams yet': 'Aucune équipe pour l\'instant', 'Team': 'Équipe', 'Month': 'Mois',
+  'Not a team of this account.': 'Ce n\'est pas une équipe de ce compte.', 'Pick a month (YYYY-MM).': 'Choisissez un mois (AAAA-MM).',
+  'The relay refused to connect. Trying again…': 'Le relais a refusé la connexion. Nouvel essai…',
+  'The account may not use the relay (sign in again, or check the relay setup). Trying again…': 'Ce compte ne peut pas utiliser le relais (reconnectez-vous ou vérifiez la configuration du relais). Nouvel essai…',
+  'Code sent. Check your email.': 'Code envoyé. Vérifiez vos courriels.', 'Signed in.': 'Connecté.',
+  'This computer is linked to your account.': 'Cet ordinateur est lié à votre compte.', 'Unlinked.': 'Délié.', 'Signed out on this computer.': 'Déconnecté sur cet ordinateur.',
+  'Type a valid email address.': 'Tapez une adresse courriel valide.', 'Ask for a sign-in code first.': 'Demandez d\'abord un code de connexion.',
+  'The code is the digits from the email.': 'Le code, ce sont les chiffres du courriel.', 'That code is wrong or has expired. Ask for a new one.': 'Ce code est erroné ou expiré. Demandez-en un nouveau.',
+  'Accounts aren\'t open for sign-up yet. VINAC Link works fully without one.': 'Les inscriptions aux comptes ne sont pas encore ouvertes. VINAC Link fonctionne entièrement sans compte.',
+  'Too many codes asked for. Wait a minute, then try again.': 'Trop de codes demandés. Attendez une minute, puis réessayez.',
+  'Could not reach the account service. Check the internet connection; everything else keeps working without it.': 'Impossible de joindre le service de comptes. Vérifiez la connexion Internet; tout le reste fonctionne sans lui.',
+  'The account session ended. Sign in again.': 'La session du compte a pris fin. Reconnectez-vous.', 'Sign in first.': 'Connectez-vous d\'abord.',
   'Your agent network at a glance': 'Votre réseau d\'agents en un coup d\'œil', 'VINAC Link™': 'VINAC Link™', 'Message': 'Message',
   'XXXXX-XXXXX-…': 'XXXXX-XXXXX-…', 'Pairing code': 'Code de jumelage',
   'Add a key you have, or receive one from a paired device. Values stay in this computer\'s key store, never in a chat, and agents see only their names.':
@@ -391,6 +436,15 @@ Object.assign(exact, {
 });
 
 const patterns = [
+  ['Linked to this account since {0}', 'Lié à ce compte depuis le {0}'],
+  ['On · {0}', 'Activé · {0}'],
+  ['{0} (so far)', '{0} (en cours)'],
+  ['You, {0}', 'Vous, {0}'], ['{0} devices in this room', '{0} appareils dans ce salon'], ['Room {0} created.', 'Salon {0} créé.'],
+  ['· Delivered to {0}', '· Remis à {0}'], ['Not delivered to {0}.', 'Non remis à {0}.'],
+  ['Write the first post below, or ask an agent to post with vinac_send and room "{0}".', 'Écrivez le premier message ci-dessous, ou demandez à un agent de publier avec vinac_send et room « {0} ».'],
+  ['Leave "{0}" on this computer? Its posts stay in your history; other devices aren\'t told.', 'Quitter « {0} » sur cet ordinateur ? Ses messages restent dans votre historique ; les autres appareils ne sont pas prévenus.'],
+  ['Shared with {0}: {1} events counted.', 'Partagé avec {0} : {1} événements comptés.'],
+  ['The relay refused to connect ({0}). Trying again…', 'Le relais a refusé la connexion ({0}). Nouvel essai…'],
   ['{0} · {1} paired device', '{0} · {1} appareil jumelé'],
   ['{0} · {1} paired devices', '{0} · {1} appareils jumelés'],
   ['Auto-reply for {0}', 'Réponse automatique pour {0}'],

@@ -41,6 +41,7 @@ export const TOOLS = {
       type: 'object',
       properties: {
         to: { type: 'string', description: 'Paired device name, id or fingerprint (may be left out when only one device is paired).' },
+        room: { type: 'string', description: 'A shared project room\'s name (see vinac_peers), instead of to: posts the text to every device in the room.' },
         text: { type: 'string', description: 'The message, up to 8000 characters. Optional when intent is set.' },
         replyTo: { type: 'string', description: 'Id of the received message this answers.' },
         intent: { type: 'string', description: 'Optional intent, e.g. "crm.contact.read" (see vinac_intents).' },

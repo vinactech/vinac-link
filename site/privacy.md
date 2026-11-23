@@ -1,18 +1,26 @@
 # Privacy Policy
 
-*Effective November 22, 2026*
+*Effective November 23, 2026* · [What changed](#changes)
 
 This policy explains what personal information Mexley Marketing Inc. ("we", "us") collects through
 the website vinac.tech and the VINAC Link software, and how we handle it. We are based in Ontario,
 Canada, and we follow Canada's *Personal Information Protection and Electronic Documents Act*
-(PIPEDA). In short: we collect as little as we can.
+(PIPEDA). In short: we collect as little as we can, and the contents of what your devices exchange
+never reach us.
 
 ## The VINAC Link software
 
-VINAC Link runs on your own computers. **It does not send us anything.** There is no account, no
+VINAC Link runs on your own computers. **Without an account, it sends us nothing.** There is no
 telemetry, no analytics and no automatic reporting. Your pairings, messages, requests, files, keys
-and tokens stay on the computers you pair, and travel only directly between them, encrypted. We run
-no server in between and cannot see or recover any of it.
+and tokens stay on the computers you pair, and travel directly between them, encrypted.
+
+Everything below about accounts, the relay and teams applies only if you choose to use them. Each
+one is off until you turn it on yourself, on the VINAC Link page on your computer or in the Team
+console. AI agents connected to VINAC Link can't sign in, link a computer, turn on the relay or share
+a summary for you.
+
+**Shared rooms** need no account and no server. A room is a thread between your paired devices, and
+each post travels over the same direct, encrypted links as any other message.
 
 While the *Pair a device* screen is open, VINAC Link announces the computer on your **local
 network only** (its name, its network address and a one-time pairing code), so your other computer
@@ -24,6 +32,57 @@ services handle your data under their own terms and privacy policies, not ours.
 The **phone vault** (vinac.tech/app) runs in your phone's browser. Your keys, your passphrase and
 the computers you pair stay on the phone, encrypted; the app sends nothing to us. The pairing code in
 its link sits after the `#`, which browsers never send to a web server.
+
+## Accounts (optional)
+
+You can create an account to link your computers, use the relay and join teams. To sign in, you enter
+your email address and type the code we email you. There is no password.
+
+- **What the account holds:** your email address, when the account was made and when you last signed
+  in, and the internet address you signed in from (kept briefly in our sign-in provider's security
+  logs), and an optional display name.
+- **For each computer you link:** its name, its public identity key and fingerprint, its operating
+  system, its VINAC Link version, when you linked it and when it was **last seen**. While a computer
+  is linked and running, it updates "last seen" about every 15 minutes, so you (and your teammates,
+  see below) can tell whether it is online.
+- **Never:** message contents, request details, files, key or token values, your activity log, or any
+  key that could decrypt your messages. Your computer's private keys never leave it.
+- Your sign-in session is kept in your computer's own key store (or, in the Team console, in that
+  browser tab only, until you close it or sign out).
+
+You can unlink a computer or sign out at any time on its VINAC Link page. Unlinking deletes that
+computer's record from your account. To **delete your account** and everything linked to it, write to
+hello@vinac.tech from the email address on the account; we delete it within 30 days, and with it
+your linked computers, your team memberships and the summaries you shared.
+
+## The relay (optional)
+
+When two of your computers can't reach each other directly, VINAC Link can pass their messages
+through a relay instead. The relay works only between computers that you paired in person **and**
+linked to the same account, and only after you turn it on. Pairing itself never goes through it.
+
+What goes through the relay is the same sealed, end-to-end encrypted data your computers would
+otherwise send directly. We can't read it. Our provider handles, and may briefly log, only what any
+relay must: which of your linked computers a frame is from and to, what kind of frame it is (for
+example a message or a receipt), its size and the time. The relay doesn't store messages: if the
+other computer isn't connected, nothing waits on the relay.
+
+## Teams and the Team console (optional)
+
+In the Team console (vinac.tech/console) you can create a team and invite people by email address.
+
+- **Invitations:** we keep the email address you invite, its role and when it expires (14 days). The
+  console doesn't email the person; you tell them to sign in with that address.
+- **Inside a team,** members see each other's email addresses and display names, and the computers
+  each member has linked (name, fingerprint, system, version and last seen). Don't join a team if you
+  don't want its members to see that.
+- **Activity summaries:** if you choose **Share summary**, your computer sends one month's activity
+  as counts only, for example how many messages, requests, approvals and denials. Names of agents,
+  keys and devices you talk to, and all contents, are left out. The summary is signed by your
+  computer, so teammates can check it wasn't changed. Only that team's members can read it.
+
+Leaving a team removes your membership and your shared summaries. When the owner deletes a team, its
+members, invitations and summaries are deleted; each person's own account and computers stay.
 
 ## This website
 
@@ -47,8 +106,8 @@ process them on our behalf.
 We keep messages for as long as needed to help you and for our normal business records, and then
 delete them.
 
-If you join the relay waitlist, we keep your email address only to tell you when the relay is
-ready, and delete it on request or when the waitlist closes.
+If you joined the relay waitlist, we keep your email address only to tell you about the relay, and
+delete it on request or when the waitlist closes.
 
 To stop spam, the form keeps a scrambled (hashed) version of the sender's internet address for up to
 one hour, only to limit how many messages can be sent.
@@ -73,9 +132,24 @@ the newsletter unless they subscribe themselves.
 
 ## Service providers
 
-We use a small number of providers to run the website and email, currently our web hosting provider
-(SiteGround), and PayPal for contributions. They may store data in Canada or other countries, and they are bound to protect it.
-Information stored outside Canada may be subject to the laws of that country.
+We use a small number of providers, who process data on our behalf and are bound to protect it:
+
+| Provider | What for | Where |
+|---|---|---|
+| SiteGround | website hosting, the contact form, the newsletter list, our email | data centres they choose |
+| Supabase | accounts, linked computers, the relay and teams | Canada (Central) |
+| Resend | sending the sign-in code emails | United States |
+| PayPal | contributions | under PayPal's own policy |
+
+Information stored or handled outside Canada may be subject to the laws of that country.
+
+## How long we keep it
+
+- **Accounts, linked computers, teams and summaries:** until you unlink, leave, delete or ask us to
+  delete them (see above). Our provider's backups may keep a copy for a short time after that.
+- **Sign-in codes:** expire within an hour, and a new code cancels the previous one.
+- **Relay frames:** not stored; our provider's technical logs are kept only briefly.
+- **Contact messages, newsletter and contributions:** as described in their sections.
 
 ## Your choices and rights
 
@@ -99,6 +173,11 @@ information is perfectly secure. To report a security issue, see our [security p
 
 If we change this policy, we will post the new version here with a new effective date. Significant
 changes will be noted on this page.
+
+- **November 23, 2026 (VINAC Link 0.13):** added optional accounts, linked computers and "last
+  seen", the relay, teams and the Team console, shared rooms, our service providers for these, and
+  how long we keep data.
+- **November 22, 2026:** first version.
 
 ## Contact
 

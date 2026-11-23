@@ -37,7 +37,8 @@ communauté de la sécurité étudie depuis des années :
 | Protection | Ce que cela signifie pour vous |
 |---|---|
 | **Chiffrement de bout en bout** | Tout ce qui passe entre vos ordinateurs est chiffré pour l'appareil jumelé seulement, avec des clés qui changent à chaque session. |
-| **Aucun serveur entre les deux** | Vos ordinateurs se parlent directement. Nous n'exploitons aucun relais, ne voyons aucun de vos échanges et ne détenons aucune de vos clés. |
+| **Direct par défaut** | Vos ordinateurs se parlent directement. Le relais facultatif reste désactivé tant que vous ne l'activez pas, ne fonctionne qu'entre vos propres ordinateurs jumelés en personne, et ne fait que transmettre des messages scellés qu'il ne peut pas lire. Nous ne voyons aucun de vos échanges et ne détenons aucune de vos clés. |
+| **Le compte est facultatif** | Un compte contient votre adresse courriel et, pour vos ordinateurs liés, leur nom, leur clé publique et leur *dernière activité* : jamais de contenu, de clés ni votre journal d'activité. Les agents ne peuvent pas se connecter, lier un ordinateur ni activer le relais. |
 | **Preuve de livraison** | « Livré » signifie que l'autre ordinateur a prouvé avoir reçu exactement ce message. Les messages rejoués ou modifiés sont refusés. |
 | **Vos règles d'abord** | Les demandes, les fichiers et les simples messages sont vérifiés selon vos règles avant qu'un agent les voie. Vous seul pouvez changer les règles ou approuver une demande, sur la page VINAC Link. |
 | **Un humain dans la boucle** | Les agents peuvent utiliser les appareils jumelés, mais seule une personne peut jumeler un appareil, approuver une demande, changer une règle ou révéler un secret. |

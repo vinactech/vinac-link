@@ -33,7 +33,8 @@ studied for years:
 | Protection | What it means for you |
 |---|---|
 | **End-to-end encryption** | Everything between your computers is encrypted for the paired device only, with keys that change every session. |
-| **No servers in between** | Your computers talk directly. We run no relay, see none of your traffic and hold none of your keys. |
+| **Direct by default** | Your computers talk directly. The optional relay is off until you turn it on, works only between your own computers paired in person, and only passes on sealed messages it can't read. We see none of your traffic and hold none of your keys. |
+| **Accounts are optional** | An account holds your email and your linked computers' names, public keys and *last seen*: never contents, keys or your activity log. Agents can't sign in, link a computer or turn on the relay. |
 | **Proof of delivery** | "Delivered" means the other computer proved it received exactly that message. Replays and altered messages are refused. |
 | **Your rules first** | Requests, files and plain messages are checked against your rules before an agent sees them. Only you can change the rules or approve a request, on the VINAC Link page. |
 | **Human in the loop** | Agents can use the devices you paired, but only a person can pair a device, approve a request, change a rule or reveal a secret. |

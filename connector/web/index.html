@@ -41,6 +41,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M10 12h5M10 15.5h5M10 8.5h2"/></svg>
           <span>Activity log</span>
         </button>
+        <button class="navbtn" id="accountNav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8.5" r="3.6"/><path d="M5 20c.8-3.6 3.6-5.6 7-5.6s6.2 2 7 5.6"/></svg>
+          <span>Account</span><span class="betatag">beta</span>
+        </button>
       </nav>
 
       <div class="side-section">
@@ -53,6 +57,14 @@
         <input id="convoSearch" type="search" placeholder="Search devices and messages" aria-label="Search devices and messages" autocomplete="off">
       </div>
       <nav class="convos" id="convos" aria-label="Conversations"></nav>
+
+      <div class="side-section">
+        <span class="side-label">Rooms</span>
+        <button class="icon tiny" id="newRoomBtn" title="New room" aria-label="New room">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+      </div>
+      <nav class="convos rooms" id="roomList" aria-label="Rooms"></nav>
 
       <div class="side-foot">
         <button class="pairbtn" id="newPairBtn">
@@ -188,6 +200,32 @@
           <small class="counter" id="counter"></small>
         </form>
         <p class="composer-hint">Enter to send · Shift+Enter for a new line · Messages go straight to the device and are not stored on any server.</p>
+      </section>
+
+      <!-- shared project room -->
+      <section class="view thread-view" data-main="room">
+        <header class="thread-head">
+          <button class="icon back" id="roomBackBtn" aria-label="Back to conversations">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <span class="avatar room-av" aria-hidden="true">#</span>
+          <div class="head-text">
+            <b id="roomName"></b>
+            <small id="roomMembers"></small>
+          </div>
+          <button class="icon" id="roomLeaveBtn" title="Leave this room" aria-label="Leave this room">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/></svg>
+          </button>
+        </header>
+        <div class="banner" id="roomBanner" hidden></div>
+        <div class="thread" id="roomThread" aria-live="polite"></div>
+        <form class="composer" id="roomComposer">
+          <textarea id="roomText" rows="1" maxlength="8000" placeholder="Post in this room" aria-label="Post in this room"></textarea>
+          <button class="send" aria-label="Post" title="Post (Enter)">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 12l16-8-6 16-2.5-6.5L4 12Z"/></svg>
+          </button>
+        </form>
+        <p class="composer-hint">Each post goes straight to every device in the room, encrypted, through each one's firewall. No server keeps it.</p>
       </section>
 
       <!-- secrets received -->
@@ -578,6 +616,80 @@
           <button class="ghost" id="secretStop">Stop</button>
           <button class="primary" id="secretDone" hidden>Done</button>
         </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ===== new shared project room (only the person makes rooms) ===== -->
+  <div class="overlay" id="roomModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="roomModalTitle">
+      <header class="info-head">
+        <b id="roomModalTitle">New room</b>
+        <button class="icon" id="roomModalClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </header>
+      <form class="modal-body account-form" id="roomForm">
+        <p class="hint">A room is a shared thread for one project across your paired devices. Each post goes straight to every device in it, encrypted, through that device's firewall. Their agents can read and post too.</p>
+        <label for="roomNameInput">Name</label>
+        <input id="roomNameInput" maxlength="40" placeholder="Website launch" required>
+        <label>Devices in the room</label>
+        <div class="room-pick" id="roomPick"></div>
+        <button class="primary wide">Create room</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- ===== optional account (beta): sign in with an email code, link this computer ===== -->
+  <div class="overlay" id="accountModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="accountTitle">
+      <header class="info-head">
+        <b id="accountTitle">Account</b>
+        <button class="icon" id="accountClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </header>
+      <div class="modal-body">
+        <p class="hint">Optional. VINAC Link works fully without an account. An account lets you see your computers in one place, reach them across networks through the relay, and share them with a team.</p>
+
+        <form id="accountEmailForm" class="account-form" hidden>
+          <label for="accountEmail">Email</label>
+          <input id="accountEmail" type="email" autocomplete="email" maxlength="200" placeholder="you@example.com" required>
+          <button class="primary wide">Send me a sign-in code</button>
+          <p class="hint small">We email you a code from no-reply@vinac.tech. No password.</p>
+        </form>
+
+        <form id="accountCodeForm" class="account-form" hidden>
+          <p class="hint">Code sent to <b id="accountPendingEmail"></b>. It works for 15 minutes.</p>
+          <label for="accountCode">Code from the email</label>
+          <input id="accountCode" inputmode="numeric" autocomplete="one-time-code" maxlength="10" placeholder="12345678" required>
+          <button class="primary wide">Sign in</button>
+          <button type="button" class="linkish" id="accountOtherEmail">Use another email</button>
+        </form>
+
+        <div id="accountSignedIn" hidden>
+          <p>Signed in as <b id="accountEmailShown"></b>.</p>
+          <div class="account-device">
+            <div><b>This computer</b><small id="accountLinkState"></small></div>
+            <button class="primary small-btn" id="accountLink" type="button">Link this computer</button>
+            <button class="ghost" id="accountUnlink" type="button" hidden>Unlink</button>
+          </div>
+          <div class="account-device" id="accountRelayRow" hidden>
+            <div><b>Relay</b><small id="accountRelayState"></small></div>
+            <label class="relay-switch"><input type="checkbox" id="accountRelay"> <span>Use when a direct link fails</span></label>
+          </div>
+          <p class="hint" id="accountRelayHint" hidden>When a computer paired with this one and linked to this account can't be reached on the same network or through Tailscale, messages go through the account service instead. They stay sealed end to end, so the service can't read them. Pairing never goes through it. Up to 200 KB at a time.</p>
+          <div id="accountTeams" hidden>
+            <h3 class="fw-h">Teams</h3>
+            <p class="hint">Teams are made and managed in the <a href="https://vinac.tech/console/" target="_blank" rel="noopener">Team console</a>. You can share this computer's monthly activity summary with a team: counts only (messages, requests, approvals, key uses), signed by this computer. Never contents, names of keys or agents, or the log itself.</p>
+            <div class="account-share">
+              <select id="shareTeam" aria-label="Team"></select>
+              <select id="sharePeriod" aria-label="Month"></select>
+              <button class="ghost" id="shareBtn" type="button">Share summary</button>
+            </div>
+          </div>
+          <h3 class="fw-h">Computers on this account</h3>
+          <ul class="secret-list" id="accountDevices"></ul>
+          <button class="ghost" id="accountSignOut" type="button">Sign out on this computer</button>
+        </div>
+
+        <p class="fine-print">Linking sends this computer's name, key fingerprint and public key, its system and VINAC Link version to the account service (Supabase, stored in Canada). Never messages, keys, files or the activity log. With the relay on, sealed messages pass through it; it sees which computers talk and when, never what they say. Agents can't sign in, link computers or turn on the relay.</p>
       </div>
     </div>
   </div>

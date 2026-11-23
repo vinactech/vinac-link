@@ -42,8 +42,10 @@ import { Firewall } from './firewall.js';
 import { env } from './env.js';
 import { AutoResponder, REPLY_INTENTS, extraProgramDirs } from './autoreply.js';
 import { Agents, Grants, GRANT_HOURS, startRun } from './grants.js';
+import { Cloud } from './cloud.js';
+import { Relay } from './relay.js';
 import { Phones } from './phones.js';
-import { query as auditQuery, toCsv, buildReport, reportHtml, applyRetention, RETENTION_CHOICES, DEFAULT_RETENTION, CATEGORIES } from './compliance.js';
+import { query as auditQuery, toCsv, buildReport, reportHtml, applyRetention, RETENTION_CHOICES, DEFAULT_RETENTION, CATEGORIES, teamSummary } from './compliance.js';
 import { PHONE_SECRET } from '../web/phone-frame.js';
 import { AuditLog } from './audit.js';
 
@@ -78,6 +80,7 @@ const FW_VISIBLE = new Set(['allowed', 'approved']);  // the agent may see these
 const FW_STATUS = { allow: 'allowed', ask: 'pending', block: 'blocked' };
 const CLOCK_SKEW_MS = 10 * 60_000;
 const REPLAY_KEEP_MS = 2 * CLOCK_SKEW_MS + 60_000;   // ids are remembered for the whole acceptance window
+const TOUCH_MS = 15 * 60_000;                         // a linked computer's "last seen" for the Team console
 const MAX_WAIT_S = 60;
 const PEER_CHECK_MS = 15_000;
 const ASK_TTL_MS = 3 * 24 * 60 * 60_000;            // a request nobody decided on expires after 3 days
@@ -94,6 +97,11 @@ const RECEIVE_WINDOW_MS = 3 * 60_000;
 const MAX_SECRETS = 100;
 const MSG_ID = /^[A-Za-z0-9_-]{16}$/;
 const AGENT_FP = /^AGT-[0-9A-F]{4}(-[0-9A-F]{4}){3}$/; // grants.js agentFingerprint
+const ROOM_POST = 'agent.room.post';                 // shared project rooms (0.13)
+const ROOM_ID = /^[A-Za-z0-9_-]{8,24}$/;
+const FINGERPRINT = /^[0-9A-F]{4}(-[0-9A-F]{4}){3}$/;
+const MAX_ROOMS = 100;
+const isRoomPost = m => m.intent === ROOM_POST;
 const HEX = n => new RegExp(`^[0-9a-f]{${n}}$`);
 const PEER_ID = HEX(16), SECRET_ID = HEX(16), SID = HEX(24);
 
@@ -228,6 +236,8 @@ export class Daemon {
     this.agents = new Agents(this.store);   // agent identities (tokens made on the page)
     this.grants = new Grants(this.store);   // standing key grants: runs the service starts itself
     this.phones = new Phones(this.store);   // phone vault: paired phones that send keys by sound
+    this.cloud = new Cloud(this.store);     // optional account (sign-in code, linked computer); only the page uses it
+    this.relay = null; this.relayFps = null; this.relayChecks = new Map(); // relay through the account (off unless the person turns it on)
     this.chunkLimiter = new RateLimiter(600);       // file parts per device per minute
     this.audit = new AuditLog(this.store.home);
     this.secretUses = new Map();   // `vinac run` requests: id -> { names, command, cwd, status, expires, values? }
@@ -253,6 +263,9 @@ export class Daemon {
     this.store.saveDaemonInfo({ pid: process.pid, port: this.port, uiPort: this.uiPort, address: this.address, version: APP_VERSION, ...(ownProof?{instance:{start:ownProof.start,exe:ownProof.exe,uid:ownProof.uid}}:{}) });
     this.log(`device "${this.me.name}" ${this.me.fpText} (${this.me.keystore}) · network ${this.address}:${this.port} · page ${this.uiUrl}`);
     if (this.me.keystore === 'file') this.log('WARNING: development mode, keys are in a plain file (VINAC_KEYSTORE=file).');
+    // The relay reconnects at start only if the person turned it on earlier (and the computer is still linked).
+    if (this.relayOn() && this.cloud.account()?.device) this.startRelay();
+    this.startTouch();
     this.checkPeers();
     if (this.discovery) {
       try { this.discovery.start((buf, from) => this.onNearby(buf, from)); } catch (e) { this.log(`discovery off: ${e.message}`); }
@@ -313,8 +326,17 @@ export class Daemon {
       let peers = [];
       try { peers = this.store.peers().filter(p => p.address && p.keyLabel); this.expireRequests(); } catch { /* reported elsewhere */ }
       await Promise.all(peers.map(async p => {
-        const up = (await this.provesIdentity(p, p.address)) || !!(await this.tryAlternates(p));
-        this.setOnline(p.id, up);
+        let up = (await this.provesIdentity(p, p.address)) || !!(await this.tryAlternates(p)), via = null;
+        // Not reachable directly: through the relay, at most once a minute per device (it counts against
+        // the account service's monthly message allowance).
+        if (!up && (await this.relayFor(p).catch(() => false))) {
+          const last = this.relayChecks.get(p.id) || 0;
+          if (Date.now() - last >= 60_000) {
+            this.relayChecks.set(p.id, Date.now());
+            if (await this.provesIdentity(p, p.address, 'relay')) { up = true; via = 'relay'; }
+          } else if (this.online.get(p.id)?.via === 'relay') { up = true; via = 'relay'; }
+        }
+        this.setOnline(p.id, up, via);
         if (up) await this.flushOutbox(p.id).catch(() => {});
       }));
       try { this.expireOutbox(); } catch { /* next round */ }
@@ -323,7 +345,7 @@ export class Daemon {
     run();
   }
 
-  setOnline(id, online) { this.online.set(id, { online, at: Date.now() }); }
+  setOnline(id, online, via = null) { this.online.set(id, { online, at: Date.now(), ...(online && via ? { via } : {}) }); }
 
   get uiUrl() { return `http://127.0.0.1:${this.uiPort}/`; }
   get v3() { return this.maxProtocol >= PROTOCOL_V3; }
@@ -334,6 +356,7 @@ export class Daemon {
     clearTimeout(this.peerTimer);
     clearInterval(this.nearbyTimer); clearInterval(this.retentionTimer);
     this.discovery?.stop();
+    this.relay?.stop(); clearInterval(this.touchTimer);
     for (const w of this.waiters) w();
     for (const w of this.eventWaiters) w();
     await Promise.all([this.lan, this.ui].filter(Boolean).map(s => new Promise(r => { s.closeAllConnections?.(); s.close(() => r()); })));
@@ -357,14 +380,14 @@ export class Daemon {
   }
 
   peers() {
-    return this.store.peers().map(p => ({ id: p.id, name: p.name, fingerprint: p.fingerprint, pairedAt: p.pairedAt, via: p.via, address: p.address || null, canMessage: !!(p.keyLabel && p.address), protocol: p.proto || 2, online: this.online.get(p.id)?.online ?? null }));
+    return this.store.peers().map(p => ({ id: p.id, name: p.name, fingerprint: p.fingerprint, pairedAt: p.pairedAt, via: p.via, address: p.address || null, canMessage: !!(p.keyLabel && p.address), protocol: p.proto || 2, online: this.online.get(p.id)?.online ?? null, ...(this.online.get(p.id)?.via ? { reachedVia: this.online.get(p.id).via } : {}) }));
   }
 
   /** One summary per paired device for the page's conversation list. */
   conversations() {
     const all = this.store.messages();
     return this.store.peers().map(p => {
-      const mine = all.filter(m => m.peer.id === p.id);
+      const mine = all.filter(m => m.peer.id === p.id && !isRoomPost(m));
       const last = mine.at(-1);
       return {
         peerId: p.id, total: mine.length, last: last ? this.messageView(last) : null,
@@ -376,7 +399,8 @@ export class Daemon {
   }
 
   thread(peerId) {
-    return this.store.messages().filter(m => m.peer.id === peerId).slice(-300).map(m => this.messageView(m));
+    // Room posts show in their room, not in the one-to-one conversation.
+    return this.store.messages().filter(m => m.peer.id === peerId && !isRoomPost(m)).slice(-300).map(m => this.messageView(m));
   }
 
   current() {
@@ -854,7 +878,7 @@ export class Daemon {
   async openNoiseSession(peer) {
     const { pattern, hs } = this.noiseSessionFor(peer, true);
     const m1 = hs.write(Buffer.from(JSON.stringify({ ts: Date.now() })));
-    const r = await postJson(`http://${peer.address}/noise`, { v: PROTOCOL_V3, from: this.meId, to: peer.id, pattern, m1: b64u(m1) }, 6000);
+    const r = await this.peerPost(peer, '/noise', { v: PROTOCOL_V3, from: this.meId, to: peer.id, pattern, m1: b64u(m1) }, 6000);
     let sid;
     try { hs.read(noiseBytes(r.m2, 1024)); sid = str(r.sid, 24, SID); }
     catch { throw httpError(502, `${peer.name} answered without proving it holds the pairing key.`); }
@@ -897,7 +921,7 @@ export class Daemon {
     const pk = this.pairKeyOf(peer), auth = authKey(pk);
     const eph = newEphemeral();
     const eI = b64u(eph.publicRaw), ts = String(Date.now());
-    const r = await postJson(`http://${peer.address}/session`, { v: PROTOCOL_VERSION, from: this.meId, to: peer.id, ePub: eI, ts, mac: b64u(mac(auth, 'session-init', this.meId, peer.id, eI, ts)) }, 6000);
+    const r = await this.peerPost(peer, '/session', { v: PROTOCOL_VERSION, from: this.meId, to: peer.id, ePub: eI, ts, mac: b64u(mac(auth, 'session-init', this.meId, peer.id, eI, ts)) }, 6000);
     const eR = bin(r.ePub, 32), sid = str(r.sid, 24, SID);
     if (!tagsEqual(bin(r.mac, 32), mac(auth, 'session-ok', this.meId, peer.id, eI, b64u(eR), sid))) throw httpError(502, `${peer.name} answered without proving it holds the pairing key.`);
     const k = sessionKeys({ shared: sharedSecret(eph.privateKey, eR), pairKey: pk, initiator: this.meId, responder: peer.id, eI: eph.publicRaw, eR });
@@ -934,13 +958,85 @@ export class Daemon {
       // Tailscale), but only one where it proves it holds the pairing key.
       if (e.status) throw e;
       const moved = await this.tryAlternates(peer);
-      if (!moved) throw e;
-      return this.sendSealedTo(moved, kind, route, id, payload, timeoutMs);
+      if (moved) return this.sendSealedTo(moved, kind, route, id, payload, timeoutMs);
+      // Last: the relay, when it is on and that device is linked to the same account.
+      if (!(await this.relayFor(peer))) throw e;
+      const r = await this.sendSealedTo({ ...peer, via: 'relay' }, kind, route, id, payload, timeoutMs);
+      return { ...r, via: 'relay' };
     }
   }
 
+  /** POSTs to a paired device: directly at its address, or through the relay (peer.via === 'relay'). */
+  peerPost(peer, route, body, timeoutMs) {
+    if (peer.via === 'relay') return this.relay.request(peer.id, route, body, timeoutMs);
+    return postJson(`http://${peer.address}${route}`, body, timeoutMs);
+  }
+
+  // ---- relay (0.13): see relay.js --------------------------------------------
+
+  relayOn() { return !!this.cloud.account()?.relay; }
+
+  /** Account computers' fingerprints, fetched at most once a minute (on a miss) or every 10 minutes. */
+  async accountFingerprints(force = false) {
+    const c = this.relayFps;
+    if (c && (Date.now() - c.at < 600_000) && !(force && Date.now() - c.at > 60_000)) return c.fps;
+    try { this.relayFps = { at: Date.now(), fps: new Set((await this.cloud.devices()).map(d => d.fingerprint)) }; }
+    catch { this.relayFps = { at: Date.now(), fps: c?.fps || new Set() }; }
+    return this.relayFps.fps;
+  }
+
+  /** May this paired device use the relay? Only when it is linked to the same account. */
+  async relayFor(peer) {
+    if (!this.relayOn() || !this.relay?.ready()) return false;
+    const rec = this.peerRecord(peer.id);
+    if (!rec?.keyLabel) return false;
+    if ((await this.accountFingerprints()).has(rec.fingerprint)) return true;
+    return (await this.accountFingerprints(true)).has(rec.fingerprint);
+  }
+
+  /** A frame that came through the relay: handled like one from the network (never pairing). */
+  async relayRequest(route, body, from) {
+    if ((route === '/session' || route === '/noise') && !this.handshakeLimiter.allow(`relay:${from}`)) throw httpError(429, 'TOO_MANY_REQUESTS');
+    const handlers = { '/session': this.lanSession, '/whoami': this.lanWhoami, '/msg': this.lanMsg, '/secret': this.lanSecret, '/secret-ack': this.lanSecretAck, '/unpair': this.lanUnpair };
+    if (this.v3) handlers['/noise'] = this.lanNoise;
+    const h = handlers[route];
+    if (!h) throw httpError(404, 'Not found');
+    return h.call(this, body, { relay: true });
+  }
+
+  startRelay() {
+    this.relay ??= new Relay({
+      cloud: this.cloud, meId: this.meId, log: m => this.log(m),
+      onRequest: (route, body, from) => this.relayRequest(route, body, from),
+      allowed: async from => { const p = this.peerRecord(from); return !!p && this.relayFor(p); },
+    });
+    this.relay.start().catch(e => this.log(`relay: ${e.message}`));
+  }
+
+  async setRelay(on) {
+    const a = this.cloud.account();
+    if (on && !a?.device) throw httpError(409, 'Link this computer to your account first.');
+    if (a) this.cloud.saveAccount({ ...a, relay: !!on });
+    if (on) this.startRelay(); else this.relay?.stop();
+    this.relayFps = null;
+    this.audit.add(on ? 'account.relay_on' : 'account.relay_off', { email: a?.email, device: this.me.name });
+    return this.accountView();
+  }
+
+  /** While this computer is linked: "last seen" for the console every 15 minutes (silent when offline). */
+  startTouch() {
+    clearInterval(this.touchTimer);
+    if (!this.cloud.account()?.device) return;
+    const touch = () => this.cloud.touch({ name: this.me.name, version: APP_VERSION }).catch(() => {});
+    touch();
+    this.touchTimer = setInterval(touch, TOUCH_MS);
+    this.touchTimer.unref?.();
+  }
+
+  accountView() { return { ...this.cloud.view(), relay: this.relayOn(), relayStatus: this.relay?.view() || { state: 'off' } }; }
+
   async sendSealedTo(peer, kind, route, id, payload, timeoutMs) {
-    if (!peer.address) throw httpError(409, `No network address is known for ${peer.name}. Pair again.`);
+    if (!peer.address && peer.via !== 'relay') throw httpError(409, `No network address is known for ${peer.name}. Pair again.`);
     for (let attempt = 0; attempt < 2; attempt++) {
       let s = this.outSessions.get(peer.id);
       if (!s || s.expires < Date.now() || s.uses >= SESSION_MAX_USES) s = await this.openSession(peer);
@@ -948,7 +1044,7 @@ export class Daemon {
       const v = s.v || PROTOCOL_VERSION;
       const { nonce, ct } = seal(s.sendKey, sealedAad(kind, this.meId, peer.id, s.sid, this.port, v), Buffer.from(payload));
       let r;
-      try { r = await postJson(`http://${peer.address}${route}`, { v, from: this.meId, to: peer.id, sid: s.sid, port: this.port, nonce: b64u(nonce), ct: b64u(ct) }, timeoutMs); }
+      try { r = await this.peerPost(peer, route, { v, from: this.meId, to: peer.id, sid: s.sid, port: this.port, nonce: b64u(nonce), ct: b64u(ct) }, timeoutMs); }
       catch (e) { if (e.status === 409 && e.message === 'NO_SESSION' && attempt === 0) { this.outSessions.delete(peer.id); continue; } throw e; }
       const receipt = typeof r.receipt === 'string' ? fromB64u(r.receipt) : Buffer.alloc(0);
       if (!tagsEqual(receipt, receiptFor(v)(s.receiptKey, kind, id, ct))) throw httpError(502, `${peer.name} did not return a valid receipt, so delivery is not confirmed.`);
@@ -974,10 +1070,10 @@ export class Daemon {
 
   // ---- addresses: only change after the device proves itself there ----------
 
-  async provesIdentity(peer, address) {
+  async provesIdentity(peer, address, via = null) {
     try {
       const nonce = randomBytes(16);
-      const r = await postJson(`http://${address}/whoami`, { v: PROTOCOL_VERSION, from: this.meId, to: peer.id, nonce: b64u(nonce) }, 2500);
+      const r = await this.peerPost({ ...peer, address, via }, '/whoami', { v: PROTOCOL_VERSION, from: this.meId, to: peer.id, nonce: b64u(nonce) }, via === 'relay' ? 6000 : 2500);
       const ok = tagsEqual(bin(r.mac, 32), mac(authKey(this.pairKeyOf(peer)), 'whoami', peer.id, this.meId, b64u(nonce)));
       if (ok && r.alt !== undefined) this.rememberAlt(peer.id, altAddressList(r.alt));
       return ok;
@@ -1013,6 +1109,7 @@ export class Daemon {
   }
 
   noticeAddress(peer, req, p) {
+    if (req?.relay) return; // no network address to learn from a relayed frame
     const candidate = hostPort(plainIp(req.socket.remoteAddress), p);
     if (candidate === peer.address || this.verifying.has(candidate)) return;
     this.verifying.add(candidate);
@@ -1048,6 +1145,7 @@ export class Daemon {
       ...(m.firewall ? { firewall: m.firewall } : {}),
       ...(m.auto ? { auto: true } : {}),
       ...(m.agent ? { agent: m.agent } : {}),
+      ...(m.via ? { via: m.via } : {}),
       ...(m.outbox ? { queued: true, queuedAt: m.outbox.queuedAt } : {}),
       ...(m.undelivered ? { undelivered: m.undelivered } : {}),
     };
@@ -1085,6 +1183,10 @@ export class Daemon {
 
   /** Sends to one device, several, a group or all. Several: one result per device. */
   async send(msg, by = 'agent', opts = {}) {
+    if (msg.room != null && msg.room !== '') {
+      if (opts.auto || opts.file || msg.intent) throw httpError(400, 'A room post is plain text (no intent, no file).');
+      return this.postRoom({ room: msg.room, text: msg.text }, by, opts);
+    }
     const peers = this.targets(msg.to);
     if (peers.length === 1) return opts.file ? this.sendFileTo(peers[0], msg, by) : this.sendOne(peers[0], msg, by, opts);
     if (opts.auto) throw httpError(403, 'Automatic replies go only to the device that asked.');
@@ -1187,9 +1289,10 @@ export class Daemon {
     // so the other device's log can say which agent here sent it. Older devices ignore the field.
     const sender = agent && by === 'agent' && agent.name && agent.fp ? { name: String(agent.name).slice(0, 40), fp: agent.fp } : null;
     const inner = { id: b64u(randomBytes(12)), text: body, sentAt: new Date().toISOString(), replyTo: replyTo || null, by, ...(intent ? { intent, args: sendArgs } : {}), ...(auto ? { auto: true } : {}), ...(sender ? { agent: sender } : {}) };
+    let via = null;
     try {
-      await this.sendSealed(peer, 'msg', '/msg', inner.id, JSON.stringify(inner));
-      this.setOnline(peer.id, true);
+      via = (await this.sendSealed(peer, 'msg', '/msg', inner.id, JSON.stringify(inner)))?.via || null;
+      this.setOnline(peer.id, true, via);
     } catch (e) {
       if (e.status === 502 && /receipt|session|proving/.test(e.message)) throw e;
       if (e.status && /UNKNOWN_INTENT/.test(e.message)) throw httpError(502, `${peer.name} does not know the intent "${intent}" yet (its intent catalog is older than ${LOGOS_VERSION}). Update VINAC Link there, or send plain text.`);
@@ -1206,9 +1309,9 @@ export class Daemon {
       }
       throw httpError(502, `Could not reach ${peer.name} at ${peer.address}. VINAC Link must be running there, on the same network, and allowed through its firewall.${hint}`);
     }
-    const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by };
+    const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by, ...(via ? { via } : {}) };
     this.store.saveMessages([...this.store.messages(), rec]);
-    this.audit.add('msg.out', { peer, id: inner.id, intent, by, chars: body.length, ...(reqArgs?.size ? { fileBytes: reqArgs.size } : {}), ...(auto ? { auto: true } : {}), ...(agent ? { agent: agent.name, agentFp: agent.fp } : {}) });
+    this.audit.add('msg.out', { peer, id: inner.id, intent, by, chars: body.length, ...(via ? { via } : {}), ...(reqArgs?.size ? { fileBytes: reqArgs.size } : {}), ...(auto ? { auto: true } : {}), ...(agent ? { agent: agent.name, agentFp: agent.fp } : {}) });
     this.log(`message → ${peer.name} (${body.length} chars${intent ? `, request ${intent}` : ''})`);
     return {
       sent: true, delivered: true, ...this.messageView(rec),
@@ -1259,6 +1362,7 @@ export class Daemon {
       by: inner.by || undefined, // as the sender says; not proof
       ...(inner.auto === true ? { auto: true } : {}),
       ...(fromAgent ? { agent: fromAgent } : {}),
+      ...(req?.relay ? { via: 'relay' } : {}),
     };
     if (fileBytes) { args.file = this.store.fileId(); this.store.saveFile(args.file, fileBytes); }
     // The firewall decides here, before any agent could see it: requests by intent,
@@ -1267,15 +1371,16 @@ export class Daemon {
     if (decision === 'ask' && this.store.messages().filter(m => m.dir === 'in' && m.peer.id === peer.id && m.firewall?.status === 'pending').length >= MAX_WAITING_PER_PEER) {
       decision = 'block'; source = `more than ${MAX_WAITING_PER_PEER} requests from this device are already waiting`;
     }
+    if (inner.intent === ROOM_POST && decision !== 'block') this.noteRoomPost(peer, args);
     if (inner.intent) Object.assign(rec, { intent: inner.intent, args, firewall: { status: FW_STATUS[decision], rule: source, at: now } });
     else if (decision !== 'allow') rec.firewall = { status: FW_STATUS[decision], rule: source, at: now };
     const list = [...this.store.messages(), rec];
     this.store.saveMessages(list);
     if (fileBytes) this.store.pruneFiles(new Set(list.slice(-500).map(m => m.args?.file).filter(Boolean)));
-    this.setOnline(peer.id, true);
+    this.setOnline(peer.id, true, req?.relay ? 'relay' : null);
     setImmediate(() => this.flushOutbox(peer.id).catch(() => {})); // it's back: send what waited for it
-    this.log(`message ← ${peer.name} (${text.length} chars${rec.intent ? `, request ${rec.intent}` : ''}${rec.firewall ? `: ${rec.firewall.status}` : ''})`);
-    this.audit.add('msg.in', { peer, id, intent: rec.intent, chars: text.length, firewall: rec.firewall?.status || 'delivered', rule: rec.firewall?.rule, ...(args?.size ? { fileBytes: args.size } : {}), ...(rec.auto ? { auto: true } : {}), ...(fromAgent ? { agent: fromAgent.name, agentFp: fromAgent.fp, remoteAgent: true } : {}) });
+    this.log(`message ← ${peer.name} (${text.length} chars${rec.intent ? `, request ${rec.intent}` : ''}${rec.firewall ? `: ${rec.firewall.status}` : ''}${rec.via ? ', via relay' : ''})`);
+    this.audit.add('msg.in', { peer, id, intent: rec.intent, chars: text.length, ...(rec.via ? { via: rec.via } : {}), firewall: rec.firewall?.status || 'delivered', rule: rec.firewall?.rule, ...(args?.size ? { fileBytes: args.size } : {}), ...(rec.auto ? { auto: true } : {}), ...(fromAgent ? { agent: fromAgent.name, agentFp: fromAgent.fp, remoteAgent: true } : {}) });
     if (agentVisible(rec)) { for (const w of this.waiters) w(); this.auto.consider(rec); }
     return { ok: true, receipt: receipt(id) };
   }
@@ -1318,6 +1423,106 @@ export class Daemon {
     }
     this.store.saveGroups(groups);
     return this.groupsView();
+  }
+
+  // ---- shared project rooms (0.13, light): a named group thread across paired devices -------------
+  // No server: each post goes to every member over the existing links (sealed, through each member's
+  // firewall) as intent agent.room.post. Only the person creates a room; agents post in rooms that exist.
+
+  roomOf(ref) {
+    const q = String(ref ?? '').trim();
+    const r = this.store.rooms().find(x => x.id === q) || this.store.rooms().find(x => x.name.toLowerCase() === q.toLowerCase());
+    if (!r) throw httpError(404, `No room called "${q}". Rooms are made by the person on the VINAC Link page.`);
+    return r;
+  }
+
+  roomsView() {
+    const peers = this.store.peers(), all = this.store.messages();
+    return this.store.rooms().map(r => {
+      const posts = all.filter(m => m.intent === ROOM_POST && m.args?.room === r.id);
+      const last = posts.at(-1);
+      return {
+        id: r.id, name: r.name, by: r.by, createdAt: r.createdAt,
+        members: r.members.map(id => peers.find(p => p.id === id)).filter(Boolean).map(p => ({ id: p.id, name: p.name, fingerprint: p.fingerprint })),
+        ...(r.others?.length ? { notPairedHere: r.others } : {}),
+        last: last ? this.messageView(last) : null,
+        incoming: posts.filter(m => m.dir === 'in' && agentVisible(m)).slice(-50).map(m => ({ id: m.id, at: m.receivedAt || m.sentAt })),
+      };
+    });
+  }
+
+  createRoom(name, members) {
+    const n = cleanName(String(name ?? '')).slice(0, 60).trim();
+    if (!n) throw httpError(400, 'Give the room a name.');
+    if (!Array.isArray(members) || !members.length || members.length > 20) throw httpError(400, 'Pick 1 to 20 paired devices.');
+    const ids = [...new Set(members.map(m => this.resolvePeer(String(m)).id))];
+    const rooms = this.store.rooms();
+    if (rooms.length >= MAX_ROOMS) throw httpError(409, `At most ${MAX_ROOMS} rooms.`);
+    if (rooms.some(r => r.name.toLowerCase() === n.toLowerCase())) throw httpError(409, 'A room with that name exists already.');
+    const room = { id: b64u(randomBytes(9)), name: n, members: ids, by: 'me', createdAt: new Date().toISOString() };
+    this.store.saveRooms([...rooms, room]);
+    this.audit.add('room.created', { room: n, members: ids.length });
+    return room;
+  }
+
+  leaveRoom(id) {
+    const r = this.roomOf(id);
+    this.store.saveRooms(this.store.rooms().filter(x => x.id !== r.id));
+    this.audit.add('room.left', { room: r.name });
+  }
+
+  /** One post to every member of the room (one sealed message each). */
+  async postRoom({ room, text }, by = 'agent', opts = {}) {
+    const r = this.roomOf(room);
+    const peers = this.store.peers();
+    const members = r.members.map(id => peers.find(p => p.id === id)).filter(Boolean);
+    if (!members.length) throw httpError(409, `No device of "${r.name}" is paired with this one any more.`);
+    const fps = [this.me.fpText, ...members.map(p => p.fingerprint), ...(r.others || [])];
+    const args = { room: r.id, name: r.name, members: [...new Set(fps)].join(','), post: b64u(randomBytes(9)) };
+    const results = [];
+    for (const p of members) {
+      try {
+        const x = await this.sendOne(p, { text, intent: ROOM_POST, args }, by, opts);
+        results.push({ to: p.name, sent: x.sent !== false, ...(x.queued ? { queued: true } : {}), ...(x.via ? { via: x.via } : {}) });
+      } catch (e) { results.push({ to: p.name, sent: false, error: e.message }); }
+    }
+    const ok = results.filter(x => x.sent).length;
+    return { sent: ok > 0, room: r.name, post: args.post, results, note: `Posted in ${r.name}: delivered to ${ok} of ${members.length} devices.` };
+  }
+
+  /** A room's posts, oldest first; a post sent to several devices shows once. */
+  roomMessages(id) {
+    const r = this.roomOf(id);
+    const seen = new Map(), out = [];
+    for (const m of this.store.messages()) {
+      if (m.intent !== ROOM_POST || m.args?.room !== r.id) continue;
+      if (m.dir === 'out' && m.args?.post) {
+        const prev = seen.get(m.args.post);
+        if (prev) { prev.to.push(m.peer.name); continue; }
+        const v = { ...this.messageView(m), to: [m.peer.name] };
+        seen.set(m.args.post, v); out.push(v);
+      } else out.push(this.messageView(m));
+    }
+    return out.slice(-300);
+  }
+
+  /** A post arrived: remember the room (made by another device) so its posts group together here. */
+  noteRoomPost(peer, args) {
+    if (!ROOM_ID.test(String(args?.room || ''))) throw httpError(400, 'BAD_FIELD');
+    const rooms = this.store.rooms();
+    let r = rooms.find(x => x.id === args.room);
+    const peers = this.store.peers();
+    const fps = String(args.members || '').split(',').map(s => s.trim()).filter(s => FINGERPRINT.test(s) && s !== this.me.fpText).slice(0, 40);
+    if (!r) {
+      if (rooms.length >= MAX_ROOMS) return;
+      const known = peers.filter(p => fps.includes(p.fingerprint)).map(p => p.id);
+      r = { id: args.room, name: cleanName(String(args.name || '')).slice(0, 60).trim() || 'Room', members: [...new Set([peer.id, ...known])], by: peer.id, createdAt: new Date().toISOString(),
+        others: fps.filter(f => !peers.some(p => p.fingerprint === f)) };
+      rooms.push(r);
+      this.audit.add('room.joined', { room: r.name, peer: { id: peer.id, name: peer.name } });
+    } else if (!r.members.includes(peer.id)) r.members.push(peer.id);
+    else return;
+    this.store.saveRooms(rooms);
   }
 
   groupsView() {
@@ -2054,7 +2259,7 @@ export class Daemon {
       device: this.device(), pairing: this.pairingView({ forHuman: true }), peers: this.peers(), conversations: this.conversations(),
       secrets: this.secretsView(), receiving: this.receiving() ? Math.round((this.receiveUntil - Date.now()) / 1000) : 0,
       waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), vaultLock: this.vault.view(),
-      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), agents: this.agents.view(), grants: this.grants.view(), phones: this.phones.view(), phonePairing: this.phones.pairingView(), ...extra,
+      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), rooms: this.roomsView(), agents: this.agents.view(), grants: this.grants.view(), phones: this.phones.view(), phonePairing: this.phones.pairingView(), ...extra,
     });
     if (req.method === 'POST' && url.pathname === '/ui/send-file') {
       // The person attaches a file in a conversation (raw bytes; name and device in the query).
@@ -2088,6 +2293,47 @@ export class Daemon {
       }
       case 'POST /ui/phone/cancel': this.phones.cancel(); break;
       case 'POST /ui/phones/remove': { const p = this.phones.remove(body.id); this.audit.add('phone.removed', { phone: p.name }); break; }
+      // ---- optional account: only this page (the person) can sign in, link or sign out ----
+      case 'GET /ui/account': return sendJson(res, 200, { account: this.accountView() });
+      case 'GET /ui/account/devices': return sendJson(res, 200, { devices: await this.cloud.devices() });
+      case 'POST /ui/account/start': await this.cloud.start(body.email); return sendJson(res, 200, { account: this.accountView() });
+      case 'POST /ui/account/verify': {
+        const account = await this.cloud.verify(body.code);
+        this.audit.add('account.signed_in', { email: account.email });
+        return sendJson(res, 200, { account: this.accountView() });
+      }
+      case 'POST /ui/account/link': {
+        const account = await this.cloud.link({ name: this.me.name, fingerprint: this.me.fpText, publicKey: b64u(this.me.publicRaw), version: APP_VERSION });
+        this.audit.add('account.linked', { email: account.email, device: this.me.name });
+        this.relayFps = null;
+        this.startTouch();
+        return sendJson(res, 200, { account: this.accountView() });
+      }
+      case 'GET /ui/account/teams': return sendJson(res, 200, { teams: await this.cloud.teams() });
+      case 'POST /ui/account/share': {
+        // One month's activity as counts, signed by this computer, shared with one of the account's teams.
+        const team = (await this.cloud.teams()).find(t => t.id === body.team);
+        if (!team) throw httpError(404, 'Not a team of this account.');
+        const { payload, signature, summary } = teamSummary({ audit: this.audit, device: { name: this.me.name, fingerprint: this.me.fpText }, privateKey: this.me.privateKey, team: team.id, period: body.period });
+        await this.cloud.shareReport({ team: team.id, fingerprint: this.me.fpText, period: body.period, payload, signature });
+        this.audit.add('account.summary_shared', { team: team.name, period: body.period, entries: summary.total });
+        return sendJson(res, 200, { shared: true, team: team.name, period: body.period, summary });
+      }
+      case 'POST /ui/account/unlink': {
+        if (this.relayOn()) await this.setRelay(false);
+        clearInterval(this.touchTimer);
+        const account = await this.cloud.unlink();
+        this.audit.add('account.unlinked', { email: account.email, device: this.me.name });
+        return sendJson(res, 200, { account: this.accountView() });
+      }
+      case 'POST /ui/account/relay': return sendJson(res, 200, { account: await this.setRelay(body.on === true) });
+      case 'POST /ui/account/signout': {
+        const email = this.cloud.view().email;
+        this.relay?.stop(); this.relayFps = null; clearInterval(this.touchTimer);
+        await this.cloud.signOut();
+        if (email) this.audit.add('account.signed_out', { email });
+        return sendJson(res, 200, { account: this.accountView() });
+      }
       case 'POST /ui/agents/add': {
         const r = this.agents.add(body.name);
         this.audit.add('agent.added', { agent: r.agent.name, agentFp: r.agent.fingerprint });
@@ -2101,6 +2347,10 @@ export class Daemon {
         break;
       }
       case 'POST /ui/groups': this.setGroup(body.name, body.members ?? null); break;
+      // Rooms: only the person makes or leaves them (agents post in existing ones through /api/send).
+      case 'POST /ui/rooms': return sendJson(res, 200, state({ room: this.createRoom(body.name, body.members) }));
+      case 'POST /ui/rooms/leave': this.leaveRoom(String(body.id ?? '')); break;
+      case 'GET /ui/rooms/messages': return sendJson(res, 200, { messages: this.roomMessages(String(url.searchParams.get('id') || '')) });
       case 'POST /ui/secret/seal': {
         const { peer, id, frame, name } = this.sealSecret(body);
         this.outSecrets.get(id).via = 'sound';
@@ -2248,7 +2498,7 @@ export class Daemon {
       case 'GET /api/events':
         return sendJson(res, 200, await this.events({ wait: url.searchParams.get('wait'), since: url.searchParams.get('since') || '' }));
       case 'GET /api/peers':
-        return sendJson(res, 200, { peers: this.peers() });
+        return sendJson(res, 200, { peers: this.peers(), rooms: this.roomsView().map(r => ({ id: r.id, name: r.name, members: r.members.map(m => m.name) })) });
       case 'POST /api/pair/open': {
         const mode = body.mode === 'listen' ? 'listen' : 'announce';
         const link = `${this.uiUrl}#${mode}`;

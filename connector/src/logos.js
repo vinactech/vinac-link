@@ -8,8 +8,9 @@
 //  - ids are positions in this list and never change: only append, never
 //    reorder or remove; every release that appends bumps LOGOS_VERSION;
 //  - ids 0-29 are the v0.2.0 business intents shared with the VINAC research
-//    packages; 30-34 came in v0.3.0; v0.4.0 appends the agent and software library.
-export const LOGOS_VERSION = '0.4.0';
+//    packages; 30-34 came in v0.3.0; v0.4.0 appends the agent and software library;
+//    v0.5.0 appends agent.room.post (shared project rooms).
+export const LOGOS_VERSION = '0.5.0';
 
 // How much harm a request could do if a tricked agent acted on it.
 export const RISK_TEXT = {
@@ -199,6 +200,8 @@ const TABLE = [
   ['data.file.convert', 'change', ['from'], ['to', 'path'], 'Convert a data file to another format.'],
   ['data.export.create', 'change', ['source'], ['format'], 'Export data.'],
   ['data.report.generate', 'change', ['topic'], ['format', 'period'], 'Generate a report.'],
+  // ---- v0.5.0: shared project rooms (ids 160-) ----------------------------------------------------
+  ['agent.room.post', 'info', ['room'], ['name', 'members', 'post'], 'Post in a shared project room: a group thread across paired devices (the text is the post).'],
 ];
 
 export const CANONICAL_INTENTS = Object.freeze(TABLE.map(r => r[0]));
@@ -210,7 +213,7 @@ export const domainOf = intent => String(intent).split('.')[0];
 export const describe = intent => BY_NAME.get(intent) || null;
 
 /** The version that added each id range (for docs and compatibility notes). */
-export const sinceVersion = id => (id < 30 ? '0.2.0' : id < 35 ? '0.3.0' : '0.4.0');
+export const sinceVersion = id => (id < 30 ? '0.2.0' : id < 35 ? '0.3.0' : id < 160 ? '0.4.0' : '0.5.0');
 
 // Required args per intent (checked on send and on receipt).
 export const ARG_SHAPES = Object.fromEntries(TABLE.filter(r => r[2].length).map(r => [r[0], { required: r[2] }]));
