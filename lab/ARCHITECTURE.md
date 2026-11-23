@@ -2,14 +2,14 @@
 
 ## Layer separation
 
-### Logos Lexicon v0.2.0
-Deterministic semantic identity only. The app embeds the authoritative 30-intent catalog currently accepted in the Logos Business Semantics work. Arbitrary `domain.entity.action` strings are not accepted merely because they match the syntax.
+### Intent catalog v0.2.0
+Identity of the action only. The app embeds a fixed catalog of 30 intents. Arbitrary `domain.entity.action` strings are not accepted merely because they match the syntax.
 
 ### VINAC-FM NUS
 Browser physical-channel experiment. It creates/receives structured near-ultrasonic frames and returns measured acoustic/modem evidence.
 
 ### Security/session layer
-A temporary browser research session binds a frame to a session, sequence, nonce, expiry, payload digest and canonical Logos intent. HMAC-SHA-256 (128-bit transmitted tag) authenticates the compact research frame. CRC-16 is used only for link integrity.
+A temporary browser research session binds a frame to a session, sequence, nonce, expiry, payload digest and intent from the catalog. HMAC-SHA-256 (128-bit transmitted tag) authenticates the compact research frame. CRC-16 is used only for link integrity.
 
 ### Policy engine
 Not implemented here as a policy service. The lab's verified result is evidence that a future policy engine can consume.
@@ -25,7 +25,7 @@ PROFILE          1 B
 FLAGS            1 B
 SESSION TAG      4 B
 SEQUENCE         2 B
-LOGOS INTENT ID  1 B
+INTENT ID        1 B
 NONCE            6 B
 EXPIRY            4 B
 PAYLOAD LENGTH   1 B
@@ -72,7 +72,7 @@ physical signal
   -> CRC
   -> session tag
   -> expiry
-  -> Logos intent policy expectation
+  -> intent policy expectation
   -> action hash
   -> HMAC
   -> replay/consumption cache
@@ -90,7 +90,7 @@ Tested in v0.1:
 - HMAC corruption;
 - action hash tampering;
 - expiry;
-- different expected Logos intent;
+- different expected intent;
 - reuse of a consumed authenticated frame.
 
 Not proven:

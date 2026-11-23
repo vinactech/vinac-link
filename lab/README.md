@@ -10,10 +10,10 @@ A self-contained browser research application for measurable near-ultrasound exp
 - Primary CP-4FSK modem with continuous phase and smooth packet fades.
 - Legacy OOK baseline for comparison.
 - AudioWorklet-based TX and RX path; link timing does not depend on `requestAnimationFrame()`.
-- Versioned binary frame with protocol/version/profile/session/sequence/Logos intent/nonce/expiry/payload/authenticator/CRC.
+- Versioned binary frame with protocol/version/profile/session/sequence/intent/nonce/expiry/payload/authenticator/CRC.
 - CRC-16 link-integrity verification.
 - HMAC-SHA-256 frame authentication (truncated to 128 bits for the research frame; documented in UI/report).
-- Action binding to canonical Logos Lexicon v0.2.0 intents.
+- Action binding to intents from the shared intent catalog (version 0.2.0).
 - Replay cache, expiry checks and consumed-frame rejection.
 - Live spectrum and simple waterfall display.
 - Measured counters: attempted/decoded/verified frames, raw bitrate, payload goodput, PER, BER when a known payload is used, SNR proxy and frame duration.
@@ -23,9 +23,9 @@ A self-contained browser research application for measurable near-ultrasound exp
 - No raw microphone upload or storage. Security replay capture is held only in memory.
 - Current browser media-track settings are shown/exported so ignored AGC/noise-suppression requests are visible.
 
-## Logos Lexicon
+## Intent catalog
 
-The lab embeds the accepted Logos Lexicon v0.2.0 canonical catalog of 30 intents. Arbitrary strings are not treated as Logos-recognized actions. Logos is used only for deterministic semantic identity in this tester; it does not make authorization decisions.
+The lab embeds a fixed catalog of 30 intents (version 0.2.0): the names that say what a request is for. Arbitrary strings are not treated as known intents. In this tester an intent only identifies the action; it does not make authorization decisions.
 
 ## Run locally
 
@@ -92,7 +92,7 @@ For testing on phones, deploy the folder behind HTTPS. A plain LAN `http://192.1
 - `index.html` — UI shell.
 - `styles.css` — responsive VINAC instrument styling.
 - `js/app.js` — application controller/UI.
-- `js/logos.js` — canonical Logos Lexicon v0.2.0 membership catalog.
+- `js/logos.js` — the intent catalog (v0.2.0) the lab accepts.
 - `js/bytes.js` — binary helpers/base64url/CRC.
 - `js/crypto.js` — session keys, canonical action hash, HMAC.
 - `js/frame.js` — binary VINAC-NUS frame encoder/parser/verifier.

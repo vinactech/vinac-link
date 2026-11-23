@@ -267,7 +267,7 @@
       <div class="panel" role="tabpanel" id="panel-secrets" aria-labelledby="tab-secrets">
         <div class="panel-copy">
           <h3>Keys and tokens move between computers, never through the chat</h3>
-          <p>Keep your API keys and tokens in a vault on each computer, and send one to another computer with one click, or ask another computer for the key a program needs. It goes straight into that computer's secure key store once its person accepts it. Your agent can use it in a program you approve, but only ever sees its name.</p>
+          <p>Keep your API keys and tokens in a vault on each computer, and send one to another computer with one click, or ask another computer for the key a program needs. It goes straight into that computer's secure key store once its person accepts it. Your agent can use it in a program you approve; VINAC Link's agent tools give it the name, not the value.</p>
           <ul class="ticks"><li>Stored by Windows, macOS or Linux's own key store</li><li>Arrives as an offer you accept, or at once when that computer asked for it</li><li>Each use needs your OK on the VINAC Link page</li></ul>
           <a class="link" href="/docs/guide/secrets.html">Moving secrets →</a>
         </div>
@@ -277,7 +277,7 @@
 <pre><span class="mut">› what secrets do I have?</span>
 <span class="acc">vinac_secrets</span>
   DEMO_API_KEY   <span class="mut">from the PC · by Wi-Fi · in Keychain</span>
-  <span class="mut">value: never shown to agents</span>
+  <span class="mut">value: not returned by agent tools</span>
 
 <span class="mut">› start the app with it</span>
 <span class="acc">vinac run</span> --secret DEMO_API_KEY -- npm start
@@ -320,7 +320,7 @@
     <ol class="story">
       <li><span class="st-tag avail">Available</span><h3>Pair the two computers</h3><p>Each lists the other. Compare 6 digits, press Allow on both. Once.</p></li>
       <li><span class="st-tag avail">Available</span><h3>Agents talk and hand off work</h3><p>Questions, reviews, task hand-offs, files and git branches, encrypted, on your network or over Tailscale. Your firewall checks every request.</p></li>
-      <li><span class="st-tag avail">Available</span><h3>Move the keys the project needs</h3><p>The Mac asks for the key it needs; one click on the PC sends it from the vault straight into the Mac's key store. The agent only ever sees its name.</p></li>
+      <li><span class="st-tag avail">Available</span><h3>Move the keys the project needs</h3><p>The Mac asks for the key it needs; one click on the PC sends it from the vault straight into the Mac's key store. VINAC Link's agent tools show only its name.</p></li>
       <li><span class="st-tag avail">Available</span><h3>Run the build with them</h3><p><code>vinac run --secret STRIPE_KEY -- npm start</code>. You approve the exact command, once or for a few hours; the program gets the value, the agent doesn't.</p></li>
       <li><span class="st-tag next">Next</span><h3>One-step project hand-off</h3><p>VINAC Link reads <code>.env.example</code>, shows which keys are missing on the Mac, and sends them all with one approval.</p></li>
     </ol>

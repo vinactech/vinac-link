@@ -13,7 +13,7 @@ export const OUTCOMES = Object.freeze({
   AUTH_FAIL: ['Wrong key', 'The signature does not match this session’s key.'],
   SESSION_MISMATCH: ['Other session', 'Sent from a different pairing link.'],
   ACTION_HASH_MISMATCH: ['Tampered', 'The request does not match what was signed.'],
-  NON_CANONICAL_INTENT: ['Unknown request', 'The intent is not in the shared Logos catalog.'],
+  NON_CANONICAL_INTENT: ['Unknown request', 'The intent is not in the shared intent catalog.'],
   DAMAGED: ['Too damaged', 'Heard, but too much was lost to repair it.'],
 });
 const describe = reason => OUTCOMES[reason] || OUTCOMES[['CRC_FAIL', 'BAD_MAGIC', 'BAD_VERSION', 'INCOMPLETE_FRAME'].includes(reason) ? 'DAMAGED' : ''] || [reason, ''];

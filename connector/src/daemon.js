@@ -73,7 +73,7 @@ const STATE_TEXT = {
 const MAX_TEXT = 8000;
 const MAX_ARGS = 4000;                                // request arguments, as JSON
 const MAX_NAME = 64;
-// What the firewall did with a request (a message that names a Logos intent).
+// What the firewall did with a request (a message that names an intent).
 const FW_VISIBLE = new Set(['allowed', 'approved']);  // the agent may see these
 const FW_STATUS = { allow: 'allowed', ask: 'pending', block: 'blocked' };
 const CLOCK_SKEW_MS = 10 * 60_000;
@@ -1238,7 +1238,7 @@ export class Daemon {
       if (!name) throw httpError(400, 'BAD_FIELD');
       fromAgent = { name, fp: a.fp };
     }
-    // A request names a Logos intent; anything else in that field is refused, not guessed.
+    // A request names an intent from the catalog; anything else in that field is refused, not guessed.
     if (inner.intent != null && !isIntent(inner.intent)) throw httpError(400, 'UNKNOWN_INTENT');
     if (inner.intent == null && inner.args != null) throw httpError(400, 'BAD_FIELD');
     let args = null, fileBytes = null, transfer = null;

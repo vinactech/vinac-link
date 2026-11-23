@@ -5,7 +5,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { tempHome } from './helpers.mjs';
 import { render, inline } from '../tools/markdown.mjs';
-import { build, PAGES, PLAIN, resolveLink, publicMarkdown } from '../tools/build-site.mjs';
+import { build, PAGES, PLAIN, FR_PLAIN, resolveLink, publicMarkdown } from '../tools/build-site.mjs';
 
 test('markdown: blocks, inline marks, and raw HTML is escaped', () => {
   const { html, headings } = render([
@@ -44,7 +44,16 @@ test('site: builds every page with no leftover placeholders, no outside requests
   assert.equal(r.missing.length, 0);
   // The phone vault app (/app/) is its own small page, checked below.
   const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !f.replaceAll('\\', '/').startsWith('app/')).map(f => path.join(out, f));
-  assert.equal(files.length, PAGES.length + PLAIN.length + 2); // + home + 404
+  assert.equal(files.length, PAGES.length + PLAIN.length + 2 + FR_PLAIN.length + 1); // + home + 404, + the French pages and home
+  // French pages: French, with the language switch and hreflang twins, and no English page left behind.
+  for (const u of ['/fr/', ...FR_PLAIN.map(p => p[1])]) {
+    const html = fs.readFileSync(path.join(out, u.endsWith('/') ? `${u}index.html` : u), 'utf8');
+    assert.match(html, /<html lang="fr-CA"/, u);
+    assert.match(html, /hreflang="fr-CA"/, `${u} names its French twin`);
+    assert.match(html, /class="lang-switch" href="\/[^"]*" hreflang="en"/, `${u} links to English`);
+  }
+  assert.match(fs.readFileSync(path.join(out, 'index.html'), 'utf8'), /class="lang-switch" href="\/fr\/"/);
+  assert.match(fs.readFileSync(path.join(out, 'fr', 'index.html'), 'utf8'), /Un lien sécurisé entre/);
   const appPage = fs.readFileSync(path.join(out, 'app', 'index.html'), 'utf8');
   assert.doesNotMatch(appPage, /<(script|img|link)[^>]+(src|href)="https?:/i, 'the phone vault loads nothing from other sites');
   for (const f of ['app/app.js', 'app/sw.js', 'app/web/phone-crypto.js', 'app/web/phone-frame.js', 'app/lab/js/audio.js', 'app/lab/worklets/vinac-tx-processor.js']) assert.ok(fs.existsSync(path.join(out, f)), f);
@@ -55,7 +64,7 @@ test('site: builds every page with no leftover placeholders, no outside requests
     assert.doesNotMatch(html, /\{\{\w+\}\}/, f);
     // The bottom bar on every page: GitHub, PayPal, newsletter (our own script, consent box required).
     assert.match(html, /<aside class="sbar"[\s\S]*href="https:\/\/paypal\.me\/vinactech"[\s\S]*action="\/subscribe\.php"[\s\S]*name="consent" type="checkbox" value="yes" required/, `${f} has the bottom bar`);
-    assert.doesNotMatch(html, /<(script|img|iframe|video|source)[^>]+src="https?:|<link(?![^>]*rel="canonical")[^>]+href="https?:/i, `${f} loads something from another site`);
+    assert.doesNotMatch(html, /<(script|img|iframe|video|source)[^>]+src="https?:|<link(?![^>]*rel="(?:canonical|alternate)")[^>]+href="https?:/i, `${f} loads something from another site`);
     assert.doesNotMatch(html, /LAUNCH\.md|ROADMAP\.md|CHANGELOG\.md|TODO|googletagmanager|gtag\(|connect\.facebook/, f);
     assert.doesNotMatch(html, /MacBook|Workstation|OpenClawGateway|ivadesk|SilentAuth|C:\\Users/i, `${f} has a device name or internal detail`);
   }

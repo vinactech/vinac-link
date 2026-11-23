@@ -3,7 +3,7 @@
 //   allow  the agent sees it
 //   ask    it waits on the page until the person approves it
 //   block  the agent never sees it; the page lists it
-// Rules apply to requests (Logos intents) and to plain-text messages (the
+// Rules apply to requests (intents) and to plain-text messages (the
 // TEXT pseudo-intent). They are kept per device, plus one set for all devices.
 // A mode (restricted, standard, auto) sets the defaults by risk, per device or
 // for all devices; a rule the person set always wins over the mode. Approving a

@@ -128,8 +128,8 @@ test('audit log: pairing, messages and decisions are logged without text; any ed
   const A = await startDevice('Audit A'), B = await startDevice('Audit B');
   try {
     await pair(A, B);
-    await api(A, 'POST', '/api/send', { to: 'Audit B', text: 'the launch code is 1234' });
-    await api(A, 'POST', '/api/send', { to: 'Audit B', intent: 'crm.contact.read', args: { name: 'Ada' } });
+    await api(A, 'POST', '/api/send', { to: 'Audit B', text: 'the launch code is PINEAPPLE-SEVEN' });
+    await api(A, 'POST', '/api/send', { to: 'Audit B', intent: 'crm.contact.read', args: { name: 'Ada Quixote' } });
     const req = (await ui(B, 'GET', '/ui/firewall')).body.requests.find(r => r.intent === 'crm.contact.read');
     await ui(B, 'POST', '/ui/firewall/decide', { id: req.id, approve: false });
     await ui(B, 'POST', '/ui/firewall/rule', { scope: '*', intent: 'crm.contact.read', decision: 'block' });
@@ -139,7 +139,8 @@ test('audit log: pairing, messages and decisions are logged without text; any ed
     for (const t of ['pair', 'msg.in', 'request.decided', 'rule.changed']) assert.ok(types.includes(t), `${t} logged`);
     assert.ok(new AuditLog(A.homeDir).tail(50).some(e => e.type === 'msg.out'));
     const text = fs.readFileSync(path.join(B.homeDir, 'audit.jsonl'), 'utf8');
-    assert.doesNotMatch(text, /launch code|1234|Ada/, 'no message text or args');
+    // Words that can't turn up by chance in random ids or hex hashes.
+    assert.doesNotMatch(text, /launch code|PINEAPPLE|Quixote/, 'no message text or args');
     assert.equal(logB.verify().ok, true);
 
     // Change one past line: verify says where.
