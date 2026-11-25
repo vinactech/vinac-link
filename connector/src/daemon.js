@@ -2960,6 +2960,7 @@ export class Daemon {
         return sendJson(res, 200, { ok: true, notify: s });
       }
       // Connecting Claude Code on this computer: the person only (agents have no route; it changes Claude Code's settings).
+      case 'GET /ui/setup': return sendJson(res, 200, (await import('./setup.js')).setupInfo());
       case 'GET /ui/connect/claude': case 'GET /ui/connect/codex': {
         const app = url.pathname.endsWith('codex') ? 'codex' : 'claude';
         const s = app === 'codex' ? codexStatus() : claudeStatus();

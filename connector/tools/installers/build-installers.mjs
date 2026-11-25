@@ -334,12 +334,12 @@ echo "VINAC Link ${V} is installed. Start it from your app menu, or run: vinac s
 if [ -d "$HOME/.claude" ] || [ -f "$HOME/.claude.json" ]; then
   yn=n
   if [ -t 0 ]; then printf "Connect Claude Code to VINAC Link now? [Y/n] "; read -r yn || yn=n; [ -z "$yn" ] && yn=y; fi
-  case "$yn" in y|Y) "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect claude || true ;; *) echo "Later: vinac connect claude (or Connect on the page: Secrets > Phones & agents)." ;; esac
+  case "$yn" in y|Y) "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect claude || true ;; *) echo "Later: vinac connect claude (or Connect on the page: Agents)." ;; esac
 fi
 if [ -d "$HOME/.codex" ]; then
   yn=n
   if [ -t 0 ]; then printf "Connect Codex to VINAC Link now? [Y/n] "; read -r yn || yn=n; [ -z "$yn" ] && yn=y; fi
-  case "$yn" in y|Y) "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect codex || true ;; *) echo "Later: vinac connect codex (or Connect on the page: Secrets > Phones & agents)." ;; esac
+  case "$yn" in y|Y) "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect codex || true ;; *) echo "Later: vinac connect codex (or Connect on the page: Agents)." ;; esac
 fi
 command -v secret-tool >/dev/null 2>&1 || echo "Note: install libsecret-tools (Debian/Ubuntu: sudo apt install libsecret-tools) so VINAC Link can keep keys in your keyring."
 `) });

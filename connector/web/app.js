@@ -120,7 +120,7 @@ $('accountUnlink').onclick = async () => { if (await accountDo('POST', '/ui/acco
 $('accountSignOut').onclick = async () => { if (await accountDo('POST', '/ui/account/signout', {})) toast('Signed out on this computer.'); };
 
 let state = null, lastPaired = null, firstLoad = true;
-let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantActivity = false, wantProjects = false, wantRooms = false, wantOverview = true, mobileMain = false;
+let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantActivity = false, wantProjects = false, wantRooms = false, wantAgents = false, wantOverview = true, mobileMain = false;
 let thread = [], threadKey = '', justOpened = true, search = '', replyTo = null;
 let pending = [];                          // messages typed here that are sending or failed
 let lastSeen = LS.get('lastSeen', {});     // peer id -> time of the last incoming message the person saw
@@ -188,7 +188,7 @@ function render(s) {
   // A pairing in progress keeps the pairing screen open; merely waiting to be picked doesn't.
   const pairing = !!(p && VIEW_OF[p.state] && !isWaitingToBePicked(p));
   if (roomOpen && !roomById(roomOpen)) roomOpen = null;
-  const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall' : wantActivity ? 'activity' : wantProjects ? 'projects' : wantRooms ? 'rooms'
+  const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall' : wantActivity ? 'activity' : wantProjects ? 'projects' : wantRooms ? 'rooms' : wantAgents ? 'agents'
     : roomOpen ? 'room' : selected && !wantOverview ? 'thread' : s.peers.length ? 'overview' : 'empty';
   // Left the pairing screen: stop telling the network this device waits to be picked.
   if (main !== 'pair' && isWaitingToBePicked(p) && !render.stopping) {
@@ -196,7 +196,7 @@ function render(s) {
     api('POST', '/ui/cancel').catch(() => {}).finally(() => { render.stopping = false; });
   }
   app.dataset.main = main;
-  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || main === 'projects' || main === 'rooms' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
+  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || main === 'projects' || main === 'rooms' || main === 'agents' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
   const needs = s.needsMe || [];
   renderNeeds();
@@ -219,6 +219,9 @@ function render(s) {
   $('roomsNav').setAttribute('aria-current', String(main === 'rooms'));
   $('roomsCount').textContent = (state.rooms || []).filter(r => !r.archived).length || '';
   if (main === 'rooms') renderRoomsPage();
+  $('agentsNav').setAttribute('aria-current', String(main === 'agents'));
+  $('agentsNavCount').textContent = (state.agents || []).length || '';
+  if (main === 'agents') renderAgentsPage();
   if (main === 'activity' && !render.activityShown) loadActivity();
   render.activityShown = main === 'activity';
   if (main === 'secrets') renderSecrets();
@@ -669,9 +672,9 @@ async function loadActivity(more = false) {
   $('auditKeep').textContent = `· ${r.retention.legalHold ? 'legal hold' : r.retention.keepDays ? `${Math.round(r.retention.keepDays / 30.4)} months` : 'always'}`;
   $('auditKeepSel').value = String(r.retention.keepDays); $('auditHold').checked = r.retention.legalHold;
 }
-function openActivity() { roomOpen = null; wantActivity = true; wantProjects = false; wantRooms = false; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openActivity() { roomOpen = null; wantActivity = true; wantProjects = false; wantRooms = false; wantAgents = false; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('activityNav').onclick = openActivity;
-$('activityBackBtn').onclick = () => { wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = false; render(state); };
+$('activityBackBtn').onclick = () => { wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; mobileMain = false; render(state); };
 $('auditFilters').addEventListener('input', () => { clearTimeout(auditTimer); auditTimer = setTimeout(() => loadActivity(), 250); });
 $('auditFilters').addEventListener('submit', e => e.preventDefault());
 $('auditMore').onclick = () => loadActivity(true);
@@ -799,8 +802,8 @@ window.addEventListener('focus', refreshCodex);
 
 // ---- Projects (0.15): a workspace per project for the agents on this computer ----
 let projOpen = LS.get('projOpen', null), projData = null;
-$('projectsNav').onclick = () => { roomOpen = null; wantProjects = true; wantRooms = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); };
-$('projectsBackBtn').onclick = () => { wantProjects = false; wantRooms = false; mobileMain = false; render(state); };
+$('projectsNav').onclick = () => { roomOpen = null; wantAgents = false; wantProjects = true; wantRooms = false; wantAgents = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); };
+$('projectsBackBtn').onclick = () => { wantProjects = false; wantRooms = false; wantAgents = false; mobileMain = false; render(state); };
 function checks(box, items, picked = []) {
   box.replaceChildren(...items.map(x => {
     const l = document.createElement('label'); l.className = 'proj-check';
@@ -1025,7 +1028,13 @@ function drawProject() {
 
   const grid = document.createElement('div'); grid.className = 'proj-grid';
   grid.append(boardSec, agentsSec, keysSec, filesSec);
-  box.replaceChildren(head, grid);
+  const foot = document.createElement('div'); foot.className = 'proj-foot';
+  const del = small('danger-link', 'Delete project…', () => {
+    if (!confirm(`Delete the project "${d.project.name}"? Its keys stay, in "No project". Its room stays too.`)) return;
+    act('POST', '/ui/projects/remove', { id: d.project.id }); projOpen = null; projData = null; $('projDetail').hidden = true;
+  });
+  foot.append(del);
+  box.replaceChildren(head, grid, foot);
 }
 
 $('agentAddForm')?.addEventListener('submit', async e => {
@@ -1043,6 +1052,13 @@ $('agentAddForm')?.addEventListener('submit', async e => {
 function renderProjects() {
   const box = $('projectsBox'); if (!box) return;
   box.replaceChildren();
+  // 0.15: keys below are grouped by project; projects are made and changed on the Projects page.
+  box.className = 'projects-line';
+  const n = (state.projects || []).length;
+  box.append(text('span', n ? `Keys are grouped by project (${n}). Agents working in a project's folder see only its keys.` : 'Group keys by project (dev and prod), so agents in a project\'s folder see only its keys.'));
+  const go = button(n ? 'Manage projects' : 'New project', () => { $('projectsNav').click(); if (!n) setTimeout(() => $('projNewBtn').click(), 50); });
+  go.className = 'ghost small-btn'; box.append(go);
+  return;
   const head = document.createElement('div'); head.className = 'proj-head';
   head.append(text('b', 'Projects'));
   const add = button('New project', () => editProject(null)); add.className = 'ghost small-btn';
@@ -1086,60 +1102,102 @@ function renderSecrets(force = false) {
   }
   const shown = [...state.secrets].reverse().filter(s => !q || s.name.toLowerCase().includes(q) || (s.from?.name || '').toLowerCase().includes(q));
   if (!shown.length) { const li = text('li', 'No secret matches.'); li.className = 'none'; list.append(li); return; }
+  const day = iso => new Date(iso).toLocaleDateString(locale(), { dateStyle: 'medium' });
   const when = iso => new Date(iso).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
-  for (const s of shown) {
-    const li = document.createElement('li'); li.className = 'secret';
-    const name = text('b', s.name);
+  const projects = state.projects || [];
+
+  // Groups: what waits for you first, then each project (dev, then prod), then keys in no project.
+  const groups = [];
+  const waiting = shown.filter(s => s.pending || s.offered);
+  if (waiting.length) groups.push({ title: 'Waiting for you', tone: 'warn', items: waiting });
+  for (const p of projects) for (const env of ['dev', 'prod']) {
+    const items = shown.filter(s => !s.pending && !s.offered && s.projectId === p.id && (s.env || 'dev') === env);
+    if (items.length || (env === 'dev' && !q && !shown.some(s => s.projectId === p.id))) groups.push({ title: p.name, env, tone: env, items, project: p });
+  }
+  const loose = shown.filter(s => !s.pending && !s.offered && !projects.some(p => p.id === s.projectId));
+  if (loose.length) groups.push({ title: projects.length ? 'No project' : 'Keys', tone: 'none', items: loose });
+
+  for (const g of groups) {
+    const sec = document.createElement('li'); sec.className = `key-group tone-${g.tone}`;
+    const head = document.createElement('div'); head.className = 'kg-head';
+    head.append(text('b', g.title));
+    if (g.env) { const e = text('span', g.env); e.className = `env-chip env-${g.env}`; head.append(e); }
+    const n = text('span', String(g.items.length)); n.className = 'kg-count'; head.append(n);
+    if (g.env === 'prod') { const h = text('small', 'asks you every time'); h.className = 'kg-note'; head.append(h); }
+    sec.append(head);
+    const ul = document.createElement('ul'); ul.className = 'key-rows';
+    if (!g.items.length) { const e = text('li', 'No keys in this project yet. Add one, or move a key here from its ⋯ menu.'); e.className = 'kg-empty'; ul.append(e); }
+    for (const s of g.items) ul.append(keyRow(s));
+    sec.append(ul); list.append(sec);
+  }
+
+  function keyRow(s) {
+    const li = document.createElement('li'); li.className = `key-row${s.pending || s.offered ? ' attention' : ''}`;
+    const tile = document.createElement('span'); tile.className = `key-tile env-${s.offered || s.pending ? 'warn' : s.projectId ? (s.env || 'dev') : 'none'}`; tile.innerHTML = KEY_SVG;
+    const main = document.createElement('div'); main.className = 'key-main';
+    const name = text('b', s.name); name.className = 'key-name';
     if (s.pending) { const t = text('span', 'Replacement waiting'); t.className = 'pendingtag'; name.append(t); }
     if (s.offered) { const t = text('span', 'Offered: accept?'); t.className = 'pendingtag'; name.append(t); }
-    const origin = s.own ? `Added on this device · ${when(s.receivedAt)}` : `From ${s.from.name} · ${when(s.receivedAt)} · by ${s.via === 'wifi' ? 'Wi-Fi' : 'sound'}`;
-    const meta = text('small', `${origin} · ${KEYSTORE_SHORT[s.keystore] || s.keystore}${s.lastUsedAt ? ` · last used ${when(s.lastUsedAt)}` : ''}${s.pending ? ' · approve to replace the current one' : ''}${s.offered ? ' · nothing can use it until you accept it' : ''}`);
-    const row = document.createElement('div'); row.className = 'row';
+    const origin = s.own ? `This device · ${day(s.receivedAt)}` : `From ${s.from.name} · ${day(s.receivedAt)}`;
+    const meta = text('small', `${origin}${s.lastUsedAt ? ` · used ${when(s.lastUsedAt)}` : ''}${s.pending ? ' · approve to replace the current one' : ''}${s.offered ? ' · nothing can use it until you accept it' : ''}`);
+    meta.title = `${s.own ? `Added on this device ${when(s.receivedAt)}` : `From ${s.from.name}, ${when(s.receivedAt)}, by ${s.via === 'wifi' ? 'Wi-Fi' : 'sound'}`} · ${KEYSTORE_SHORT[s.keystore] || s.keystore}`;
+    main.append(name, meta);
+    const acts = document.createElement('div'); acts.className = 'key-acts';
     const showing = shownSecret?.id === s.id;
-    const reveal = button(showing ? 'Hide' : 'Reveal', async () => {
-      if (showing) { hideSecret(); return; }
-      try { const r = await api('POST', '/ui/secrets/reveal', { id: s.id }); showSecret(r); } catch (e) { toast(e.message); }
-    });
-    const copy = button('Copy', async () => {
-      try {
-        const r = await api('POST', '/ui/secrets/reveal', { id: s.id });
-        let value = r.value;
-        await navigator.clipboard.writeText(value);
-        toast(`${s.name} copied. It is cleared from the clipboard in 30 seconds.`);
-        // Clear it after 30 s, but only if it is still what's on the clipboard.
-        setTimeout(async () => {
-          try { if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText(''); }
-          catch { if (document.hasFocus()) navigator.clipboard.writeText('').catch(() => {}); }
-          value = null;
-        }, 30_000);
-      } catch (e) { toast(e.message.includes('clipboard') ? 'Could not copy.' : e.message); }
-    });
-    const del = button(s.pending ? 'Reject' : 'Delete', () => {
-      if (!confirmRemove(s.name)) return;
-      if (showing) hideSecret();
-      act('POST', '/ui/secrets/delete', { id: s.id });
-    });
-    let buttons = [reveal, copy, del];
-    if (!s.pending) buttons.splice(2, 0, button('Send…', () => openSecretModal('stored', { item: s })));
-    if (s.pending) buttons.unshift(button('Approve', () => act('POST', '/ui/secrets/approve', { id: s.id })));
-    // Offered by another device: nothing can use it until the person accepts it.
-    if (s.offered) buttons = [button('Accept', () => act('POST', '/ui/secrets/accept', { id: s.id })), button('Decline', () => act('POST', '/ui/secrets/decline', { id: s.id }))];
-    for (const b of buttons) b.className = 'ghost';
-    if (s.pending || s.offered) buttons[0].className = 'primary small-btn';
-    row.append(...buttons);
-    // Projects: which project and environment this key belongs to (none = "No project").
-    if ((state.projects || []).length && !s.offered) {
-      const sel = document.createElement('select'); sel.className = 'proj-pick'; sel.setAttribute('aria-label', `Project for ${s.name}`);
-      const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
-      sel.append(opt('', 'No project'));
-      for (const p of state.projects) for (const env of ['dev', 'prod']) sel.append(opt(`${p.id}|${env}`, `${p.name} · ${env}`));
-      sel.value = s.projectId ? `${s.projectId}|${s.env || 'dev'}` : '';
-      sel.onchange = () => { const [project, env] = sel.value.split('|'); act('POST', '/ui/secrets/assign', { id: s.id, project: project || null, env }); };
-      row.append(sel);
+    if (s.offered) {
+      const ok = button('Accept', () => act('POST', '/ui/secrets/accept', { id: s.id })); ok.className = 'primary small-btn';
+      const no = button('Decline', () => act('POST', '/ui/secrets/decline', { id: s.id })); no.className = 'ghost';
+      acts.append(ok, no);
+    } else {
+      if (s.pending) { const ap = button('Approve', () => act('POST', '/ui/secrets/approve', { id: s.id })); ap.className = 'primary small-btn'; acts.append(ap); }
+      const reveal = button(showing ? 'Hide' : 'Reveal', async () => {
+        if (showing) { hideSecret(); return; }
+        try { const r = await api('POST', '/ui/secrets/reveal', { id: s.id }); showSecret(r); } catch (e) { toast(e.message); }
+      });
+      const copy = button('Copy', async () => {
+        try {
+          const r = await api('POST', '/ui/secrets/reveal', { id: s.id });
+          let value = r.value;
+          await navigator.clipboard.writeText(value);
+          toast(`${s.name} copied. It is cleared from the clipboard in 30 seconds.`);
+          // Clear it after 30 s, but only if it is still what's on the clipboard.
+          setTimeout(async () => {
+            try { if ((await navigator.clipboard.readText()) === value) await navigator.clipboard.writeText(''); }
+            catch { if (document.hasFocus()) navigator.clipboard.writeText('').catch(() => {}); }
+            value = null;
+          }, 30_000);
+        } catch (e) { toast(e.message.includes('clipboard') ? 'Could not copy.' : e.message); }
+      });
+      reveal.className = 'ghost'; copy.className = 'ghost';
+      acts.append(reveal, copy);
+      // The rest under ⋯: send, move to a project, delete.
+      const more = document.createElement('details'); more.className = 'key-more';
+      const sum = document.createElement('summary'); sum.textContent = '⋯'; sum.title = 'More'; sum.setAttribute('aria-label', `More for ${s.name}`);
+      const menu = document.createElement('div'); menu.className = 'key-menu';
+      if (!s.pending) menu.append(button('Send to a device…', () => { more.open = false; openSecretModal('stored', { item: s }); }));
+      if (projects.length) {
+        const lab = document.createElement('label'); lab.className = 'key-move'; lab.append(text('span', 'Project'));
+        const sel = document.createElement('select'); sel.setAttribute('aria-label', `Project for ${s.name}`);
+        const opt = (v, l) => { const o = document.createElement('option'); o.value = v; o.textContent = l; return o; };
+        sel.append(opt('', 'No project'));
+        for (const p of projects) for (const env of ['dev', 'prod']) sel.append(opt(`${p.id}|${env}`, `${p.name} · ${env}`));
+        sel.value = s.projectId ? `${s.projectId}|${s.env || 'dev'}` : '';
+        sel.onchange = () => { const [project, env] = sel.value.split('|'); act('POST', '/ui/secrets/assign', { id: s.id, project: project || null, env }); };
+        lab.append(sel); menu.append(lab);
+      }
+      const del = button(s.pending ? 'Reject the replacement' : 'Delete…', () => {
+        if (!confirmRemove(s.name)) return;
+        if (showing) hideSecret();
+        act('POST', '/ui/secrets/delete', { id: s.id });
+      });
+      del.className = 'danger-link';
+      menu.append(del);
+      more.append(sum, menu);
+      acts.append(more);
     }
-    li.append(name, row, meta);
+    li.append(tile, main, acts);
     if (showing) { const v = text('code', shownSecret.value); v.className = 'value'; li.append(v); }
-    list.append(li);
+    return li;
   }
 }
 
@@ -1202,11 +1260,22 @@ function vaultForm(label, button1, action, hint) {
 function renderVaultLock() {
   const box = $('vaultLock'); const v = state?.vaultLock;
   if (!box || !v) return;
-  box.replaceChildren(); box.className = `vault-lock ${!v.protected ? 'off' : v.locked ? 'locked' : 'open'}`;
+  box.replaceChildren(); box.className = `vault-lock vl-banner ${!v.protected ? 'off' : v.locked ? 'locked' : 'open'}`;
+  // A lock icon: open (no passphrase, or unlocked for now) or closed (locked).
+  const icon = document.createElement('span'); icon.className = 'vl-icon'; icon.setAttribute('aria-hidden', 'true');
+  icon.innerHTML = v.protected && v.locked
+    ? '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/><path d="M12 14.5v2.5"/></svg>'
+    : '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 7.6-1.7"/><path d="M12 14.5v2.5"/></svg>';
+  box.append(icon);
   const head = document.createElement('div'); head.className = 'vl-head';
   if (!v.protected) {
-    head.append(text('b', 'Lock the vault with a passphrase'), text('small', 'Recommended. Values get sealed with a key only your passphrase opens, so no other program can read them while the vault is locked. Receiving still works.'));
-    box.append(head, vaultForm('New passphrase (8+ characters)', 'Set passphrase', 'setup'));
+    // Slim by default: one line and a button; the field opens when the person asks for it.
+    head.append(text('b', 'Vault not locked'), text('small', 'Recommended: a passphrase, so no other program can read the values while the vault is locked.'));
+    const open = button(renderVaultLock.open ? 'Cancel' : 'Set passphrase…', () => { renderVaultLock.open = !renderVaultLock.open; renderVaultLock(); });
+    open.className = renderVaultLock.open ? 'ghost small-btn' : 'primary small-btn';
+    const line = document.createElement('div'); line.className = 'vl-line'; line.append(head, open);
+    box.append(line);
+    if (renderVaultLock.open) box.append(vaultForm('New passphrase (8+ characters)', 'Set passphrase', 'setup'));
   } else if (v.locked) {
     head.append(text('b', 'Vault locked'), text('small', 'Unlock to reveal, copy or send a secret, or to approve a program run. New secrets still arrive.'));
     box.append(head, vaultForm('Passphrase', 'Unlock', 'unlock'));
@@ -1222,7 +1291,7 @@ function renderVaultLock() {
 }
 function hideSecret() { shownSecret = null; clearTimeout(showSecret.timer); if (state) renderSecrets(true); }
 
-$('secretsNav').onclick = () => { roomOpen = null; wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = true; render(state); };
+$('secretsNav').onclick = () => { roomOpen = null; wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; mobileMain = true; render(state); };
 $('secretsBackBtn').onclick = () => { wantSecrets = false; mobileMain = false; hideSecret(); render(state); };
 
 // ---- firewall: requests (intents) from paired devices ---------------------
@@ -1245,16 +1314,16 @@ async function downloadFile(fileId, name) {
 const DECISION_LABEL = { allow: 'Allow', ask: 'Ask me', block: 'Block' };
 let fw = null, fwKey = '', fwScope = '*', fwLoading = false;
 
-function openFirewall() { roomOpen = null; wantFirewall = true; wantActivity = false; wantProjects = false; wantRooms = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openFirewall() { roomOpen = null; wantFirewall = true; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('firewallNav').onclick = openFirewall;
 
 // ---- overview: the dashboard ------------------------------------------------------
 
-function openOverview() { roomOpen = null; wantOverview = true; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openOverview() { roomOpen = null; wantOverview = true; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('overviewNav').onclick = openOverview;
 $('overviewBackBtn').onclick = () => { mobileMain = false; render(state); };
 $('ovFirewallLink').onclick = openFirewall;
-$('ovReceiveBtn').onclick = () => { roomOpen = null; wantSecrets = true; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
+$('ovReceiveBtn').onclick = () => { roomOpen = null; wantSecrets = true; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
 const ICON_PATH = {
   devices: '<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M7 18h5M9.5 14v4"/><rect x="17.5" y="8" width="4" height="10" rx="1"/>',
   waiting: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
@@ -1331,7 +1400,7 @@ function renderOverview() {
   // Checklist
   const steps = [
     [s.peers.length > 0, 'Pair a second computer', 'Sound or a typed code; you swap 6-digit codes.', openPair],
-    [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'One click for Claude Code or Codex: Secrets › Phones & agents › Connect.', null],
+    [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'One click for Claude Code or Codex: Agents › Connect.', null],
     [!!fw && fw.intents.some(i => i.all || Object.keys(i.devices).length), 'Set your firewall rules', 'Allow what you trust, keep risky intents blocked.', openFirewall],
     [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive…, then send it from the other computer.', () => $('ovReceiveBtn').click()],
     [!!d.tailscale, 'Reach your devices from anywhere', 'Install Tailscale on both computers.', null],
@@ -1346,7 +1415,7 @@ function renderOverview() {
     ul.append(li);
   }
 }
-$('firewallBackBtn').onclick = () => { wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = false; render(state); };
+$('firewallBackBtn').onclick = () => { wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; mobileMain = false; render(state); };
 
 async function loadFirewall(force = false) {
   if (fwLoading) return;
@@ -1439,12 +1508,23 @@ function renderModes() {
   box.replaceChildren();
   const cur = fwScope === '*' ? m.all : (m.devices[fwScope] || 'default');
   const who = fwScope === '*' ? 'all devices' : (fw.peers.find(p => p.id === fwScope)?.name || 'this device');
-  const seg = document.createElement('div'); seg.className = 'mode-seg'; seg.setAttribute('role', 'radiogroup'); seg.setAttribute('aria-label', `Mode for ${who}`);
+  const seg = document.createElement('div'); seg.className = 'mode-cards'; seg.setAttribute('role', 'radiogroup'); seg.setAttribute('aria-label', `Mode for ${who}`);
   const opts = fwScope === '*' ? Object.keys(MODE_INFO) : ['default', ...Object.keys(MODE_INFO)];
+  const SHORT = { restricted: 'Everything waits for you', standard: 'Questions go through, changes wait', auto: 'Trusted devices: more goes through', default: 'Follow the mode for all devices' };
+  const ICON = {
+    restricted: '<svg viewBox="0 0 24 24"><rect x="5" y="10.5" width="14" height="10" rx="2.5"/><path d="M8 10.5V7.5a4 4 0 0 1 8 0v3"/></svg>',
+    standard: '<svg viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3Z"/><path d="M9 12l2 2 4-4"/></svg>',
+    auto: '<svg viewBox="0 0 24 24"><path d="M13 3 5 13h6l-1 8 8-10h-6l1-8Z"/></svg>',
+    default: '<svg viewBox="0 0 24 24"><path d="M4 12h16M14 6l6 6-6 6"/></svg>',
+  };
   for (const k of opts) {
     const b = document.createElement('button'); b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('aria-checked', String(k === cur));
-    b.className = k === cur ? 'on' : '';
-    b.textContent = k === 'default' ? `Same as all (${MODE_INFO[m.all][0]})` : MODE_INFO[k][0];
+    b.className = `mode-card m-${k}${k === cur ? ' on' : ''}`;
+    const ico = document.createElement('span'); ico.className = 'mc-icon'; ico.setAttribute('aria-hidden', 'true'); ico.innerHTML = ICON[k];
+    const name = text('b', k === 'default' ? `Same as all (${MODE_INFO[m.all][0]})` : MODE_INFO[k][0]);
+    const sub = text('small', SHORT[k]);
+    const tick = document.createElement('span'); tick.className = 'mc-tick'; tick.setAttribute('aria-hidden', 'true'); tick.textContent = '✓';
+    b.append(ico, name, sub, tick);
     b.onclick = async () => {
       if (k === cur) return;
       try { await api('POST', '/ui/firewall/mode', { scope: fwScope, mode: k }); toast(`${k === 'default' ? 'Follows the mode for all devices' : `${MODE_INFO[k][0]} mode`} for ${who}.`); loadFirewall(true); }
@@ -1744,10 +1824,46 @@ function renderRooms() {
   }
 }
 
+// ---- Agents page (0.15): the agent apps on this computer and their identities ----
+$('agentsNav').onclick = () => { roomOpen = null; wantAgents = true; wantRooms = false; wantProjects = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); refreshClaude(); refreshCodex(); };
+$('agentsBackBtn').onclick = () => { wantAgents = false; mobileMain = false; render(state); };
+let agentSetup = null;
+function renderAgentsPage() {
+  renderGrants();
+  // Each app card says when this app last used VINAC Link (its identity's "last seen").
+  for (const [box, re] of [['claudeBox', /claude/i], ['codexBox', /codex/i]]) {
+    const a = (state.agents || []).find(x => re.test(x.name));
+    let seen = $(box).querySelector('.app-seen');
+    if (!seen) { seen = document.createElement('p'); seen.className = 'app-seen'; $(box).append(seen); }
+    seen.textContent = a ? (a.lastSeenAt ? `Last used VINAC Link: ${new Date(a.lastSeenAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })}` : 'Its identity is ready; not used yet (start a new session in the app).') : '';
+  }
+  if (!agentSetup) { api('GET', '/ui/setup').then(s => { agentSetup = s; drawAgentOthers(); }).catch(() => {}); return; }
+  if (!$('agentOthers').childElementCount) drawAgentOthers();
+}
+function drawAgentOthers() {
+  const s = agentSetup; if (!s) return;
+  const copyBox = (label, value) => {
+    const wrap = document.createElement('div'); wrap.className = 'setup-snip';
+    const head = document.createElement('div'); head.className = 'snip-head'; head.append(text('small', label));
+    const c = button('Copy', async () => { try { await navigator.clipboard.writeText(value); toast('Copied.'); } catch { toast('Could not copy.'); } }); c.className = 'ghost small-btn';
+    head.append(c);
+    const pre = document.createElement('pre'); pre.textContent = value;
+    wrap.append(head, pre); return wrap;
+  };
+  const card = (name, what, ...kids) => { const d = document.createElement('div'); d.className = 'other-app'; d.append(text('b', name), Object.assign(text('p', what), { className: 'fw-note' }), ...kids); return d; };
+  $('agentOthers').replaceChildren(
+    card('Cursor, Continue, LibreChat and other MCP apps', 'Add an MCP server (stdio) in the app\'s settings with this JSON.', copyBox('MCP settings (JSON)', s.mcpJson)),
+    card('LM Studio and small local models', 'Program tab › Install › Edit mcp.json, and add this. "--simple" gives small models just send, inbox and peers.', copyBox('mcp.json', s.mcpJsonSimple)),
+    card('Goose', 'goose configure › Add Extension › Command-line Extension, named vinac, with this command.', copyBox('Command', s.commandLineSimple)),
+    card('OpenClaw', 'Two small plugins (node host and gateway). The guide is in the VINAC Link folder.', copyBox('Guide', s.openclaw)),
+    card('Any other app or a terminal', 'The agent tools over stdio. To act as a named agent, add VINAC_AGENT_TOKEN from "Add agent" above to its environment.', copyBox('Command', s.commandLine)),
+  );
+}
+
 // ---- Rooms page (0.15): every room in one list, with filters and quick pin / mute / archive ----
 let roomsFilter = 'active', roomsPageKey = '';
-$('roomsNav').onclick = () => { roomOpen = null; wantRooms = true; wantProjects = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); };
-$('roomsBackBtn').onclick = () => { wantRooms = false; mobileMain = false; render(state); };
+$('roomsNav').onclick = () => { roomOpen = null; wantAgents = false; wantRooms = true; wantProjects = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); };
+$('roomsBackBtn').onclick = () => { wantRooms = false; wantAgents = false; mobileMain = false; render(state); };
 $('roomsNewBtn').onclick = () => $('newRoomBtn').click();
 $('roomsFilter').addEventListener('input', () => renderRoomsPage(true));
 for (const b of document.querySelectorAll('[data-rf]')) b.onclick = () => {
@@ -1795,7 +1911,7 @@ function renderRoomsPage(force = false) {
 
 function openRoom(id) {
   if (id !== roomOpen) { roomMsgs = []; roomKey = ''; }
-  roomOpen = id; wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantOverview = false; mobileMain = true; roomJustOpened = true;
+  roomOpen = id; wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; wantOverview = false; mobileMain = true; roomJustOpened = true;
   render(state);
   if (!isNarrow()) $('roomText').focus();
 }
@@ -2053,7 +2169,7 @@ $('roomForm').onsubmit = async e => {
 function select(id) {
   if (id !== selected) { thread = []; threadKey = ''; replyTo = null; search = ''; $('threadSearch').value = ''; $('searchBar').hidden = true; $('replyBox').hidden = true; }
   selected = id; LS.set('selected', id); roomOpen = null;
-  wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
+  wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
   threadKey = ''; // reload and scroll to the newest message, even if it was rendered while hidden
   render(state);
   if (!isNarrow()) $('composeText').focus();
@@ -2300,7 +2416,7 @@ $('openNewBtn').onclick = () => {
   const peer = state?.peers.find(x => x.fingerprint === fp);
   if (peer) { lastResult = null; select(peer.id); }
 };
-function openPair() { roomOpen = null; wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
+function openPair() { roomOpen = null; wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
 $('newPairBtn').onclick = openPair;
 $('sidePairBtn').onclick = openPair;
 $('ovPairBtn').onclick = openPair;
@@ -2599,7 +2715,7 @@ $('secretAsk').onsubmit = async e => {
 };
 $('secretKeyPick').addEventListener('change', useKeyPick);
 
-// Secrets tabs: Keys · Requests · Phones & agents (remembered in this browser).
+// Secrets tabs: Keys · Requests · Phones (remembered in this browser).
 let secretTab = LS.get('secretTab', 'keys');
 function showSecretTab(tab) {
   secretTab = tab; LS.set('secretTab', tab);
@@ -2612,7 +2728,7 @@ let seenWaiting = 0;
 function renderSecretTabs() {
   const keys = (state.secrets || []).length;
   const waiting = (state.secretRequests || []).length + (state.secretUses || []).length;
-  const devices = (state.phones || []).length + (state.agents || []).length;
+  const devices = (state.phones || []).length;
   const setCount = (id, n, hot = false) => { const el = $(id); el.textContent = n || ''; el.classList.toggle('hot', hot && n > 0); };
   setCount('tabKeysCount', keys, (state.secrets || []).some(s => s.pending || s.offered));
   setCount('tabRequestsCount', waiting, true);

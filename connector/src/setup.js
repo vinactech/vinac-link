@@ -90,7 +90,7 @@ export async function doctor({ home = defaultHome() } = {}) {
     if (c.error) add(false, 'Claude Code', c.error);
     else if (c.present) {
       const tidy = c.mode === 'plugin' && (c.manual || c.direct.server);
-      add(c.mode === 'direct' || (c.mode === 'plugin' && !tidy), 'Claude Code', describeClaude(c) + (c.mode === 'none' || c.mode === 'partial' || tidy ? ' Run: vinac connect claude (or press Connect on the page: Secrets > Phones & agents).' : ''));
+      add(c.mode === 'direct' || (c.mode === 'plugin' && !tidy), 'Claude Code', describeClaude(c) + (c.mode === 'none' || c.mode === 'partial' || tidy ? ' Run: vinac connect claude (or press Connect on the page: Agents).' : ''));
     }
   } catch { /* Claude Code config unreadable: nothing to report */ }
   return checks;
@@ -98,6 +98,20 @@ export async function doctor({ home = defaultHome() } = {}) {
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BIN_PATH = path.join(ROOT, 'connector', 'bin', 'vinac.mjs');
+
+/** The paths other agent apps need (the page shows them with Copy buttons). */
+export function setupInfo({ root = ROOT, bin = BIN_PATH, node = process.execPath } = {}) {
+  const server = simple => ({ command: node, args: [bin, 'mcp', ...(simple ? ['--simple'] : [])] });
+  const q = s => (/[\s"]/.test(s) ? `"${s}"` : s);
+  return {
+    root, node, bin,
+    mcpJson: JSON.stringify({ mcpServers: { vinac: server(false) } }, null, 2),
+    mcpJsonSimple: JSON.stringify({ mcpServers: { vinac: server(true) } }, null, 2),
+    commandLine: `${q(node)} ${q(bin)} mcp`,
+    commandLineSimple: `${q(node)} ${q(bin)} mcp --simple`,
+    openclaw: path.join(root, 'openclaw', 'README.md'),
+  };
+}
 
 /** How to connect each agent app, with this folder's real paths (works offline). Prints commands; changes nothing. */
 export function setupText({ root = ROOT, bin = BIN_PATH, node = process.execPath } = {}) {
@@ -107,7 +121,7 @@ export function setupText({ root = ROOT, bin = BIN_PATH, node = process.execPath
 VINAC Link is in: ${root}
 
 Claude Code (desktop app or terminal): the easiest way, no \`claude\` command needed
-  Press Connect on the VINAC Link page (Secrets > Phones & agents), or run:
+  Press Connect on the VINAC Link page (Agents), or run:
                    ${q(node)} ${q(bin)} connect claude
   Then start a new Claude Code session. It gets the tools and wakes up when a message arrives.
 

@@ -9,7 +9,7 @@ package, double-click **Connect my agent**.
 
 **Claude Code, the easy way** (desktop app or terminal; no `claude` command needed)
 
-Press **Connect Claude Code** on the VINAC Link page (Secrets › Phones & agents), or run:
+Press **Connect Claude Code** on the VINAC Link page (**Agents** in the sidebar), or run:
 ```
 vinac connect claude            # --status to check, --remove to undo
 ```

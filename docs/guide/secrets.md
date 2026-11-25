@@ -5,7 +5,7 @@ agent or tool output**.
 
 The **Secrets** page has three actions: **Add** (keep a key here), **Send…** and **Receive…**, and
 three tabs: **Keys** (your vault), **Requests** (keys your devices ask for, programs asking to use a
-key, allowed runs) and **Phones & agents**. A tab shows a count when something waits for you.
+key, allowed runs) and **Phones**. Agent apps and their identities are on the **Agents** page. A tab shows a count when something waits for you.
 
 1. On the **sending** computer: **Secrets** → **Send…** (or the key button in a conversation) →
    pick the device, then a key from the vault or a new one (name like `OPENAI_API_KEY` and value).

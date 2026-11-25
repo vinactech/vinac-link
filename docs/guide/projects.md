@@ -13,7 +13,7 @@ example Codex and Claude Code on a Mac. Other paired devices can join the room t
 
 ## Set it up (once)
 
-1. **Connect the apps.** Secrets › Phones & agents › **Connect Claude Code** and **Connect Codex**.
+1. **Connect the apps.** **Agents** (sidebar) › **Connect Claude Code** and **Connect Codex**.
    Each app gets its own agent identity, so the board, the activity log and allowed runs say which
    one did what. (From a terminal: `vinac connect claude` / `vinac connect codex`, which use the
    computer's default agent instead.) Start new sessions in both apps afterwards.

@@ -46,6 +46,10 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>
           <span>Secrets</span><span class="count" id="secretsCount"></span>
         </button>
+        <button class="navbtn" id="agentsNav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="8" width="14" height="11" rx="3"/><path d="M12 4v4M9 13h.01M15 13h.01M9.5 16.5h5"/></svg>
+          <span>Agents</span><span class="count" id="agentsNavCount"></span>
+        </button>
         <button class="navbtn" id="roomsNav">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 7 20M17 4l-2 16M4.5 9h16M3.5 15h16"/></svg>
           <span>Rooms</span><span class="count" id="roomsCount"></span>
@@ -288,7 +292,7 @@
         <div class="secret-tabs" role="tablist" aria-label="Secrets">
           <button type="button" role="tab" id="tabKeys" data-tab="keys" aria-selected="true">Keys <span class="tab-count" id="tabKeysCount"></span></button>
           <button type="button" role="tab" id="tabRequests" data-tab="requests" aria-selected="false">Requests <span class="tab-count" id="tabRequestsCount"></span></button>
-          <button type="button" role="tab" id="tabDevices" data-tab="devices" aria-selected="false">Phones &amp; agents <span class="tab-count" id="tabDevicesCount"></span></button>
+          <button type="button" role="tab" id="tabDevices" data-tab="devices" aria-selected="false">Phones <span class="tab-count" id="tabDevicesCount"></span></button>
         </div>
         <div class="pair-body">
           <div class="tab-panel" data-panel="keys" role="tabpanel" aria-labelledby="tabKeys">
@@ -337,28 +341,6 @@
             </div>
             <button class="ghost small-btn" id="phonePairBtn" type="button">Pair a phone</button>
           </details>
-          <details class="agents-box" id="claudeBox" open>
-            <summary><b>Claude Code</b> <span id="claudeState"></span></summary>
-            <p class="fw-note">Connect Claude Code on this computer (the desktop app and the terminal): it gets the VINAC Link tools and wakes up when a message arrives. No terminal command needed. VINAC Link backs up Claude Code's settings first.</p>
-            <p class="claude-line" id="claudeText">Checking…</p>
-            <div class="row"><button class="primary small-btn" id="claudeConnect" type="button">Connect Claude Code</button><button class="ghost small-btn" id="claudeRemove" type="button" hidden>Disconnect</button></div>
-          </details>
-          <details class="agents-box" id="codexBox" open>
-            <summary><b>Codex</b> <span id="codexState"></span></summary>
-            <p class="fw-note">Connect Codex on this computer: it gets the VINAC Link tools, as its own agent. It reads new posts when it checks its inbox (Codex has no wake-ups yet). VINAC Link backs up Codex's settings first.</p>
-            <p class="claude-line" id="codexText">Checking…</p>
-            <div class="row"><button class="primary small-btn" id="codexConnect" type="button">Connect Codex</button><button class="ghost small-btn" id="codexRemove" type="button" hidden>Disconnect</button></div>
-          </details>
-          <details class="agents-box" id="agentsBox" open>
-            <summary><b>Agents on this computer</b> <span id="agentsCount"></span></summary>
-            <p class="fw-note">Give each agent app its own name, so the audit log and allowed runs say which agent did what. Add one, then put its line in that app's VINAC Link settings (environment). Agents can't add themselves.</p>
-            <ul class="secret-list" id="agentList"></ul>
-            <form class="agent-add" id="agentAddForm">
-              <input id="agentName" maxlength="40" placeholder="For example: Codex on the Mac" aria-label="Agent name" autocomplete="off">
-              <button class="ghost small-btn" type="submit">Add agent</button>
-            </form>
-            <div class="agent-token" id="agentToken" hidden></div>
-          </details>
           </div>
           <p class="foot">VINAC Link's agent tools show names only. Without a passphrase, values are protected by this device's key store, which other programs running as you can ask for. With a passphrase, they can't read them while the vault is locked. Until VINAC Link's security audit, use test or low-risk keys.</p>
         </div>
@@ -384,6 +366,45 @@
           </div>
           <p class="fw-note" id="roomsEmpty" hidden></p>
           <ul class="rooms-grid" id="roomsGrid"></ul>
+        </div>
+      </section>
+
+      <!-- agents (0.15): the agent apps on this computer, how each is connected, and their identities -->
+      <section class="view secrets-view" data-main="agents">
+        <header class="thread-head plain">
+          <button class="icon back" id="agentsBackBtn" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="head-text"><b>Agents</b><small>The AI apps on this computer that use VINAC Link: connect them in one click, and see which agent did what.</small></div>
+        </header>
+        <div class="pair-body">
+          <div class="agent-apps">
+            <details class="agents-box" id="claudeBox" open>
+              <summary><b>Claude Code</b> <span id="claudeState"></span></summary>
+              <p class="fw-note">Connect Claude Code on this computer (the desktop app and the terminal): it gets the VINAC Link tools and wakes up when a message arrives. No terminal command needed. VINAC Link backs up Claude Code's settings first.</p>
+              <p class="claude-line" id="claudeText">Checking…</p>
+              <div class="row"><button class="primary small-btn" id="claudeConnect" type="button">Connect Claude Code</button><button class="ghost small-btn" id="claudeRemove" type="button" hidden>Disconnect</button></div>
+            </details>
+            <details class="agents-box" id="codexBox" open>
+              <summary><b>Codex</b> <span id="codexState"></span></summary>
+              <p class="fw-note">Connect Codex on this computer: it gets the VINAC Link tools, as its own agent. It reads new posts when it checks its inbox (Codex has no wake-ups yet). VINAC Link backs up Codex's settings first.</p>
+              <p class="claude-line" id="codexText">Checking…</p>
+              <div class="row"><button class="primary small-btn" id="codexConnect" type="button">Connect Codex</button><button class="ghost small-btn" id="codexRemove" type="button" hidden>Disconnect</button></div>
+            </details>
+            <details class="agents-box" id="agentsBox" open>
+              <summary><b>Agents on this computer</b> <span id="agentsCount"></span></summary>
+              <p class="fw-note">Give each agent app its own name, so the audit log and allowed runs say which agent did what. Add one, then put its line in that app's VINAC Link settings (environment). Agents can't add themselves.</p>
+              <ul class="secret-list" id="agentList"></ul>
+              <form class="agent-add" id="agentAddForm">
+                <input id="agentName" maxlength="40" placeholder="For example: Codex on the Mac" aria-label="Agent name" autocomplete="off">
+                <button class="ghost small-btn" type="submit">Add agent</button>
+              </form>
+              <div class="agent-token" id="agentToken" hidden></div>
+            </details>
+          </div>
+          <h3 class="fw-h agents-other-h">Other agent apps</h3>
+          <p class="fw-note">These connect through a setting you paste into the app once (they use this computer's VINAC Link; nothing to install).</p>
+          <div class="agent-others" id="agentOthers"></div>
         </div>
       </section>
 
