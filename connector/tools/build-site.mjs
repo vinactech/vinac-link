@@ -34,6 +34,7 @@ export const PAGES = [
   ['docs/guide/networks.md', '/docs/guide/networks.html', 'Networks and ports', 'Guide'],
   ['docs/guide/offline.md', '/docs/guide/offline.html', 'Offline use', 'Guide'],
   ['docs/guide/agents.md', '/docs/guide/agents.html', 'Connecting agents', 'Guide'],
+  ['docs/guide/projects.md', '/docs/guide/projects.html', 'Projects: agents together', 'Guide'],
   ['docs/guide/auto-mode.md', '/docs/guide/auto-mode.html', 'Auto mode', 'Guide'],
   ['docs/guide/compliance.md', '/docs/guide/compliance.html', 'Activity log and compliance', 'Guide'],
   ['docs/guide/accounts.md', '/docs/guide/accounts.html', 'Accounts, relay, teams', 'Guide'],

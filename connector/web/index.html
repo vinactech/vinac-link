@@ -41,6 +41,14 @@
           <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg>
           <span>Secrets</span><span class="count" id="secretsCount"></span>
         </button>
+        <button class="navbtn" id="roomsNav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 7 20M17 4l-2 16M4.5 9h16M3.5 15h16"/></svg>
+          <span>Rooms</span><span class="count" id="roomsCount"></span>
+        </button>
+        <button class="navbtn" id="projectsNav">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/><path d="M8 13h8M8 16h5"/></svg>
+          <span>Projects</span><span class="count" id="projectsCount"></span>
+        </button>
         <button class="navbtn" id="activityNav">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M7 3.5h7l4 4v13H7z"/><path d="M14 3.5v4h4M10 12h5M10 15.5h5M10 8.5h2"/></svg>
           <span>Activity log</span>
@@ -117,6 +125,12 @@
           </div>
         </header>
         <div class="page-body">
+          <div class="connect-banner" id="claudeBanner" hidden>
+            <span class="ch-ico ic-violet" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M9 7 4 12l5 5M15 7l5 5-5 5"/></svg></span>
+            <div class="cb-text"><b>Claude Code is on this computer.</b> <span id="claudeBannerText">Connect it, so it can use VINAC Link and wakes up when a message arrives.</span></div>
+            <button class="primary small-btn" id="claudeBannerConnect" type="button">Connect</button>
+            <button class="ghost small-btn" id="claudeBannerLater" type="button">Not now</button>
+          </div>
           <div class="kpis" id="ovKpis"></div>
           <div class="ov-grid">
             <div class="ov-col">
@@ -318,6 +332,18 @@
             </div>
             <button class="ghost small-btn" id="phonePairBtn" type="button">Pair a phone</button>
           </details>
+          <details class="agents-box" id="claudeBox" open>
+            <summary><b>Claude Code</b> <span id="claudeState"></span></summary>
+            <p class="fw-note">Connect Claude Code on this computer (the desktop app and the terminal): it gets the VINAC Link tools and wakes up when a message arrives. No terminal command needed. VINAC Link backs up Claude Code's settings first.</p>
+            <p class="claude-line" id="claudeText">Checking…</p>
+            <div class="row"><button class="primary small-btn" id="claudeConnect" type="button">Connect Claude Code</button><button class="ghost small-btn" id="claudeRemove" type="button" hidden>Disconnect</button></div>
+          </details>
+          <details class="agents-box" id="codexBox" open>
+            <summary><b>Codex</b> <span id="codexState"></span></summary>
+            <p class="fw-note">Connect Codex on this computer: it gets the VINAC Link tools, as its own agent. It reads new posts when it checks its inbox (Codex has no wake-ups yet). VINAC Link backs up Codex's settings first.</p>
+            <p class="claude-line" id="codexText">Checking…</p>
+            <div class="row"><button class="primary small-btn" id="codexConnect" type="button">Connect Codex</button><button class="ghost small-btn" id="codexRemove" type="button" hidden>Disconnect</button></div>
+          </details>
           <details class="agents-box" id="agentsBox" open>
             <summary><b>Agents on this computer</b> <span id="agentsCount"></span></summary>
             <p class="fw-note">Give each agent app its own name, so the audit log and allowed runs say which agent did what. Add one, then put its line in that app's VINAC Link settings (environment). Agents can't add themselves.</p>
@@ -330,6 +356,68 @@
           </details>
           </div>
           <p class="foot">VINAC Link's agent tools show names only. Without a passphrase, values are protected by this device's key store, which other programs running as you can ask for. With a passphrase, they can't read them while the vault is locked. Until VINAC Link's security audit, use test or low-risk keys.</p>
+        </div>
+      </section>
+
+      <!-- rooms (0.15): every room in one list, with filters and quick pin / mute / archive -->
+      <section class="view secrets-view" data-main="rooms">
+        <header class="thread-head plain">
+          <button class="icon back" id="roomsBackBtn" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="head-text"><b>Rooms</b><small>Shared threads: with your other devices, or on this computer only for a project's agents.</small></div>
+          <div class="vault-actions"><button class="primary small-btn" id="roomsNewBtn" type="button">New room</button></div>
+        </header>
+        <div class="pair-body">
+          <div class="rooms-tools">
+            <input type="search" id="roomsFilter" placeholder="Find a room" aria-label="Find a room" autocomplete="off">
+            <div class="seg" role="tablist" aria-label="Show">
+              <button type="button" data-rf="active" aria-pressed="true">Active</button>
+              <button type="button" data-rf="pinned" aria-pressed="false">Pinned</button>
+              <button type="button" data-rf="archived" aria-pressed="false">Archived</button>
+            </div>
+          </div>
+          <p class="fw-note" id="roomsEmpty" hidden></p>
+          <ul class="rooms-grid" id="roomsGrid"></ul>
+        </div>
+      </section>
+
+      <!-- projects (0.15): one workspace per project for the agents on this computer (and other devices) -->
+      <section class="view secrets-view" data-main="projects">
+        <header class="thread-head plain">
+          <button class="icon back" id="projectsBackBtn" aria-label="Back">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          </button>
+          <div class="head-text"><b>Projects</b><small>A workspace per project: its folder, the agents that work on it (Codex, Claude Code…), their room and task board, files and keys.</small></div>
+          <div class="vault-actions"><button class="primary small-btn" id="projNewBtn" type="button">New project</button></div>
+        </header>
+        <div class="pair-body">
+          <form class="proj-new agents-box" id="projNewForm" hidden>
+            <h3 class="fw-h">New project</h3>
+            <label for="projNewFolder">Folder on this computer</label>
+            <div class="folder-row">
+              <input id="projNewFolder" placeholder="Full path, for example /Users/me/code/shop" autocomplete="off">
+              <button class="primary small-btn" type="button" id="projBrowse">Browse…</button>
+            </div>
+            <p class="folder-facts-row"><span class="folder-facts" id="projFolderFacts"></span> <button class="linkish" type="button" id="projBrowseHere">or browse here</button></p>
+            <div class="folder-browser" id="folderBrowser" hidden>
+              <div class="fb-head"><button class="ghost small-btn" type="button" id="fbUp">↑ Up</button><button class="ghost small-btn" type="button" id="fbHome">Home</button><span class="fb-path" id="fbPath"></span></div>
+              <ul class="fb-list" id="fbList"></ul>
+              <div class="row"><button class="primary small-btn" type="button" id="fbUse">Use this folder</button><button class="ghost small-btn" type="button" id="fbClose">Close</button></div>
+            </div>
+            <label>Name <input id="projNewName" maxlength="40" placeholder="For example: Shop" required autocomplete="off"></label>
+            <label>What are you building? <small class="fw-note">(optional; the project's agents read it as their brief)</small>
+              <textarea id="projNewAbout" maxlength="600" rows="3" placeholder="For example: an online shop in Next.js. Claude Code writes features, Codex reviews them."></textarea></label>
+            <fieldset><legend>Agents on this computer</legend><div id="projNewAgents" class="proj-checks"></div>
+              <div id="projNewAgentsNote"><p class="fw-note">Connect the agent apps on this computer; each gets its own identity to pick here.</p>
+                <div class="row"><button class="ghost small-btn" type="button" id="projConnectClaude">Connect Claude Code</button><button class="ghost small-btn" type="button" id="projConnectCodex">Connect Codex</button></div></div></fieldset>
+            <fieldset><legend>Other devices in its room (optional)</legend><div id="projNewDevices" class="proj-checks"></div></fieldset>
+            <div class="row"><button class="primary small-btn" type="submit">Create project</button><button class="ghost small-btn" type="button" id="projNewCancel">Cancel</button></div>
+          </form>
+          <p class="fw-note" id="projEmpty">No projects yet. A project gives the agents on this computer one room and one task board, so Codex and Claude Code can hand work to each other, and lets them use the project's keys without seeing them.</p>
+          <input type="search" class="proj-search" id="projSearch" placeholder="Find a project" aria-label="Find a project" autocomplete="off" hidden>
+          <ul class="secret-list proj-list" id="projList"></ul>
+          <div class="proj-detail" id="projDetail" hidden></div>
         </div>
       </section>
 

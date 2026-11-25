@@ -42,6 +42,13 @@ export function checkCard(c, { fromNetwork = false, newId = false } = {}) {
   const out = { id, type, title: line(c.title, 200) };
   if (c.body != null && String(c.body).trim()) out.body = para(c.body, 2000);
   if (type === 'status') out.level = LEVELS.includes(c.level) ? c.level : 'info';
+  // 0.15 hand-offs between agents: a task may be a review, and may name a git branch and a path in
+  // the project folder (where the work is; nothing is copied). Older devices drop these fields.
+  if (type === 'task') {
+    if (c.review === true) out.review = true;
+    if (c.branch != null && line(c.branch, 120)) out.branch = line(c.branch, 120);
+    if (c.path != null && line(c.path, 300)) out.path = line(c.path, 300);
+  }
   if (type === 'decision') {
     const opts = Array.isArray(c.options) ? c.options.map(o => line(o, 60)).filter(Boolean) : [];
     if (opts.length < 2 || opts.length > 4) throw bad('A decision needs 2 to 4 options.', fromNetwork);
@@ -82,7 +89,7 @@ export function checkUpdate(u, { fromNetwork = false } = {}) {
 
 /** Plain text for a card, for older devices and agents reading text only. */
 export function cardText(c) {
-  if (c.type === 'task') return `Task: ${c.title}`;
+  if (c.type === 'task') return `${c.review ? 'Review' : 'Task'}: ${c.title}${c.branch ? ` (branch ${c.branch})` : ''}${c.path ? ` [${c.path}]` : ''}`;
   if (c.type === 'decision') return `Decision: ${c.title} (${c.options.join(' / ')})`;
   if (c.type === 'key') return `Key request: ${c.name}${c.project ? ` (${c.project}${c.env ? `, ${c.env}` : ''})` : ''}`;
   if (c.type === 'link') return `Link: ${c.title} ${c.url}`;
@@ -95,7 +102,7 @@ export function updateText(u, title = 'a card') {
 }
 
 /** Who did something, as a short label: "Windows PC" or "Mac › Codex". */
-const actor = m => `${m.dir === 'out' ? 'me' : m.peer?.name || 'a device'}${m.agent?.name ? ` › ${m.agent.name}` : ''}`;
+const actor = m => `${m.dir === 'out' || m.dir === 'local' ? 'me' : m.peer?.name || 'a device'}${m.agent?.name ? ` › ${m.agent.name}` : ''}`;
 
 /**
  * Works out every card's state from the stored messages (oldest first).
@@ -104,9 +111,11 @@ const actor = m => `${m.dir === 'out' ? 'me' : m.peer?.name || 'a device'}${m.ag
 export function cardStates(messages) {
   const cards = new Map();
   const ups = [];
+  const posts = new Set();   // a room post kept here once and sent to N devices counts once
   for (const m of messages) {
     const a = m.args;
     if (!a || (m.firewall && !['allowed', 'approved'].includes(m.firewall.status) && m.dir === 'in')) continue;
+    if (m.dir !== 'in' && a.post) { if (posts.has(a.post)) continue; posts.add(a.post); }
     if (a.card && typeof a.card === 'object' && !cards.has(a.card.id)) {
       cards.set(a.card.id, { card: a.card, from: actor(m), at: m.sentAt, state: a.card.type === 'task' ? 'open' : a.card.type === 'decision' ? 'open' : 'posted', claimedBy: null, doneBy: null, answer: null, answeredBy: null, updates: [] });
     }

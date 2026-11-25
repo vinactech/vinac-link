@@ -52,6 +52,17 @@ export class Agents {
     return { agent: { id: agent.id, name: agent.name, fingerprint: agentFingerprint(agent.hash), createdAt: agent.createdAt }, token };
   }
 
+  /** The page connects an agent app (0.15): that app's identity by name, made now or given a fresh token (same id, so its grants stay). */
+  identityFor(name) {
+    const list = this.list();
+    const a = list.find(x => x.name.toLowerCase() === String(name).toLowerCase());
+    if (!a) return this.add(name);
+    const token = `agt_${crypto.randomBytes(32).toString('base64url')}`;
+    a.hash = sha256(token);
+    this.store.saveAgents(list);
+    return { agent: { id: a.id, name: a.name, fingerprint: agentFingerprint(a.hash), createdAt: a.createdAt }, token };
+  }
+
   remove(id) {
     const list = this.list();
     const a = list.find(x => x.id === String(id));

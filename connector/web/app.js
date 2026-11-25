@@ -120,7 +120,7 @@ $('accountUnlink').onclick = async () => { if (await accountDo('POST', '/ui/acco
 $('accountSignOut').onclick = async () => { if (await accountDo('POST', '/ui/account/signout', {})) toast('Signed out on this computer.'); };
 
 let state = null, lastPaired = null, firstLoad = true;
-let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantActivity = false, wantOverview = true, mobileMain = false;
+let selected = LS.get('selected', null), wantPair = false, wantSecrets = false, wantFirewall = false, wantActivity = false, wantProjects = false, wantRooms = false, wantOverview = true, mobileMain = false;
 let thread = [], threadKey = '', justOpened = true, search = '', replyTo = null;
 let pending = [];                          // messages typed here that are sending or failed
 let lastSeen = LS.get('lastSeen', {});     // peer id -> time of the last incoming message the person saw
@@ -188,7 +188,7 @@ function render(s) {
   // A pairing in progress keeps the pairing screen open; merely waiting to be picked doesn't.
   const pairing = !!(p && VIEW_OF[p.state] && !isWaitingToBePicked(p));
   if (roomOpen && !roomById(roomOpen)) roomOpen = null;
-  const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall' : wantActivity ? 'activity'
+  const main = pairing || wantPair ? 'pair' : wantSecrets ? 'secrets' : wantFirewall ? 'firewall' : wantActivity ? 'activity' : wantProjects ? 'projects' : wantRooms ? 'rooms'
     : roomOpen ? 'room' : selected && !wantOverview ? 'thread' : s.peers.length ? 'overview' : 'empty';
   // Left the pairing screen: stop telling the network this device waits to be picked.
   if (main !== 'pair' && isWaitingToBePicked(p) && !render.stopping) {
@@ -196,7 +196,7 @@ function render(s) {
     api('POST', '/ui/cancel').catch(() => {}).finally(() => { render.stopping = false; });
   }
   app.dataset.main = main;
-  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
+  app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || main === 'projects' || main === 'rooms' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
   const needs = s.needsMe || [];
   $('needsCount').textContent = needs.length || '';
@@ -214,6 +214,12 @@ function render(s) {
   $('firewallCount').title = s.waitingRequests ? `${s.waitingRequests} request(s) waiting for you` : '';
   $('firewallNav').setAttribute('aria-current', String(main === 'firewall'));
   $('activityNav').setAttribute('aria-current', String(main === 'activity'));
+  $('projectsNav').setAttribute('aria-current', String(main === 'projects'));
+  $('projectsCount').textContent = (s.projects || []).length || '';
+  if (main === 'projects') renderWorkspaces();
+  $('roomsNav').setAttribute('aria-current', String(main === 'rooms'));
+  $('roomsCount').textContent = (state.rooms || []).filter(r => !r.archived).length || '';
+  if (main === 'rooms') renderRoomsPage();
   if (main === 'activity' && !render.activityShown) loadActivity();
   render.activityShown = main === 'activity';
   if (main === 'secrets') renderSecrets();
@@ -248,7 +254,7 @@ function renderConvos() {
     const name = document.createElement('b'); name.textContent = peer.name;
     const when = document.createElement('time'); when.textContent = last ? shortWhen(last.sentAt) : '';
     const prev = document.createElement('span'); prev.className = 'preview';
-    prev.textContent = last ? `${last.direction === 'sent' ? (last.by === 'agent' ? 'Your agent: ' : 'You: ') : ''}${flat(last.text)}`
+    prev.textContent = last ? `${last.direction === 'sent' ? (last.by === 'agent' ? `${last.agent?.name || 'Your agent'}: ` : 'You: ') : ''}${flat(last.text)}`
       : peer.canMessage ? 'No messages yet' : 'Pair again to message';
     b.append(av, name, when, prev);
     if (unread) { const badge = document.createElement('span'); badge.className = 'badge'; badge.textContent = unread > 99 ? '99+' : unread; b.append(badge); }
@@ -308,7 +314,7 @@ function renderThread() {
     if (!prev || !sameDay(prev.sentAt, m.sentAt)) {
       const day = document.createElement('div'); day.className = 'day'; day.textContent = dayLabel(m.sentAt); box.append(day); prev = null;
     }
-    const cont = prev && prev.direction === m.direction && prev.by === m.by && new Date(m.sentAt) - new Date(prev.sentAt) < GROUP_MS && !q;
+    const cont = prev && prev.direction === m.direction && prev.by === m.by && (prev.agent?.name || '') === (m.agent?.name || '') && new Date(m.sentAt) - new Date(prev.sentAt) < GROUP_MS && !q;
     box.append(messageEl(m, cont, q));
     prev = m;
   }
@@ -334,7 +340,7 @@ function cardEl(c0, m = null) {
   const c = cardMap.get(c0.id) || c0;
   const box = document.createElement('div'); box.className = `card card-${c.type}${c.state ? ` st-${c.state}` : ''}${c.level ? ` lv-${c.level}` : ''}`;
   const head = document.createElement('div'); head.className = 'card-head';
-  head.append(text('span', CARD_LABEL[c.type] || 'Card'));
+  head.append(text('span', c.review ? 'Review' : CARD_LABEL[c.type] || 'Card'));
   if (STATE_LABEL[c.state]) { const s = text('span', STATE_LABEL[c.state]); s.className = 'card-state'; head.append(s); }
   box.append(head, text('b', c.title));
   if (c.body) { const b = document.createElement('div'); b.className = 'card-body'; rich(b, c.body, ''); box.append(b); }
@@ -342,7 +348,8 @@ function cardEl(c0, m = null) {
   if (c.type === 'key') info.push(`${c.name}${c.project ? ` · ${c.project}` : ''}${c.env ? ` · ${c.env}` : ''}`);
   if (c.type === 'file') info.push(`${c.name}${c.size ? ` · ${kb(c.size)}` : ''}`);
   if (c.type === 'link') info.push(c.url);
-  const you = w => (w === 'me' ? 'you' : w);
+  if (c.branch || c.path) info.push([c.branch && `branch ${c.branch}`, c.path].filter(Boolean).join(' · '));
+  const you = w => (w === 'me' ? 'you' : String(w).replace(/^me › /, ''));
   if (c.claimedBy && c.state === 'claimed') info.push(`Claimed by ${you(c.claimedBy)}`);
   if (c.doneBy) info.push(`Done by ${you(c.doneBy)}`);
   if (c.answer) info.push(`Answer: ${c.answer} (${you(c.answeredBy)})`);
@@ -375,7 +382,7 @@ function cardEl(c0, m = null) {
 }
 function cardUpdateEl(m) {
   const el = document.createElement('div'); el.className = 'note card-note'; el.dataset.id = m.id;
-  const who = m.direction === 'sent' ? 'You' : `${m.peer.name}${m.agent ? ` › ${m.agent.name}` : ''}`;
+  const who = m.direction === 'sent' ? (m.agent ? m.agent.name : 'You') : `${m.peer.name}${m.agent ? ` › ${m.agent.name}` : ''}`;
   const t = document.createElement('span'); t.textContent = `${who}: ${m.text}`;
   const time = document.createElement('small'); time.textContent = clock(m.sentAt);
   el.append(t, time);
@@ -445,7 +452,7 @@ function messageEl(m, cont, q, { room = false } = {}) {
     const q = text('span', '· Waiting to send: device offline'); q.className = 'queued'; q.title = 'Sent automatically when the device is back, for up to 24 hours.';
     meta.append(q, button('Cancel', async () => { try { render(await api('POST', '/ui/outbox/cancel', { id: m.id })); loadThread?.(); } catch (e) { toast(e.message); } }), button('Why?', () => explain('message', m.id)));
   } else if (out && m.undelivered) { const f = text('span', '· Not delivered'); f.className = 'fail'; f.title = m.undelivered; meta.append(f, button('Why?', () => explain('message', m.id))); }
-  else if (out && room && m.to) meta.append(text('span', `· Delivered to ${m.to.join(', ')}`));
+  else if (out && room && m.to) meta.append(text('span', m.to.length ? `· Delivered to ${m.to.join(', ')}` : '· On this computer'));
   else if (out) meta.append(text('span', '· Delivered'));
   else if (m.firewall && !['allowed', 'approved'].includes(m.firewall.status)) {
     meta.append(button('Why?', () => explain('request', m.id)));
@@ -663,9 +670,9 @@ async function loadActivity(more = false) {
   $('auditKeep').textContent = `· ${r.retention.legalHold ? 'legal hold' : r.retention.keepDays ? `${Math.round(r.retention.keepDays / 30.4)} months` : 'always'}`;
   $('auditKeepSel').value = String(r.retention.keepDays); $('auditHold').checked = r.retention.legalHold;
 }
-function openActivity() { roomOpen = null; wantActivity = true; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openActivity() { roomOpen = null; wantActivity = true; wantProjects = false; wantRooms = false; wantFirewall = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('activityNav').onclick = openActivity;
-$('activityBackBtn').onclick = () => { wantActivity = false; mobileMain = false; render(state); };
+$('activityBackBtn').onclick = () => { wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = false; render(state); };
 $('auditFilters').addEventListener('input', () => { clearTimeout(auditTimer); auditTimer = setTimeout(() => loadActivity(), 250); });
 $('auditFilters').addEventListener('submit', e => e.preventDefault());
 $('auditMore').onclick = () => loadActivity(true);
@@ -740,6 +747,287 @@ $('phoneAllow')?.addEventListener('click', async () => {
   try { const r = await api('POST', '/ui/phone/confirm', { allow: true }); Object.assign(state, r); toast(`Paired with ${r.pairedPhone.name}. To get a key from it: Receive… › From your phone here, then Send on the phone.`); renderPhones(); } catch (e) { toast(e.message); }
 });
 $('phoneDeny')?.addEventListener('click', async () => { await act('POST', '/ui/phone/confirm', { allow: false }); });
+
+// Claude Code on this computer: connect it from here (the service backs up its settings first).
+function renderClaude(c) {
+  if (!c || !$('claudeText')) return;
+  const connected = c.mode === 'direct' || c.mode === 'plugin';
+  const tidy = c.mode === 'plugin' && (c.manual || c.direct?.server);
+  $('claudeText').textContent = c.copyProblem && !connected ? c.copyProblem : c.text;
+  $('claudeText').className = `claude-line ${connected && !tidy ? 'ok' : c.present ? 'warn' : ''}`;
+  $('claudeState').textContent = !c.present ? '' : connected ? '· connected' : '· not connected';
+  $('claudeConnect').textContent = connected ? (tidy ? 'Tidy up' : 'Connect again') : 'Connect Claude Code';
+  $('claudeConnect').hidden = (connected && !tidy && c.mode === 'plugin') || !!(c.copyProblem && !connected);
+  $('claudeRemove').hidden = c.mode !== 'direct' && !c.direct?.server;
+  $('claudeBanner').hidden = !c.present || connected || c.dismissed || !!c.copyProblem;
+  if (c.mode === 'partial') $('claudeBannerText').textContent = 'It was added by hand, without wake-ups. Connect it again to fix that.';
+}
+async function refreshClaude() { try { renderClaude(await api('GET', '/ui/connect/claude')); } catch { /* older service */ } }
+async function connectClaudeNow(body = {}) {
+  try {
+    const r = await api('POST', '/ui/connect/claude', body);
+    if (!body.dismiss) toast(r.message);
+  } catch (e) { toast(e.message); }
+  refreshClaude();
+}
+$('claudeConnect')?.addEventListener('click', () => connectClaudeNow());
+$('claudeBannerConnect')?.addEventListener('click', () => connectClaudeNow());
+$('claudeBannerLater')?.addEventListener('click', () => { $('claudeBanner').hidden = true; connectClaudeNow({ dismiss: true }); });
+$('claudeRemove')?.addEventListener('click', () => { if (confirm('Disconnect Claude Code from VINAC Link? Its agents lose the VINAC Link tools after their next start.')) connectClaudeNow({ remove: true }); });
+refreshClaude();
+window.addEventListener('focus', refreshClaude);
+
+// Codex on this computer (0.15): same idea, no wake-ups (Codex has no hooks yet).
+function renderCodex(c) {
+  if (!c || !$('codexText')) return;
+  const connected = c.mode === 'direct';
+  $('codexText').textContent = c.copyProblem && !connected ? c.copyProblem : c.text;
+  $('codexText').className = `claude-line ${connected ? 'ok' : c.present ? 'warn' : ''}`;
+  $('codexState').textContent = !c.present ? '' : connected ? '· connected' : '· not connected';
+  $('codexConnect').textContent = connected ? 'Connect again' : 'Connect Codex';
+  $('codexConnect').hidden = !!(c.copyProblem && !connected);
+  $('codexRemove').hidden = c.mode === 'none';
+}
+async function refreshCodex() { try { renderCodex(await api('GET', '/ui/connect/codex')); } catch { /* older service */ } }
+async function connectCodexNow(body = {}) {
+  try { toast((await api('POST', '/ui/connect/codex', body)).message); } catch (e) { toast(e.message); }
+  refreshCodex(); act('GET', '/ui/state');
+}
+$('codexConnect')?.addEventListener('click', () => connectCodexNow());
+$('codexRemove')?.addEventListener('click', () => { if (confirm('Disconnect Codex from VINAC Link? It loses the VINAC Link tools after its next start.')) connectCodexNow({ remove: true }); });
+refreshCodex();
+window.addEventListener('focus', refreshCodex);
+
+// ---- Projects (0.15): a workspace per project for the agents on this computer ----
+let projOpen = LS.get('projOpen', null), projData = null;
+$('projectsNav').onclick = () => { roomOpen = null; wantProjects = true; wantRooms = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); };
+$('projectsBackBtn').onclick = () => { wantProjects = false; wantRooms = false; mobileMain = false; render(state); };
+function checks(box, items, picked = []) {
+  box.replaceChildren(...items.map(x => {
+    const l = document.createElement('label'); l.className = 'proj-check';
+    const c = document.createElement('input'); c.type = 'checkbox'; c.value = x.id; c.checked = picked.includes(x.id);
+    l.append(c, ` ${x.name}`); return l;
+  }));
+}
+const picked = box => [...box.querySelectorAll('input:checked')].map(c => c.value);
+$('projNewBtn').onclick = () => {
+  const f = $('projNewForm'); f.hidden = !f.hidden;
+  checks($('projNewAgents'), state.agents || [], (state.agents || []).filter(a => /claude|codex/i.test(a.name)).map(a => a.id));
+  const has = re => (state.agents || []).some(a => re.test(a.name));
+  $('projConnectClaude').hidden = has(/claude/i); $('projConnectCodex').hidden = has(/codex/i);
+  $('projNewAgentsNote').hidden = has(/claude/i) && has(/codex/i);
+  nameTouched = false; $('projFolderFacts').textContent = ''; $('folderBrowser').hidden = true;
+  checks($('projNewDevices'), state.peers || []);
+  $('projNewDevices').closest('fieldset').hidden = !(state.peers || []).length;
+  if (!f.hidden) $('projNewName').focus();
+};
+$('projNewCancel').onclick = () => { $('projNewForm').hidden = true; $('folderBrowser').hidden = true; };
+
+// Folder: the system's folder window (the service opens it on this computer), else the page's own browser.
+let nameTouched = false;
+$('projNewName').addEventListener('input', () => { nameTouched = !!$('projNewName').value.trim(); });
+async function setFolder(p) {
+  $('projNewFolder').value = p;
+  await showFolderFacts();
+}
+async function showFolderFacts() {
+  const p = $('projNewFolder').value.trim(), out = $('projFolderFacts');
+  if (!p) { out.textContent = ''; out.className = 'folder-facts'; return; }
+  try {
+    const f = await api('GET', `/ui/folders/facts?path=${encodeURIComponent(p)}`);
+    if (!f.exists) { out.textContent = 'This folder doesn\'t exist on this computer.'; out.className = 'folder-facts warn'; return; }
+    out.textContent = [f.git ? `Git repository${f.branch ? `, on ${f.branch}` : ''}` : 'Not a git repository', f.manifest ? 'vinac.keys.json found' : 'no vinac.keys.json (optional)'].join(' · ');
+    out.className = 'folder-facts ok';
+    if (!nameTouched && f.name) $('projNewName').value = f.name.slice(0, 40);
+  } catch { out.textContent = ''; }
+}
+$('projNewFolder').addEventListener('change', showFolderFacts);
+$('projBrowse').onclick = async () => {
+  const b = $('projBrowse'); b.disabled = true; b.textContent = 'Choose in the window…';
+  try {
+    const r = await api('POST', '/ui/folders/pick', { start: $('projNewFolder').value.trim() || undefined });
+    if (r.path) await setFolder(r.path);
+    else if (r.unavailable) openFolderBrowser($('projNewFolder').value.trim());
+  } catch (e) { toast(e.message); openFolderBrowser($('projNewFolder').value.trim()); }
+  finally { b.disabled = false; b.textContent = 'Browse…'; }
+};
+let fbAt = null;
+async function openFolderBrowser(start) {
+  try {
+    const r = await api('GET', `/ui/folders${start ? `?path=${encodeURIComponent(start)}` : ''}`);
+    fbAt = r; $('folderBrowser').hidden = false;
+    $('fbPath').textContent = r.path + (r.git ? `  ·  git${r.branch ? ` (${r.branch})` : ''}` : '');
+    $('fbUp').disabled = !r.parent;
+    const items = r.dirs.map(name => { const li = document.createElement('li'); li.append(button(`📁 ${name}`, () => openFolderBrowser(`${r.path}${/[\\/]$/.test(r.path) ? '' : r.path.includes('\\') ? '\\' : '/'}${name}`))); return li; });
+    if (!r.parent) for (const root of r.roots || []) if (root !== r.path) { const li = document.createElement('li'); li.append(button(`💽 ${root}`, () => openFolderBrowser(root))); items.unshift(li); }
+    $('fbList').replaceChildren(...items);
+    if (!items.length) $('fbList').append(text('li', 'No folders inside.'));
+  } catch (e) { toast(e.message); }
+}
+$('projBrowseHere').onclick = () => openFolderBrowser($('projNewFolder').value.trim());
+$('fbUp').onclick =() => fbAt?.parent && openFolderBrowser(fbAt.parent);
+$('fbHome').onclick = () => openFolderBrowser(fbAt?.home || '');
+$('fbClose').onclick = () => { $('folderBrowser').hidden = true; };
+$('fbUse').onclick = async () => { if (fbAt) { await setFolder(fbAt.path); $('folderBrowser').hidden = true; } };
+async function connectFromProject(app) {
+  try { toast((await api('POST', `/ui/connect/${app}`, {})).message); } catch (e) { toast(e.message); }
+  const s = await api('GET', '/ui/state'); render(s);
+  checks($('projNewAgents'), s.agents || [], [...picked($('projNewAgents')), ...(s.agents || []).filter(a => /claude|codex/i.test(a.name)).map(a => a.id)]);
+  const has = re => (s.agents || []).some(a => re.test(a.name));
+  $('projConnectClaude').hidden = has(/claude/i); $('projConnectCodex').hidden = has(/codex/i);
+  $('projNewAgentsNote').hidden = has(/claude/i) && has(/codex/i);
+  refreshClaude(); refreshCodex();
+}
+$('projConnectClaude').onclick = () => connectFromProject('claude');
+$('projConnectCodex').onclick = () => connectFromProject('codex');
+$('projNewForm').addEventListener('submit', async e => {
+  e.preventDefault();
+  try {
+    const r = await api('POST', '/ui/projects/workspace', { name: $('projNewName').value.trim(), about: $('projNewAbout').value.trim(), folder: $('projNewFolder').value.trim(), agents: picked($('projNewAgents')), devices: picked($('projNewDevices')) });
+    $('projNewForm').hidden = true; $('projNewName').value = ''; $('projNewFolder').value = ''; $('projNewAbout').value = '';
+    projOpen = r.project.id; LS.set('projOpen', projOpen); projData = r;
+    render(r); renderWorkspaces(true); toast(`Project ${r.project.name} created, with its room.`);
+  } catch (err) { toast(err.message); }
+});
+let wsKey = '';
+$('projSearch').addEventListener('input', () => renderWorkspaces(true));
+function renderWorkspaces(force = false) {
+  const all = state.projects || [];
+  const pq = $('projSearch').value.trim().toLowerCase();
+  $('projSearch').hidden = all.length < 4 && !pq;
+  const list = pq ? all.filter(p => p.name.toLowerCase().includes(pq) || (p.about || '').toLowerCase().includes(pq) || (p.folders || []).some(f => f.toLowerCase().includes(pq))) : all;
+  // Redraw only when something changed, and never under the person's typing.
+  const room = projOpen && list.find(p => p.id === projOpen)?.room;
+  const key = JSON.stringify([list, pq, state.agents || [], projOpen, (state.rooms || []).find(r => r.id === room)?.last?.id || null, (state.grants || []).length]);
+  const busy = $('projDetail').contains(document.activeElement) && document.activeElement.tagName !== 'BUTTON' || [...$('projDetail').querySelectorAll('input:not([type=checkbox])')].some(i => i.value);
+  if (!force && (key === wsKey || busy)) return;
+  wsKey = key;
+  $('projEmpty').hidden = all.length > 0;
+  if (projOpen && !list.some(p => p.id === projOpen)) projOpen = null;
+  if (!projOpen && list.length) projOpen = list[0].id;
+  $('projList').replaceChildren(...list.map(p => {
+    const li = document.createElement('li'); li.className = `proj-item${p.id === projOpen ? ' on' : ''}`;
+    const b = button(p.name, () => { projOpen = p.id; LS.set('projOpen', p.id); renderWorkspaces(true); });
+    const n = (p.agents || []).length;
+    const small = document.createElement('small'); small.textContent = `${p.folders?.[0] || 'no folder'} · ${n} agent${n === 1 ? '' : 's'}`;
+    li.append(b, small); return li;
+  }));
+  if (projOpen) loadProject(projOpen); else $('projDetail').hidden = true;
+}
+async function loadProject(id) {
+  try { projData = await api('GET', `/ui/project?id=${encodeURIComponent(id)}`); drawProject(); } catch (e) { $('projDetail').hidden = true; }
+}
+function sec(title, ...kids) { const s = document.createElement('section'); s.className = 'proj-sec'; const h = document.createElement('h3'); h.className = 'fw-h'; h.textContent = title; s.append(h, ...kids); return s; }
+function note(text) { const p = document.createElement('p'); p.className = 'fw-note'; p.textContent = text; return p; }
+function cardLine(c) {
+  const li = document.createElement('li'); li.className = 'proj-card';
+  const t = document.createElement('b'); t.textContent = `${c.review ? 'Review: ' : ''}${c.title}`;
+  const m = document.createElement('small');
+  m.textContent = [c.branch && `branch ${c.branch}`, c.path, c.claimedBy && `claimed by ${c.claimedBy}`, c.doneBy && `done by ${c.doneBy}`, !c.claimedBy && !c.doneBy && `from ${c.from}`].filter(Boolean).join(' · ');
+  li.append(t, m); return li;
+}
+function drawProject() {
+  const d = projData, box = $('projDetail');
+  if (!d) return;
+  box.hidden = false;
+  const small = (cls, label, fn) => { const b = button(label, fn); b.className = cls; return b; };
+
+  // Header: name, open the room, the folder (with its own picker), the brief.
+  const head = document.createElement('div'); head.className = 'proj-head';
+  const titleRow = document.createElement('div'); titleRow.className = 'proj-title-row';
+  const h = document.createElement('h2'); h.textContent = d.project.name;
+  titleRow.append(h);
+  if (d.room) titleRow.append(small('primary', `Open room #${d.room.name}`, () => openRoom(d.room.id)));
+  const folderRow = document.createElement('div'); folderRow.className = 'proj-folder-row';
+  const fp = text('span', d.project.folders[0] || 'No folder yet'); fp.className = `proj-folder${d.project.folders[0] ? '' : ' none'}`;
+  const chooseFolder = small('ghost', d.project.folders[0] ? 'Change folder…' : 'Choose folder…', async () => {
+    let p = null;
+    try {
+      const r = await api('POST', '/ui/folders/pick', { start: d.project.folders[0] || undefined });
+      p = r.path || (r.unavailable ? prompt('The project\'s folder on this computer (full path):', d.project.folders[0] || '') : null);
+    } catch (e) { toast(e.message); return; }
+    if (!p) return;
+    try { const s = await api('POST', '/ui/projects', { id: d.project.id, name: d.project.name, folders: [p], prodAsks: d.project.prodAsks }); render(s); loadProject(d.project.id); toast('Folder saved.'); } catch (e) { toast(e.message); }
+  });
+  folderRow.append(fp, chooseFolder);
+  const about = document.createElement('textarea'); about.className = 'proj-about'; about.maxLength = 600; about.rows = 2; about.value = d.project.about || '';
+  about.placeholder = 'What are you building? The project\'s agents read this as their brief.'; about.setAttribute('aria-label', 'What are you building?');
+  const saveAbout = small('ghost', 'Save', async () => { try { projData = await api('POST', '/ui/projects/about', { id: d.project.id, about: about.value }); about.blur(); toast('Saved. The project\'s agents see it in vinac_peers.'); } catch (e) { toast(e.message); } });
+  const aboutRow = document.createElement('div'); aboutRow.className = 'proj-about-row'; aboutRow.append(about, saveAbout);
+  head.append(titleRow, folderRow, aboutRow);
+
+  // Board (full width)
+  const roomNote = note(d.room ? (d.room.members.length ? `Room shared with ${d.room.members.join(', ')} and the agents here.` : 'Room on this computer only: its agents and you.') : 'No room.');
+  const cols = document.createElement('div'); cols.className = 'proj-board';
+  for (const [label, items, cls] of [['Open', d.board.open, 'open'], ['Claimed', d.board.claimed, 'claimed'], ['Done', d.board.done, 'done']]) {
+    const col = document.createElement('div'); col.className = `proj-col col-${cls}`;
+    const hh = document.createElement('h4'); hh.append(text('span', label), text('span', String(items.length)));
+    const ul = document.createElement('ul');
+    if (items.length) ul.append(...items.map(cardLine)); else { const e = text('li', 'Nothing here'); e.className = 'proj-empty'; ul.append(e); }
+    col.append(hh, ul); cols.append(col);
+  }
+  const addTask = document.createElement('form'); addTask.className = 'proj-inline';
+  const ti = document.createElement('input'); ti.placeholder = 'New task for the agents'; ti.maxLength = 200; ti.setAttribute('aria-label', 'New task');
+  const tb = document.createElement('button'); tb.className = 'primary'; tb.type = 'submit'; tb.textContent = 'Add task';
+  addTask.append(ti, tb);
+  addTask.onsubmit = async e => { e.preventDefault(); if (!ti.value.trim() || !d.room) return; try { await api('POST', '/ui/card', { room: d.room.id, card: { type: 'task', title: ti.value.trim() } }); ti.value = ''; ti.blur(); loadProject(d.project.id); } catch (err) { toast(err.message); } };
+  const boardSec = sec('Task board', roomNote, cols, ...(d.room ? [addTask] : []),
+    ...(d.board.decisions.length ? [note(`${d.board.decisions.length} decision(s) wait for you in the room.`)] : []));
+  boardSec.classList.add('wide');
+
+  // Agents
+  let agentsSec;
+  if (d.agents.length) {
+    const ag = document.createElement('div'); ag.className = 'proj-checks';
+    checks(ag, d.agents, d.project.agents);
+    const saveAgents = small('ghost', 'Save agents', async () => { try { projData = await api('POST', '/ui/projects/agents', { id: d.project.id, agents: picked(ag) }); drawProject(); toast('Saved.'); } catch (e) { toast(e.message); } });
+    agentsSec = sec('Agents', note('Only the agents ticked here post in the project room. None ticked: any agent here may.'), ag, saveAgents);
+  } else {
+    const row = document.createElement('div'); row.className = 'row';
+    for (const [app, label] of [['claude', 'Connect Claude Code'], ['codex', 'Connect Codex']]) row.append(small('ghost', label, async () => {
+      try { toast((await api('POST', `/ui/connect/${app}`, {})).message); } catch (e) { toast(e.message); }
+      render(await api('GET', '/ui/state')); refreshClaude(); refreshCodex(); loadProject(d.project.id);
+    }));
+    agentsSec = sec('Agents', note('Connect the agent apps on this computer; each gets its own identity, then tick them here.'), row);
+  }
+
+  // Keys and allowed runs
+  const kv = document.createElement('div'); kv.className = 'proj-keys';
+  const missing = d.manifest ? (d.manifest.dev || []).filter(n => !d.keys.dev.includes(n)) : [];
+  const chip = (t, cls = '') => { const c = text('span', t); c.className = `rc-tag ${cls}`; return c; };
+  kv.append(text('b', 'Dev'), ...(d.keys.dev.length ? d.keys.dev.map(n => chip(n)) : [chip('none', 'dim')]));
+  const kv2 = document.createElement('div'); kv2.className = 'proj-keys';
+  kv2.append(text('b', 'Prod'), ...(d.keys.prod.length ? d.keys.prod.map(n => chip(n)) : [chip('none', 'dim')]));
+  const keyKids = [kv, kv2];
+  if (missing.length) { const kv3 = document.createElement('div'); kv3.className = 'proj-keys'; kv3.append(text('b', 'Missing'), ...missing.map(n => chip(n, 'warn'))); keyKids.push(kv3); }
+  const addKeys = small('ghost', 'Add keys…', () => { $('secretsNav').click(); });
+  const gl = document.createElement('ul'); gl.className = 'proj-files';
+  gl.append(...d.grants.map(g => { const li = document.createElement('li'); li.textContent = `${g.agentName}: ${g.command}${g.prefix ? ' …' : ''} with ${g.names.join(', ')} until ${new Date(g.expiresAt).toLocaleString()}`; return li; }));
+  const gf = document.createElement('form'); gf.className = 'proj-inline';
+  const gc = document.createElement('input'); gc.placeholder = 'Command, e.g. npm run dev'; gc.maxLength = 400; gc.setAttribute('aria-label', 'Command');
+  const gh = document.createElement('select'); gh.setAttribute('aria-label', 'For how long');
+  for (const hr of [1, 8, 24]) { const o = document.createElement('option'); o.value = hr; o.textContent = `${hr} h`; if (hr === 8) o.selected = true; gh.append(o); }
+  const gb = document.createElement('button'); gb.className = 'ghost'; gb.type = 'submit'; gb.textContent = 'Allow';
+  gf.append(gc, gh, gb);
+  gf.onsubmit = async e => {
+    e.preventDefault(); if (!gc.value.trim()) return;
+    if (!confirm(`Let this project's agents run "${gc.value.trim()}" (and with more arguments) in its folder with its dev keys for ${gh.value} h? Whatever that command runs gets the keys.`)) return;
+    try { const r = await api('POST', '/ui/projects/grant', { id: d.project.id, command: gc.value.trim(), hours: Number(gh.value), prefix: true }); projData = r; drawProject(); toast(r.note); } catch (err) { toast(err.message); }
+  };
+  const canAllow = d.project.folders[0] && d.keys.dev.length;
+  const keysSec = sec('Keys and allowed runs', ...keyKids, addKeys,
+    note(canAllow ? 'Agents never see values. Allow one command for the project\'s agents with its DEV keys, without asking each time. Prod keys always ask.' : 'Agents never see values. Give the project a folder and dev keys, then you can allow one command with them. Prod keys always ask.'),
+    gl, ...(canAllow ? [gf] : []));
+
+  // Files
+  const fl = document.createElement('ul'); fl.className = 'proj-files';
+  fl.append(...d.files.map(c => { const li = document.createElement('li'); li.textContent = c.type === 'link' ? `${c.title} · ${c.url}` : `${c.name} · ${Math.max(1, Math.round((c.size || 0) / 1024))} KB · from ${c.from}`; return li; }));
+  const filesSec = sec('Files', note(d.files.length ? 'Posted in the room. Other devices in the room get them on request.' : 'Agents here share the project folder, so they hand work over by branch or path. Files posted in the room show here.'), fl);
+
+  const grid = document.createElement('div'); grid.className = 'proj-grid';
+  grid.append(boardSec, agentsSec, keysSec, filesSec);
+  box.replaceChildren(head, grid);
+}
 
 $('agentAddForm')?.addEventListener('submit', async e => {
   e.preventDefault();
@@ -935,7 +1223,7 @@ function renderVaultLock() {
 }
 function hideSecret() { shownSecret = null; clearTimeout(showSecret.timer); if (state) renderSecrets(true); }
 
-$('secretsNav').onclick = () => { roomOpen = null; wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; mobileMain = true; render(state); };
+$('secretsNav').onclick = () => { roomOpen = null; wantSecrets = true; wantPair = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = true; render(state); };
 $('secretsBackBtn').onclick = () => { wantSecrets = false; mobileMain = false; hideSecret(); render(state); };
 
 // ---- firewall: requests (intents) from paired devices ---------------------
@@ -958,16 +1246,16 @@ async function downloadFile(fileId, name) {
 const DECISION_LABEL = { allow: 'Allow', ask: 'Ask me', block: 'Block' };
 let fw = null, fwKey = '', fwScope = '*', fwLoading = false;
 
-function openFirewall() { roomOpen = null; wantFirewall = true; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openFirewall() { roomOpen = null; wantFirewall = true; wantActivity = false; wantProjects = false; wantRooms = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('firewallNav').onclick = openFirewall;
 
 // ---- overview: the dashboard ------------------------------------------------------
 
-function openOverview() { roomOpen = null; wantOverview = true; wantFirewall = false; wantActivity = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
+function openOverview() { roomOpen = null; wantOverview = true; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantSecrets = false; wantPair = false; mobileMain = true; render(state); }
 $('overviewNav').onclick = openOverview;
 $('overviewBackBtn').onclick = () => { mobileMain = false; render(state); };
 $('ovFirewallLink').onclick = openFirewall;
-$('ovReceiveBtn').onclick = () => { roomOpen = null; wantSecrets = true; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
+$('ovReceiveBtn').onclick = () => { roomOpen = null; wantSecrets = true; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantPair = false; mobileMain = true; render(state); openSecretModal('choose'); };
 const ICON_PATH = {
   devices: '<rect x="3" y="4" width="13" height="10" rx="1.5"/><path d="M7 18h5M9.5 14v4"/><rect x="17.5" y="8" width="4" height="10" rx="1"/>',
   waiting: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
@@ -1059,7 +1347,7 @@ function renderOverview() {
     ul.append(li);
   }
 }
-$('firewallBackBtn').onclick = () => { wantFirewall = false; wantActivity = false; mobileMain = false; render(state); };
+$('firewallBackBtn').onclick = () => { wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = false; render(state); };
 
 async function loadFirewall(force = false) {
   if (fwLoading) return;
@@ -1441,7 +1729,7 @@ function renderRooms() {
     const name = document.createElement('b'); name.textContent = r.name; name.setAttribute('translate', 'no');
     const when = document.createElement('time'); when.textContent = last ? shortWhen(last.sentAt) : '';
     const prev = document.createElement('span'); prev.className = 'preview';
-    prev.textContent = last ? `${last.direction === 'sent' ? (last.by === 'agent' ? 'Your agent: ' : 'You: ') : `${last.peer.name}: `}${flat(last.text)}` : `${r.members.length + 1} devices in this room`;
+    prev.textContent = last ? `${last.direction === 'sent' ? (last.by === 'agent' ? `${last.agent?.name || 'Your agent'}: ` : 'You: ') : `${last.peer.name}: `}${flat(last.text)}` : r.members.length ? `${r.members.length + 1} devices in this room` : 'This computer only';
     if (r.pinned) { const pi = text('span', ' · pinned'); pi.className = 'muted-tag'; name.append(pi); }
     if (r.muted) { const mu = text('span', ' · muted'); mu.className = 'muted-tag'; name.append(mu); }
     b.append(av, name, when, prev);
@@ -1456,9 +1744,58 @@ function renderRooms() {
   }
 }
 
+// ---- Rooms page (0.15): every room in one list, with filters and quick pin / mute / archive ----
+let roomsFilter = 'active', roomsPageKey = '';
+$('roomsNav').onclick = () => { roomOpen = null; wantRooms = true; wantProjects = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantPair = false; mobileMain = true; render(state); };
+$('roomsBackBtn').onclick = () => { wantRooms = false; mobileMain = false; render(state); };
+$('roomsNewBtn').onclick = () => $('newRoomBtn').click();
+$('roomsFilter').addEventListener('input', () => renderRoomsPage(true));
+for (const b of document.querySelectorAll('[data-rf]')) b.onclick = () => {
+  roomsFilter = b.dataset.rf;
+  for (const x of document.querySelectorAll('[data-rf]')) x.setAttribute('aria-pressed', String(x === b));
+  renderRoomsPage(true);
+};
+function renderRoomsPage(force = false) {
+  const q = $('roomsFilter').value.trim().toLowerCase();
+  const key = JSON.stringify([state.rooms || [], roomsFilter, q, state.projects?.length]);
+  if (!force && key === roomsPageKey) return;
+  roomsPageKey = key;
+  const all = [...(state.rooms || [])].sort((a, b) => (!!b.pinned - !!a.pinned) || (b.last?.sentAt || b.createdAt).localeCompare(a.last?.sentAt || a.createdAt));
+  const shown = all.filter(r => (roomsFilter === 'archived' ? r.archived : roomsFilter === 'pinned' ? r.pinned && !r.archived : !r.archived))
+    .filter(r => !q || r.name.toLowerCase().includes(q) || (r.project || '').toLowerCase().includes(q) || r.members.some(m => m.name.toLowerCase().includes(q)));
+  $('roomsEmpty').hidden = shown.length > 0;
+  $('roomsEmpty').textContent = q ? 'No room matches.' : roomsFilter === 'archived' ? 'No archived rooms.' : roomsFilter === 'pinned' ? 'No pinned rooms. Pin the ones you use most.'
+    : 'No rooms yet. Make one with other devices (New room), or make a project: its room is on this computer for its agents.';
+  $('roomsGrid').replaceChildren(...shown.map(r => {
+    const li = document.createElement('li'); li.className = `room-card${r.archived ? ' archived' : ''}`;
+    const open = document.createElement('button'); open.type = 'button'; open.className = 'room-open'; open.onclick = () => openRoom(r.id);
+    const top = document.createElement('div'); top.className = 'rc-top';
+    const name = document.createElement('b'); name.textContent = `# ${r.name}`; name.setAttribute('translate', 'no');
+    top.append(name);
+    const unread = r.muted ? 0 : roomUnread(r);
+    if (r.mentions) { const at = text('span', '@'); at.className = 'badge mention'; top.append(at); }
+    else if (unread) { const n = text('span', unread > 99 ? '99+' : String(unread)); n.className = 'badge'; top.append(n); }
+    const tags = document.createElement('div'); tags.className = 'rc-tags';
+    if (r.project) { const p = text('span', r.project); p.className = 'rc-tag proj'; tags.append(p); }
+    const where = text('span', r.members.length ? `You, ${r.members.map(m => m.name).join(', ')}` : 'This computer only'); where.className = 'rc-tag'; tags.append(where);
+    if (r.pinned) { const x = text('span', 'pinned'); x.className = 'rc-tag'; tags.append(x); }
+    if (r.muted) { const x = text('span', 'muted'); x.className = 'rc-tag'; tags.append(x); }
+    if (r.policy?.paused) { const x = text('span', 'agents paused'); x.className = 'rc-tag warn'; tags.append(x); }
+    const last = r.last;
+    const prev = text('p', last ? `${last.direction === 'sent' ? (last.by === 'agent' ? `${last.agent?.name || 'Your agent'}: ` : 'You: ') : `${last.peer.name}: `}${flat(last.text)}` : 'No posts yet.');
+    prev.className = 'rc-last';
+    const when = text('small', last ? shortWhen(last.sentAt) : '');
+    open.append(top, tags, prev, when);
+    const acts = document.createElement('div'); acts.className = 'rc-acts';
+    const pref = (k, on, off) => { const b = button(r[k] ? off : on, () => act('POST', '/ui/rooms/prefs', { id: r.id, [k]: !r[k] })); b.className = 'ghost small-btn'; return b; };
+    acts.append(pref('pinned', 'Pin', 'Unpin'), pref('muted', 'Mute', 'Unmute'), pref('archived', 'Archive', 'Unarchive'));
+    li.append(open, acts); return li;
+  }));
+}
+
 function openRoom(id) {
   if (id !== roomOpen) { roomMsgs = []; roomKey = ''; }
-  roomOpen = id; wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantOverview = false; mobileMain = true; roomJustOpened = true;
+  roomOpen = id; wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantOverview = false; mobileMain = true; roomJustOpened = true;
   render(state);
   if (!isNarrow()) $('roomText').focus();
 }
@@ -1466,7 +1803,9 @@ function openRoom(id) {
 function renderRoomHead() {
   const r = roomById(roomOpen); if (!r) return;
   $('roomName').textContent = r.name;
-  $('roomMembers').textContent = `You, ${r.members.map(m => m.name).join(', ')}`;
+  $('roomMembers').textContent = r.members.length ? `You, ${r.members.map(m => m.name).join(', ')}` : 'You and the agents on this computer';
+  const hint = document.querySelector('section[data-main="room"] .composer-hint');
+  if (hint) hint.textContent = r.members.length ? 'Each post goes straight to every device in the room, encrypted, through each one\'s firewall. No server keeps it.' : 'This room stays on this computer: you and its agents (Codex, Claude Code…). Nothing leaves it.';
   // Room rules on this computer: pause agents, card types, limits. Only ever stricter.
   const pol = r.policy || {};
   const pb = $('roomPauseBtn');
@@ -1603,7 +1942,7 @@ function renderRoomThread() {
   let prev = null;
   for (const m of roomMsgs) {
     if (!prev || !sameDay(prev.sentAt, m.sentAt)) { const day = document.createElement('div'); day.className = 'day'; day.textContent = dayLabel(m.sentAt); box.append(day); prev = null; }
-    const cont = prev && prev.direction === m.direction && prev.peer.id === m.peer.id && prev.by === m.by && new Date(m.sentAt) - new Date(prev.sentAt) < GROUP_MS;
+    const cont = prev && !prev.args?.cardUpdate && prev.direction === m.direction && prev.peer.id === m.peer.id && prev.by === m.by && (prev.agent?.name || '') === (m.agent?.name || '') && new Date(m.sentAt) - new Date(prev.sentAt) < GROUP_MS;
     box.append(messageEl(m, cont, '', { room: true }));
     prev = m;
   }
@@ -1683,7 +2022,7 @@ $('roomForm').onsubmit = async e => {
 function select(id) {
   if (id !== selected) { thread = []; threadKey = ''; replyTo = null; search = ''; $('threadSearch').value = ''; $('searchBar').hidden = true; $('replyBox').hidden = true; }
   selected = id; LS.set('selected', id); roomOpen = null;
-  wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
+  wantPair = false; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantOverview = false; hideSecret(); mobileMain = true; justOpened = true;
   threadKey = ''; // reload and scroll to the newest message, even if it was rendered while hidden
   render(state);
   if (!isNarrow()) $('composeText').focus();
@@ -1930,7 +2269,7 @@ $('openNewBtn').onclick = () => {
   const peer = state?.peers.find(x => x.fingerprint === fp);
   if (peer) { lastResult = null; select(peer.id); }
 };
-function openPair() { roomOpen = null; wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
+function openPair() { roomOpen = null; wantPair = true; wantSecrets = false; wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; mobileMain = true; lastResult = null; render(state); ensureDiscover(); }
 $('newPairBtn').onclick = openPair;
 $('sidePairBtn').onclick = openPair;
 $('ovPairBtn').onclick = openPair;

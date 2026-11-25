@@ -4,6 +4,8 @@
 //  - the folder an agent or program works in picks the project; the same NAME can exist in several
 //    projects without clashing
 //  - vinac.keys.json in a project's folder lists the key NAMES it needs per environment (never values)
+//  - 0.15 workspaces: `agents` (identity ids allowed in the project room) and a room linked to it
+//    (rooms.json `project`), which may be local only: agents on this computer and the person
 // Only the page creates or changes projects and moves keys between them; agents read names only.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -38,7 +40,7 @@ export class Projects {
     return best;
   }
   /** The page: create or change one project. */
-  upsert({ id, name, folders, prodAsks }) {
+  upsert({ id, name, folders, prodAsks, agents, about }) {
     const list = this.list();
     const n = String(name ?? '').trim();
     if (!NAME.test(n)) throw err(400, 'Give the project a short name (up to 40 characters).');
@@ -53,6 +55,10 @@ export class Projects {
       list.push(p);
     }
     Object.assign(p, { name: n, folders: dirs.map(f => path.resolve(f)), prodAsks: prodAsks !== false });
+    // 0.15: the agents of this project (agent identity ids). When set, only they post in its room.
+    // What the project is about (the person writes it; its agents read it as the project brief).
+    if (about !== undefined) { const a = String(about ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').trim().slice(0, 600); if (a) p.about = a; else delete p.about; }
+    if (Array.isArray(agents)) p.agents = [...new Set(agents.map(String).filter(a => /^[0-9a-f]{12}$/.test(a)))].slice(0, 10);
     this.save(list);
     return p;
   }

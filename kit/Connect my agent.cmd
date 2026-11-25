@@ -1,18 +1,16 @@
 @echo off
-rem VINAC Link: connect an AI agent app (Windows). Adds the Claude Code plugin if you say yes;
-rem for other apps it prints what to paste.
+rem VINAC Link: connect an AI agent app (Windows). Connects Claude Code if you say yes (no `claude`
+rem command needed; its settings are backed up first); for other apps it prints what to paste.
 cd /d "%~dp0"
 if exist "%~dp0node\node.exe" set "PATH=%~dp0node;%PATH%"
 node connector\bin\vinac.mjs setup
 echo.
-where claude >nul 2>nul
-if errorlevel 1 goto noclaude
-choice /m "Add VINAC Link to Claude Code now"
+if not exist "%USERPROFILE%\.claude" if not exist "%USERPROFILE%\.claude.json" goto noclaude
+choice /m "Connect Claude Code to VINAC Link now"
 if errorlevel 2 goto end
-claude plugin marketplace add "%~dp0."
-claude plugin install vinac-link@vinac
+node connector\bin\vinac.mjs connect claude
 echo.
-echo Done. Start a new Claude Code session and ask: "is VINAC Link working?"
+echo Start a new Claude Code session and ask: "is VINAC Link working?"
 goto end
 
 :noclaude

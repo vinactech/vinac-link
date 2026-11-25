@@ -2,7 +2,6 @@
 // and `vinac stop`. None of them start the daemon or change any settings.
 import fs from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { defaultHome } from './store.js';
@@ -39,10 +38,10 @@ export async function sessionStartContext({ home = defaultHome(), timeoutMs = 15
   return parts.length ? parts.join(' ') : null;
 }
 
-export async function runHook(event, { home } = {}) {
+export async function runHook(event, { home, as = '' } = {}) {
   if (event === 'prompt' || event === 'tool' || event === 'wait') {
     const { runNoteHook } = await import('./hooks.js');
-    return runNoteHook(event, { home: home || defaultHome() });
+    return runNoteHook(event, { home: home || defaultHome(), as: /^[0-9a-f]{12}$/.test(String(as)) ? String(as) : '' });
   }
   if (event !== 'session-start') return;
   const text = await sessionStartContext({ home });
@@ -85,12 +84,15 @@ export async function doctor({ home = defaultHome() } = {}) {
   try { add(true, `git ${execFileSync('git', ['--version'], { encoding: 'utf8', windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).trim().replace(/^git version /, '')}`, 'for vinac git send / fetch'); }
   catch { add(true, 'git not found', 'Only needed for vinac git send / fetch.'); }
 
-  const claudeJson = path.join(os.homedir(), '.claude.json');
   try {
-    if (JSON.parse(fs.readFileSync(claudeJson, 'utf8')).mcpServers?.vinac) {
-      add(true, 'Claude Code: VINAC Link also added by hand (claude mcp add)', 'If you installed the plugin, remove the manual one: claude mcp remove --scope user agentlink');
+    const { claudeStatus, describeClaude } = await import('./connect.js');
+    const c = claudeStatus();
+    if (c.error) add(false, 'Claude Code', c.error);
+    else if (c.present) {
+      const tidy = c.mode === 'plugin' && (c.manual || c.direct.server);
+      add(c.mode === 'direct' || (c.mode === 'plugin' && !tidy), 'Claude Code', describeClaude(c) + (c.mode === 'none' || c.mode === 'partial' || tidy ? ' Run: vinac connect claude (or press Connect on the page: Secrets > Phones & agents).' : ''));
     }
-  } catch { /* no Claude Code config */ }
+  } catch { /* Claude Code config unreadable: nothing to report */ }
   return checks;
 }
 
@@ -104,7 +106,12 @@ export function setupText({ root = ROOT, bin = BIN_PATH, node = process.execPath
   return `Connect your AI agent to VINAC Link (do this on each computer).
 VINAC Link is in: ${root}
 
-Claude Code (plugin: tools, skills, a note when messages arrive)
+Claude Code (desktop app or terminal): the easiest way, no \`claude\` command needed
+  Press Connect on the VINAC Link page (Secrets > Phones & agents), or run:
+                   ${q(node)} ${q(bin)} connect claude
+  Then start a new Claude Code session. It gets the tools and wakes up when a message arrives.
+
+  Or, if you develop VINAC Link or want its skills too, the plugin (needs Node.js 22+ on the PATH):
   In a terminal:   claude plugin marketplace add ${q(root)}
                    claude plugin install vinac-link@vinac
   (or inside Claude Code: /plugin marketplace add ${root}  then  /plugin install vinac-link@vinac)

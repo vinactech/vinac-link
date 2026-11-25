@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // vinac start  [--name NAME]                       start the service in the background, open the page, show next steps (default)
 // vinac setup                                      how to connect Claude Code, Codex, OpenClaw, LM Studio, Goose or any MCP app (changes nothing)
+// vinac connect claude|codex [--remove] [--status] [--json]   add VINAC Link to Claude Code (tools + wake-ups) or Codex (tools), no app command needed
 // vinac daemon [--home DIR] [--port N] [--name NAME] [--host IP] [--open]   run the service in this window
 // vinac mcp    [--home DIR] [--port N] [--simple]  agent tools over stdio (starts the service in the background if needed)
 // vinac status [--home DIR]                        this device, pairing and unread count (starts the service if needed)
@@ -34,7 +35,7 @@ import {macLifecycleAvailable,managedConnect,readOnlyStartupDiagnostics,withLaun
 import {maybeInstallFromVolume} from '../src/mac-install.js';
 
 const [command = 'start', ...rest] = process.argv.slice(2);
-const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output', 'csv', 'recover', 'force-recovery', 'sample']);
+const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output', 'csv', 'recover', 'force-recovery', 'sample', 'remove', 'status']);
 const REPEAT = new Set(['secret']);
 const opt = { _: [], cmd: [] };
 for (let i = 0; i < rest.length; i++) {
@@ -92,6 +93,25 @@ Next: pair another computer on the page, then connect your agent:
     console.log(JSON.stringify(await readOnlyStartupDiagnostics(home||defaultHome(),opt.port?port:undefined,{sample:!!opt.sample}),null,2));
   } else if (command === 'setup') {
     console.log(setupText());
+  } else if (command === 'connect') {
+    // vinac connect claude [--remove] [--json]: adds VINAC Link to Claude Code (no `claude` command needed).
+    // vinac connect codex [--remove] [--status] [--json]: the same for Codex (~/.codex/config.toml).
+    // From here they use this computer's default agent; Connect on the page gives each app its own identity.
+    const app = opt._[0] || 'claude';
+    if (app !== 'claude' && app !== 'codex') fail(`connect: "claude" or "codex". For ${app}, run: vinac setup`);
+    const c = await import('../src/connect.js');
+    const [label, status, connect, disconnect, describe] = app === 'codex'
+      ? ['Codex', c.codexStatus, c.connectCodex, c.disconnectCodex, c.describeCodex]
+      : ['Claude Code', c.claudeStatus, c.connectClaude, c.disconnectClaude, c.describeClaude];
+    if (opt.status) { const s = status(); console.log(opt.json ? JSON.stringify(s, null, 2) : `${label}: ${describe(s)}`); process.exit(0); }
+    const r = opt.remove ? disconnect() : connect();
+    if (opt.json) console.log(JSON.stringify(r, null, 2));
+    else {
+      console.log(r.message);
+      for (const f of r.changed) console.log(`  changed ${f}${fs.existsSync(`${f}.vinac-backup`) ? ` (the original is kept as ${path.basename(f)}.vinac-backup)` : ''}`);
+      if (r.status) console.log(`  ${label}: ${describe(r.status)}`);
+    }
+    if (!r.ok) process.exit(1);
   } else if (command === 'daemon') {
     const runDaemon=async()=>{
     const d = await new Daemon({ home, port, name: opt.name, host: opt.host }).start();
@@ -119,7 +139,7 @@ Next: pair another computer on the page, then connect your agent:
   } else if (command === 'stop') {
     console.log((await stopDaemon({ home,force:!!opt['force-recovery'],expectedInstance:opt['recover-instance'] })).message);
   } else if (command === 'hook') {
-    await runHook(opt._[0], { home });
+    await runHook(opt._[0], { home, as: opt.as });
   } else if (command === 'watch') {
     const { watch } = await import('../src/watch.js');
     const stop = new AbortController();

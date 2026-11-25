@@ -181,15 +181,30 @@ Name: "{autodesktop}\\VINAC Link"; ${run('start')}; IconFilename: "{app}\\vinac.
 Root: HKCU; Subkey: "Environment"; ValueType: expandsz; ValueName: "Path"; ValueData: "{olddata};{app};{app}\\node"; Check: NeedsAddPath(ExpandConstant('{app}')); Tasks: addtopath
 
 [Run]
+${run('connect claude')}; Description: "Connect Claude Code to VINAC Link (its settings are backed up first)"; Flags: postinstall skipifsilent runhidden waituntilterminated; Check: ClaudeCodeFound
+${run('connect codex')}; Description: "Connect Codex to VINAC Link (its settings are backed up first)"; Flags: postinstall skipifsilent runhidden waituntilterminated; Check: CodexFound
 ${run('start')}; Description: "Start VINAC Link now"; Flags: postinstall nowait skipifsilent runminimized
 
 [UninstallRun]
 ${run('stop')}; Flags: runhidden; RunOnceId: "StopVinacLink"
+${run('connect claude --remove')}; Flags: runhidden; RunOnceId: "DisconnectClaudeCode"
+${run('connect codex --remove')}; Flags: runhidden; RunOnceId: "DisconnectCodex"
 
 [Messages]
 FinishedLabel=VINAC Link is installed. Start it from the Start menu; its page opens in your browser. If Windows asks whether Node.js may use the network, choose Private networks and Allow.
 
 [Code]
+function ClaudeCodeFound: Boolean;
+begin
+  { Claude Code (desktop app or terminal) keeps its settings in %USERPROFILE%\\.claude }
+  Result := DirExists(ExpandConstant('{%USERPROFILE}\\.claude')) or FileExists(ExpandConstant('{%USERPROFILE}\\.claude.json'));
+end;
+
+function CodexFound: Boolean;
+begin
+  Result := DirExists(ExpandConstant('{%USERPROFILE}\\.codex'));
+end;
+
 function NeedsAddPath(Dir: string): Boolean;
 var Current: string;
 begin
@@ -315,12 +330,25 @@ Terminal=false
 Categories=Network;Utility;
 EOF
 echo "VINAC Link ${V} is installed. Start it from your app menu, or run: vinac start"
+# Claude Code on this computer: offer to connect it (tools + wake-ups; its settings are backed up first).
+if [ -d "$HOME/.claude" ] || [ -f "$HOME/.claude.json" ]; then
+  yn=n
+  if [ -t 0 ]; then printf "Connect Claude Code to VINAC Link now? [Y/n] "; read -r yn || yn=n; [ -z "$yn" ] && yn=y; fi
+  case "$yn" in y|Y) "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect claude || true ;; *) echo "Later: vinac connect claude (or Connect on the page: Secrets > Phones & agents)." ;; esac
+fi
+if [ -d "$HOME/.codex" ]; then
+  yn=n
+  if [ -t 0 ]; then printf "Connect Codex to VINAC Link now? [Y/n] "; read -r yn || yn=n; [ -z "$yn" ] && yn=y; fi
+  case "$yn" in y|Y) "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect codex || true ;; *) echo "Later: vinac connect codex (or Connect on the page: Secrets > Phones & agents)." ;; esac
+fi
 command -v secret-tool >/dev/null 2>&1 || echo "Note: install libsecret-tools (Debian/Ubuntu: sudo apt install libsecret-tools) so VINAC Link can keep keys in your keyring."
 `) });
   out.push({ name: `${top}/uninstall.sh`, mode: 0o755, data: Buffer.from(`#!/bin/sh
 # Removes VINAC Link for this user. Your pairings and history in ~/.vinac stay (delete that folder too to remove them).
 DEST="$HOME/.local/share/vinac-link"
 [ -x "$DEST/node/bin/node" ] && "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" stop >/dev/null 2>&1 || true
+[ -x "$DEST/node/bin/node" ] && "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect claude --remove >/dev/null 2>&1 || true
+[ -x "$DEST/node/bin/node" ] && "$DEST/node/bin/node" "$DEST/connector/bin/vinac.mjs" connect codex --remove >/dev/null 2>&1 || true
 rm -rf "$DEST" "$HOME/.local/bin/vinac" "$HOME/.local/share/applications/vinac-link.desktop" "$HOME/.local/share/icons/hicolor/256x256/apps/vinac-link.png"
 echo "VINAC Link was removed."
 `) });

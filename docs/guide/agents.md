@@ -7,7 +7,24 @@ VINAC Link gives agents ten tools over MCP. The service they talk to is the same
 `vinac setup` prints all of the below with the real paths on your computer. From the tester
 package, double-click **Connect my agent**.
 
-**Claude Code** (plugin: tools + skills + session-start note + live-mode monitor)
+**Claude Code, the easy way** (desktop app or terminal; no `claude` command needed)
+
+Press **Connect Claude Code** on the VINAC Link page (Secrets › Phones & agents), or run:
+```
+vinac connect claude            # --status to check, --remove to undo
+```
+VINAC Link backs up Claude Code's settings, then adds its tools and the wake-up hooks, using its
+own Node.js by full path (nothing to install, follows updates). Start a new Claude Code session
+afterwards. If the plugin below is installed, this leaves it alone so no tool shows twice. On a
+Mac, run VINAC Link from Applications first (not from the disk image). Before deleting VINAC Link
+by hand, run `vinac connect claude --remove` (the Windows and Linux uninstallers do it for you).
+
+**Codex, the easy way**: **Connect Codex** on the same page, or `vinac connect codex` (adds a
+`[mcp_servers.vinac]` table to `~/.codex/config.toml`, backed up first). Codex has no hooks yet,
+so it reads new messages when it checks its inbox. To have Codex and Claude Code work on one
+project, see [Projects](projects.md).
+
+**Claude Code plugin** (tools + skills + hooks; its commands need Node.js 22+ on the PATH)
 ```
 claude plugin marketplace add vinactech/vinac-link      # or the folder where VINAC Link is
 claude plugin install vinac-link@vinac
