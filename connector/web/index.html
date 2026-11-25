@@ -19,19 +19,24 @@
           <h1>VINAC Link</h1>
           <p>Agent network</p>
         </div>
-        <button class="icon" id="notifyBtn" title="Notify me about new messages" aria-label="Notifications">
+        <button class="icon bell" id="bellBtn" title="Needs me" aria-label="Needs me" aria-haspopup="true" aria-expanded="false" aria-controls="needsPop">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.5A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.5L18 12.6V9a6 6 0 0 0-6-6Zm-2 15.5a2 2 0 0 0 4 0"/></svg>
+          <span class="bell-count" id="needsCount" hidden></span>
         </button>
+        <div class="needs-pop" id="needsPop" role="dialog" aria-label="Needs me" hidden>
+          <header class="np-head"><b>Needs me</b><span class="np-sub" id="needsPopSub"></span></header>
+          <ul class="needs-list np-list" id="needsPopList"></ul>
+          <footer class="np-foot">
+            <button class="linkish" type="button" id="needsPopAll">Show on the Overview</button>
+            <button class="linkish" type="button" id="notifyBtn">Browser notifications: off</button>
+          </footer>
+        </div>
       </header>
 
       <nav class="mainnav" aria-label="Sections">
         <button class="navbtn" id="overviewNav">
           <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5"/></svg>
           <span>Overview</span>
-        </button>
-        <button class="navbtn" id="needsNav">
-          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9a6 6 0 0 1 12 0c0 6 2.5 7.5 2.5 7.5h-17S6 15 6 9Z"/><path d="M10 20a2.2 2.2 0 0 0 4 0"/></svg>
-          <span>Needs me</span><span class="count waiting" id="needsCount"></span>
         </button>
         <button class="navbtn" id="firewallNav">
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l8 3v6c0 4.5-3.4 8.3-8 9-4.6-.7-8-4.5-8-9V6l8-3Z"/><path d="M9 12l2 2 4-4"/></svg>
@@ -135,7 +140,7 @@
           <div class="ov-grid">
             <div class="ov-col">
             <section class="panel needs-panel" id="needsPanel" hidden>
-              <header class="panel-head"><h3>Needs me</h3><span class="panel-sub" id="needsSub"></span></header>
+              <header class="panel-head"><h3><span class="needs-ico" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3a6 6 0 0 0-6 6v3.6L4.3 15.5A1 1 0 0 0 5.2 17h13.6a1 1 0 0 0 .9-1.5L18 12.6V9a6 6 0 0 0-6-6Zm-2 15.5a2 2 0 0 0 4 0"/></svg></span>Needs me</h3><span class="panel-sub" id="needsSub"></span></header>
               <ul class="needs-list" id="needsList"></ul>
             </section>
             <section class="panel ov-devices">

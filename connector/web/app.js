@@ -199,7 +199,6 @@ function render(s) {
   app.dataset.pane = main === 'pair' || main === 'secrets' || main === 'firewall' || main === 'activity' || main === 'projects' || main === 'rooms' || ((main === 'thread' || main === 'overview' || main === 'room') && mobileMain) || (main === 'empty' && !s.peers.length) ? 'main' : 'list';
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
   const needs = s.needsMe || [];
-  $('needsCount').textContent = needs.length || '';
   renderNeeds();
 
   renderPairing(p);
@@ -1332,7 +1331,7 @@ function renderOverview() {
   // Checklist
   const steps = [
     [s.peers.length > 0, 'Pair a second computer', 'Sound or a typed code; you swap 6-digit codes.', openPair],
-    [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'Run npx vinac-link setup for Claude Code, Codex or OpenClaw.', null],
+    [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'One click for Claude Code or Codex: Secrets › Phones & agents › Connect.', null],
     [!!fw && fw.intents.some(i => i.all || Object.keys(i.devices).length), 'Set your firewall rules', 'Allow what you trust, keep risky intents blocked.', openFirewall],
     [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive…, then send it from the other computer.', () => $('ovReceiveBtn').click()],
     [!!d.tailscale, 'Reach your devices from anywhere', 'Install Tailscale on both computers.', null],
@@ -1693,7 +1692,8 @@ function syncNotifyButton() {
   const b = $('notifyBtn');
   const on = notifyOn && 'Notification' in window && Notification.permission === 'granted';
   b.classList.toggle('on', on);
-  b.title = on ? 'Notifications on. Click to turn off.' : 'Notify me about new messages';
+  b.textContent = on ? 'Browser notifications: on' : 'Browser notifications: off';
+  b.title = on ? 'Click to turn browser notifications off.' : 'Notify me in this browser about new messages while the page is in the background.';
 }
 
 $('notifyBtn').onclick = async () => {
@@ -1864,31 +1864,62 @@ $('explainModal').addEventListener('click', e => { if (e.target === $('explainMo
 
 // "Needs me": everything waiting for the person, across rooms and conversations, with the action at hand.
 const NEED_LABEL = { request: 'Held request', decision: 'Decision', key: 'Key request', task: 'Open task', keyOffer: 'Key to accept', run: 'Program asks', keyAsk: 'Key asked for', mention: 'Mention' };
+// It lives in two places: the panel at the top of the Overview, and the bell (count + dropdown).
 function renderNeeds() {
-  const list = $('needsList'); if (!list) return;
   const needs = state.needsMe || [];
+  const n = needs.length;
+  $('needsCount').hidden = !n; $('needsCount').textContent = n > 99 ? '99+' : String(n);
+  $('bellBtn').classList.toggle('has', !!n);
+  $('bellBtn').title = n ? `Needs me: ${n} waiting` : 'Needs me: all clear';
   $('needsPanel').hidden = false;
-  $('needsSub').textContent = needs.length ? `${needs.length} waiting` : '';
+  $('needsPanel').classList.toggle('has', !!n);
+  $('needsSub').textContent = n ? `${n} waiting` : 'All clear';
+  $('needsPopSub').textContent = n ? `${n} waiting` : 'All clear';
+  $('needsPopAll').hidden = !(state.peers || []).length;
+  const key = JSON.stringify([needs, (state.peers || []).length]);
+  if (key === renderNeeds.key) return;
+  renderNeeds.key = key;
+  fillNeeds($('needsList'), needs, 30);
+  fillNeeds($('needsPopList'), needs, 8);
+}
+function fillNeeds(list, needs, max) {
+  if (!list) return;
   list.replaceChildren();
-  if (!needs.length) { const li = text('li', 'All clear: nothing is waiting for you. Held requests, decisions, key requests, open tasks and mentions show up here.'); li.className = 'need-empty'; list.append(li); }
-  for (const n of needs.slice(0, 30)) {
+  if (!needs.length) {
+    const li = document.createElement('li'); li.className = 'need-empty';
+    li.append(text('b', 'Nothing needs you right now.'), text('span', 'Requests your firewall holds, decisions, key requests, open tasks and @mentions show up here, with the button to act on them.'));
+    list.append(li);
+  }
+  for (const n of needs.slice(0, max)) {
     const li = document.createElement('li'); li.className = `need need-${n.kind}`;
     const t = document.createElement('div');
     t.append(text('small', `${NEED_LABEL[n.kind] || n.kind}${n.room ? ` · # ${n.room}` : n.with ? ` · ${n.with}` : ''}`), text('b', n.title));
     const acts = document.createElement('div'); acts.className = 'card-acts';
-    const go = () => { if (n.roomId) openRoom(n.roomId); else if (n.peerId) { wantOverview = false; select(n.peerId); } };
+    const go = () => { closeNeedsPop(); if (n.roomId) openRoom(n.roomId); else if (n.peerId) { wantOverview = false; select(n.peerId); } };
     if (n.kind === 'decision') for (const o of n.options || []) acts.append(button(o, () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'answer', option: o } })));
-    else if (n.kind === 'request' || n.kind === 'run' || n.kind === 'keyAsk') acts.append(button('Open', () => (n.kind === 'request' ? openFirewall() : $('secretsNav').click())));
-    else if (n.kind === 'keyOffer') acts.append(button('Open', () => $('secretsNav').click()));
+    else if (n.kind === 'request' || n.kind === 'run' || n.kind === 'keyAsk') acts.append(button('Open', () => { closeNeedsPop(); if (n.kind === 'request') openFirewall(); else $('secretsNav').click(); }));
+    else if (n.kind === 'keyOffer') acts.append(button('Open', () => { closeNeedsPop(); $('secretsNav').click(); }));
+    else if (n.kind === 'key' && n.local) acts.append(button('Add key', () => { closeNeedsPop(); $('secretsNav').click(); }), button('Open', go));
     else if (n.kind === 'key') acts.append(button('Send', async () => { if (!confirm(`Send this key to ${n.from}? It goes sealed to that device only.`)) return; try { render(await api('POST', '/ui/card/send-key', { card: n.card })); toast('Sent.'); } catch (e) { toast(e.message); } }), button('Open', go));
     else if (n.kind === 'task') acts.append(button('Claim', () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'claim' } })), button('Open', go));
     else acts.append(button('Open', go));
     for (const b of acts.children) b.className = 'ghost small';
     li.append(t, acts); list.append(li);
   }
+  if (needs.length > max) { const more = text('li', `and ${needs.length - max} more on the Overview`); more.className = 'need-more'; list.append(more); }
 }
-$('needsNav').onclick = () => {
-  openOverview();
+function closeNeedsPop() { $('needsPop').hidden = true; $('bellBtn').setAttribute('aria-expanded', 'false'); }
+$('bellBtn').onclick = e => {
+  e.stopPropagation();
+  const open = $('needsPop').hidden;
+  $('needsPop').hidden = !open; $('bellBtn').setAttribute('aria-expanded', String(open));
+  if (open) syncNotifyButton();
+};
+$('needsPop').addEventListener('click', e => e.stopPropagation());
+document.addEventListener('click', () => { if (!$('needsPop').hidden) closeNeedsPop(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('needsPop').hidden) { closeNeedsPop(); $('bellBtn').focus(); } });
+$('needsPopAll').onclick = () => {
+  closeNeedsPop(); openOverview();
   setTimeout(() => { const p = $('needsPanel'); p.scrollIntoView({ block: 'start', behavior: 'smooth' }); p.classList.remove('flash'); void p.offsetWidth; p.classList.add('flash'); }, 100);
 };
 

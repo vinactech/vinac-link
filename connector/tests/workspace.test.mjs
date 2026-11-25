@@ -54,9 +54,17 @@ test('two agents on one computer work in a project room: posts, claims, per-agen
     assert.match((await C('GET', '/api/inbox')).body.messages[0].trust, /the person on this computer/);
     assert.equal((await X('GET', '/api/inbox')).body.messages.length, 1);
 
+    // A decision an agent here posts reaches the person's Needs me; their tasks between them don't.
+    await X('POST', '/api/send', { room, card: { type: 'decision', title: 'Stripe or Paddle?', options: ['Stripe', 'Paddle'] } });
+    const needs = (await ui(A, 'GET', '/ui/state')).body.needsMe;
+    assert.deepEqual(needs.map(n => [n.kind, n.title]), [['decision', 'Stripe or Paddle?']]);
+    await ui(A, 'POST', '/ui/card', { room, cardUpdate: { card: needs[0].card, action: 'answer', option: 'Stripe' } });
+    assert.equal((await ui(A, 'GET', '/ui/state')).body.needsMe.length, 0);
+    await C('GET', '/api/inbox'); await X('GET', '/api/inbox');
+
     // The room's messages show each post once.
     const msgs = (await ui(A, 'GET', `/ui/rooms/messages?id=${room}`)).body.messages;
-    assert.equal(msgs.length, 3);
+    assert.equal(msgs.length, 5, 'task, claim, decision, answer, person post: once each');
 
     // An agent that isn't in the project can't post in its room (the default token, here).
     const def = await api(A, 'POST', '/api/send', { room, text: 'hello' });

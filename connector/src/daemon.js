@@ -1672,9 +1672,13 @@ export class Daemon {
     const cardMsg = new Map(msgs.filter(m => m.args?.card).map(m => [m.args.card.id, m]));
     for (const [id, s] of states) {
       const m = cardMsg.get(id);
-      if (!m || m.dir !== 'in' || (m.intent === ROOM_POST && rooms.get(m.args.room)?.muted)) continue;
+      // From another device, or from an agent on this computer (a decision or key request it posted
+      // for the person); tasks between agents here are theirs, not the person's.
+      const local = m?.dir === 'local' && m.by !== 'person';
+      if (!m || (m.dir !== 'in' && !local) || (m.intent === ROOM_POST && rooms.get(m.args.room)?.muted)) continue;
+      if (local && s.card.type === 'task') continue;
       if (s.card.type === 'decision' && s.state === 'open') items.push({ kind: 'decision', title: s.card.title, options: s.card.options, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
-      if (s.card.type === 'key' && s.state !== 'done') items.push({ kind: 'key', title: `${s.from} needs ${s.card.name}${s.card.project ? ` (${s.card.project}${s.card.env ? `, ${s.card.env}` : ''})` : ''}`, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
+      if (s.card.type === 'key' && s.state !== 'done') items.push({ kind: 'key', ...(local ? { local: true } : {}), title: `${String(s.from).replace(/^me › /, '')} needs ${s.card.name}${s.card.project ? ` (${s.card.project}${s.card.env ? `, ${s.card.env}` : ''})` : ''}`, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
       if (s.card.type === 'task' && s.state === 'open') items.push({ kind: 'task', title: s.card.title, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
     }
     for (const s of this.store.secrets().items) if (s.offered || s.pending) items.push({ kind: 'keyOffer', title: `${s.name} from ${s.from?.name || 'a device'}: ${s.offered ? 'accept it?' : 'replace yours?'}`, at: s.receivedAt, secret: s.id });
