@@ -831,7 +831,7 @@
             <div><b>Relay</b><small id="accountRelayState"></small></div>
             <label class="relay-switch"><input type="checkbox" id="accountRelay"> <span>Use when a direct link fails</span></label>
           </div>
-          <p class="hint" id="accountRelayHint" hidden>When a computer paired with this one and linked to this account can't be reached on the same network or through Tailscale, messages go through the account service instead. They stay sealed end to end, so the service can't read them. Pairing never goes through it. Up to 200 KB at a time.</p>
+          <p class="hint" id="accountRelayHint" hidden>When a computer paired with this one, and linked to this account or to a teammate's, can't be reached on the same network or through Tailscale, messages go through the account service instead. They stay sealed end to end, so the service can't read them. Pairing never goes through it. Up to 200 KB at a time.</p>
           <div id="accountTeams" hidden>
             <h3 class="fw-h">Teams</h3>
             <p class="hint">Teams are made and managed in the <a href="https://vinac.tech/console/" target="_blank" rel="noopener">Team console</a>. You can share this computer's monthly activity summary with a team: counts only (messages, requests, approvals, key uses), signed by this computer. Never contents, names of keys or agents, or the log itself.</p>
@@ -840,6 +840,11 @@
               <select id="sharePeriod" aria-label="Month"></select>
               <button class="ghost" id="shareBtn" type="button">Share summary</button>
             </div>
+          </div>
+          <div id="accountTeamDir" hidden>
+            <h3 class="fw-h">Your teams' computers</h3>
+            <p class="hint">Teammates' linked computers, and whether this one is paired with them. Pairing a teammate's computer over the internet is coming next; today, pair in person or with an invite.</p>
+            <div class="team-dir" id="teamDirList"></div>
           </div>
           <h3 class="fw-h">Computers on this account</h3>
           <ul class="secret-list" id="accountDevices"></ul>

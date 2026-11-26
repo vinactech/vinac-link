@@ -33,14 +33,37 @@ can pass the same sealed frames through your account's private relay instead. It
 seconds.
 
 - **Off until you switch it on:** Account → **Relay** on each computer.
-- **Only between computers paired in person and linked to the same account.** Pairing never goes
-  through the relay.
+- **Only between computers paired in person and linked to the same account, or to teammates'
+  accounts** (a team channel each; the other computer's key must match the team directory). Pairing
+  never goes through the relay.
 - **Sealed:** the relay sees which of your computers a frame is from and to, its kind, size and time,
-  never what's inside. It stores nothing: if the other computer isn't connected, the message waits on
-  your computer as usual (up to 24 hours) and goes out when it can.
+  never what's inside.
+- **The mailbox:** if the other computer isn't connected, the message is left sealed in your
+  account's mailbox (up to 7 days) and that computer collects it when it connects, even if yours is
+  off by then. Only the two paired computers can open it. Messages delivered this way say *via
+  mailbox*.
 - **Limits:** 200 KB per frame and a rate limit per computer. Big files go faster on the same network.
 
 Messages that went through the relay say *via relay*, and the overview shows *Online via relay*.
+
+## Working with your team across the internet
+
+Teammates (people in the same team in the Team console) can work on one project from different
+networks, each with their own computers and agents.
+
+1. **Each person:** sign in, link the computer, and turn on the **Relay** (Account).
+2. **Account › Your teams' computers** lists your teammates' linked computers, and whether yours is
+   paired with each. A red *Key does not match* means a paired computer's key differs from the one
+   in the team's list: stop and check with your team.
+3. **Pair over the internet:** press it next to a teammate's computer. They see the request (in that
+   list and in **Needs me**) and press **Accept**. Both screens then show the same 6 digits: compare
+   them by phone or chat, and both press **Allow**. Nothing is confirmed automatically, and agents
+   can't send, accept or confirm a pairing.
+4. **Projects:** on a project's page, **Add to the room** puts a teammate's computer in the project
+   room. Their agents see the project's posts and tasks from then on, each through their own firewall.
+
+Teammates' computers use a channel for their team that only members can join, and each computer
+checks the other's key against the team's list before anything goes through.
 
 ## The Team console
 

@@ -36,7 +36,7 @@ import { detectKeystore, protect, unprotect, forget } from './keystore.js';
 import { Vault, sealTo, openWith, checkPassphrase } from './vault.js';
 import { UdpDiscovery, nearbyPacket, readNearbyPacket, NEARBY_TTL_MS } from './discovery.js';
 import { encodeBeacon, decodeBeacon, beaconToCode, codeToBeacon, fromHex, toHex, BEACON_BPS } from '../web/beacon.js';
-import { createHash } from 'node:crypto';
+import { createHash, createCipheriv, createDecipheriv, hkdfSync } from 'node:crypto';
 import { LOGOS_VERSION, isIntent, catalog, riskOf, ARG_SHAPES } from './logos.js';
 import { Firewall } from './firewall.js';
 import { env } from './env.js';
@@ -84,6 +84,7 @@ const MAX_NAME = 64;
 const FW_VISIBLE = new Set(['allowed', 'approved']);  // the agent may see these
 const FW_STATUS = { allow: 'allowed', ask: 'pending', block: 'blocked' };
 const CLOCK_SKEW_MS = 10 * 60_000;
+const MAILBOX_DAYS = 7;                                 // 0.16: sealed items wait at most this long in the mailbox
 const REPLAY_KEEP_MS = 2 * CLOCK_SKEW_MS + 60_000;   // ids are remembered for the whole acceptance window
 const TOUCH_MS = 15 * 60_000;                         // a linked computer's "last seen" for the Team console
 const MAX_WAIT_S = 60;
@@ -364,7 +365,7 @@ export class Daemon {
     clearTimeout(this.peerTimer);
     clearInterval(this.nearbyTimer); clearInterval(this.retentionTimer);
     this.discovery?.stop();
-    this.relay?.stop(); clearInterval(this.touchTimer);
+    this.relay?.stop(); clearInterval(this.touchTimer); clearInterval(this.teamRelayTimer); clearInterval(this.mailboxTimer);
     for (const w of this.waiters) w();
     for (const w of this.eventWaiters) w();
     await Promise.all([this.lan, this.ui].filter(Boolean).map(s => new Promise(r => { s.closeAllConnections?.(); s.close(() => r()); })));
@@ -423,6 +424,7 @@ export class Daemon {
     const v = {
       role: p.role, state: p.state, message: p.error || STATE_TEXT[p.state], via: p.via, quiet: !!p.quiet,
       discover: !!p.discover, ...(p.invite ? { invite: { mode: p.invite.mode } } : {}), ...(p.join ? { join: true } : {}),
+      ...(p.team ? { team: { name: p.team.name, email: p.team.email || null } } : {}),
       peer: p.peer ? { name: p.peer.name, fingerprint: p.peer.idPub ? formatFingerprint(fingerprint(p.peer.idPub)) : null } : null,
       confirmedHere: !!p.localConfirmed, confirmedThere: !!p.remoteConfirmed, attemptsLeft: CODE_ATTEMPTS - (p.attempts || 0),
       secondsLeft: TERMINAL.has(p.state) ? 0 : Math.max(0, Math.round((p.expiresAt - Date.now()) / 1000)),
@@ -506,7 +508,7 @@ export class Daemon {
     const p = this.current();
     if (!p || TERMINAL.has(p.state)) return;
     this.setState(p, 'cancelled', reason);
-    if (p.role === 'listen' && p.target) postJson(`${p.target}/pair/cancel`, { rid: p.id }).catch(() => {});
+    if (p.role === 'listen' && (p.target || p.relayPeer)) this.pairPost(p, '/pair/cancel', { rid: p.id }).catch(() => {});
   }
 
   // ---- pairing: announcing device (plays the beacon) -----------------------
@@ -557,6 +559,7 @@ export class Daemon {
     if (body.v === PROTOCOL_V3 && this.v3) return this.lanHello3(body, req);
     version(body.v);
     const p = this.announcing(str(body.rid, 24, HEX(24)), ['announcing'], req);
+    if (p.via === 'team') throw httpError(400, 'UNSUPPORTED_VERSION'); // team pairing is v3 only
     const name = cleanName(str(body.name, 200));
     p.peer = { name: name || 'Unnamed device', idPub: bin(body.idPub, 32) };
     p.peerEph = bin(body.ePub, 32);
@@ -584,7 +587,7 @@ export class Daemon {
     p.commitB = bin(first.commit, 32);
     p.peerAddr = req.socket.remoteAddress;
     p.peerPort = port(first.port);
-    p.peerAddress = hostPort(plainIp(p.peerAddr), p.peerPort);
+    p.peerAddress = p.via === 'team' ? null : hostPort(plainIp(p.peerAddr), p.peerPort);
     p.peerAlt = altAddressList(first.alt);
     if (!p.invite && ['code', 'network', 'sound'].includes(first.via)) p.via = first.via;
     p.hs = hs;
@@ -601,6 +604,7 @@ export class Daemon {
     try { const last = noisePayload(p.hs.read(noiseBytes(body.m3, 2048))); idB = bin(last.idPub, 32); nB = bin(last.nB, 16); }
     catch { this.fail(p, 'The other device’s keys did not check out.'); throw httpError(400, 'BAD_HANDSHAKE'); }
     if (!tagsEqual(commitment(nB), p.commitB)) { this.fail(p, 'The other device changed its answer midway.'); throw httpError(400, 'COMMITMENT_MISMATCH'); }
+    if (p.team && b64u(idB) !== p.team.publicKey) { this.fail(p, 'That computer\'s key doesn\'t match your team\'s directory. Don\'t pair; tell your team\'s admin.'); throw httpError(403, 'KEY_MISMATCH'); }
     const meta = canonicalMeta3({ aName: this.me.name, bName: p.peer.name, aPort: this.port, bPort: p.peerPort });
     const t = transcript3({ h: p.hs.hash, idA: this.me.publicRaw, idB, nA: p.nA, nB, meta });
     if (!verify(idB, t, bin(body.sig, 64))) { this.fail(p, 'The other device’s signature did not check out.'); throw httpError(400, 'BAD_SIGNATURE'); }
@@ -691,20 +695,23 @@ export class Daemon {
     const hs = new Handshake({ pattern: 'XX', initiator: true, prologue: pairPrologue(p.secret), s: this.noise });
     p.nB = randomBytes(16);
     const m1 = hs.write(Buffer.from(JSON.stringify({ name: this.me.name, port: this.port, via: p.via, alt: this.altAddresses(), commit: b64u(commitment(p.nB)) })));
-    const r1 = await postJson(`${p.target}/pair/hello`, { v: PROTOCOL_V3, rid: p.id, m1: b64u(m1) });
+    const r1 = await this.pairPost(p, '/pair/hello', { v: PROTOCOL_V3, rid: p.id, m1: b64u(m1) });
     if (this.pair !== p || TERMINAL.has(p.state)) return;
     if (r1.v !== PROTOCOL_V3) return this.fail(p, 'The other device runs a different VINAC Link version. Update both.');
     let second, idA, nA;
     try { second = noisePayload(hs.read(noiseBytes(r1.m2, 2048))); idA = bin(second.idPub, 32); nA = bin(second.nA, 16); }
     catch { return this.fail(p, 'The other device’s keys did not check out.'); }
     if (!fingerprint(idA).equals(p.beaconFp)) return this.fail(p, 'The device that answered is not the one that played the sound.');
-    if (second.port !== p.beaconPort) return this.fail(p, 'The device that answered gave a different port than its pairing sound.');
+    // 0.16 team pairing: no port to check over the relay, but the key must be the one in the team directory.
+    if (p.team && b64u(idA) !== p.team.publicKey) return this.fail(p, 'That computer\'s key doesn\'t match your team\'s directory. Don\'t pair; tell your team\'s admin.');
+    if (p.team) p.beaconPort = port(second.port);
+    else if (second.port !== p.beaconPort) return this.fail(p, 'The device that answered gave a different port than its pairing sound.');
     p.peerAlt = altAddressList(second.alt);
     p.peer = { name: cleanName(typeof second.name === 'string' ? second.name : '') || 'Unnamed device', idPub: idA };
     const m3 = hs.write(Buffer.from(JSON.stringify({ idPub: b64u(this.me.publicRaw), nB: b64u(p.nB) })));
     const meta = canonicalMeta3({ aName: p.peer.name, bName: this.me.name, aPort: p.beaconPort, bPort: this.port });
     const t = transcript3({ h: hs.hash, idA, idB: this.me.publicRaw, nA, nB: p.nB, meta });
-    const r2 = await postJson(`${p.target}/pair/reveal`, { v: PROTOCOL_V3, rid: p.id, m3: b64u(m3), sig: b64u(sign(this.me.privateKey, t)) });
+    const r2 = await this.pairPost(p, '/pair/reveal', { v: PROTOCOL_V3, rid: p.id, m3: b64u(m3), sig: b64u(sign(this.me.privateKey, t)) });
     if (this.pair !== p || TERMINAL.has(p.state)) return;
     if (typeof r2.sig !== 'string' || !verify(idA, t, fromB64u(r2.sig))) return this.fail(p, 'The other device’s signature did not check out.');
     this.settle3(p, t, hs);
@@ -738,7 +745,7 @@ export class Daemon {
     const tick = async () => {
       if (this.pair !== p || TERMINAL.has(this.current()?.state)) return;
       try {
-        const s = await postJson(`${p.target}/pair/status`, { rid: p.id }, 4000);
+        const s = await this.pairPost(p, '/pair/status', { rid: p.id }, 4000);
         if (['cancelled', 'failed', 'expired'].includes(s.state)) return this.setState(p, 'cancelled', 'The other device cancelled or timed out.');
         if (s.tag && !p.remoteConfirmed) {
           if (!tagsEqual(bin(s.tag, 32), this.ctag(p, 'announce'))) return this.fail(p, 'The other device sent a wrong confirmation.');
@@ -776,7 +783,7 @@ export class Daemon {
   async sendConfirm(p) {
     p.localConfirmed = true;
     if (p.role === 'listen') {
-      try { await postJson(`${p.target}/pair/confirm`, { rid: p.id, tag: b64u(this.ctag(p, 'listen')) }); }
+      try { await this.pairPost(p, '/pair/confirm', { rid: p.id, tag: b64u(this.ctag(p, 'listen')) }); }
       catch (e) { p.localConfirmed = false; throw httpError(502, friendlyNetError(e, p.target)); }
     }
     this.finishIfBothConfirmed(p);
@@ -960,6 +967,11 @@ export class Daemon {
    * receipt that proves the peer decrypted exactly this payload.
    */
   async sendSealed(peer, kind, route, id, payload, timeoutMs = 8000) {
+    // A teammate paired over the internet (0.16) may have no network address yet: the relay is its route.
+    if (!peer.address && peer.via !== 'relay' && (await this.relayFor(peer))) {
+      const r = await this.sendSealedTo({ ...peer, via: 'relay' }, kind, route, id, payload, timeoutMs);
+      return { ...r, via: 'relay' };
+    }
     try { return await this.sendSealedTo(peer, kind, route, id, payload, timeoutMs); }
     catch (e) {
       // The device did not answer at its usual address: try its other addresses (e.g.
@@ -993,17 +1005,211 @@ export class Daemon {
     return this.relayFps.fps;
   }
 
-  /** May this paired device use the relay? Only when it is linked to the same account. */
+  /**
+   * 0.16: teammates' linked computers (not this account's), fingerprint -> { team, publicKey }, from
+   * the team directory; refreshed every 10 minutes, or at most once a minute on a miss.
+   */
+  async teamFingerprints(force = false) {
+    const c = this.teamRelay;
+    if (c && (Date.now() - c.at < 600_000) && !(force && Date.now() - c.at > 60_000)) return c;
+    try {
+      const me = this.cloud.account()?.userId;
+      const dir = await this.cloud.teamDirectory();
+      const byFp = new Map();
+      for (const t of dir) for (const m of t.members) if (m.userId !== me) for (const d of m.devices) if (!byFp.has(d.fingerprint)) byFp.set(d.fingerprint, { team: t.id, publicKey: d.publicKey, name: d.name, email: m.email, userId: m.userId });
+      this.teamRelay = { at: Date.now(), byFp, teams: dir.map(t => t.id) };
+    } catch { this.teamRelay = { at: Date.now(), byFp: c?.byFp || new Map(), teams: c?.teams || [] }; }
+    this.relay?.setTeams(this.teamRelay.teams);
+    return this.teamRelay;
+  }
+
+  // ---- 0.16: pairing with a teammate's computer over the internet ---------------------------
+  // Both people act (one sends the request, the other accepts it), the messages go over the team
+  // channel they share, each side checks the other's key against the team directory, and both people
+  // compare the 6 digits and press Allow. Agents can't start, accept or confirm any of it.
+
+  /** A teammate's linked computer by its device id (its fingerprint in hex). */
+  teamDeviceById(id) {
+    for (const [fp, e] of this.teamRelay?.byFp || []) if (fp.replace(/-/g, '').toLowerCase() === id) return { fp, ...e };
+    return null;
+  }
+
+  /** The relay asks before a pairing frame on a team channel is handled. */
+  async teamPairGate(from, topic, route) {
+    if (!/^[0-9a-f]{16}$/.test(String(from))) return false;
+    await this.teamFingerprints();
+    let d = this.teamDeviceById(from);
+    if (!d) { await this.teamFingerprints(true); d = this.teamDeviceById(from); }
+    if (!d || this.relay?.teamTopic(d.team) !== topic) return false;
+    if (route === '/pair/offer') return (this.teamOfferLimiter ??= new RateLimiter(6)).allow(from);
+    const p = this.current();
+    if (p && p.via === 'team' && !TERMINAL.has(p.state) && p.team?.peerId === from) return true;
+    // Just finished here: the other side may still collect our confirmation for two minutes (as on the network).
+    return [...this.finished.values()].some(f => f.via === 'team' && f.team?.peerId === from && f.state === 'paired');
+  }
+
+  /** The person asks to pair with a teammate's computer: start a pairing and send the request. */
+  async startTeamPair(fp) {
+    if (!this.relayOn() || !this.relay?.ready()) throw httpError(409, 'Turn on the relay first (Account › Relay), on both computers.');
+    await this.teamFingerprints(true);
+    const e = this.teamRelay?.byFp.get(String(fp));
+    if (!e) throw httpError(404, 'That isn\'t a teammate\'s linked computer.');
+    const peerId = String(fp).replace(/-/g, '').toLowerCase();
+    if (this.peerRecord(peerId)) throw httpError(409, `${e.name} is already paired with this computer.`);
+    const topic = this.relay.teamTopic(e.team);
+    if (!this.relay.teamJoins.has(topic)) { this.relay.setTeams(this.teamRelay.teams); throw httpError(409, 'Still connecting to your team\'s channel. Try again in a few seconds.'); }
+    const secret = randomBytes(8);
+    const p = this.newPairing('announce', { state: 'announcing', id: rendezvousId(secret).toString('hex'), secret, via: 'team', quiet: true,
+      team: { id: e.team, peerId, publicKey: e.publicKey, name: e.name, email: e.email, topic } });
+    p.expiresAt = Date.now() + INVITE_TTL_MS;
+    try { await this.relay.request(peerId, '/pair/offer', { from: this.meId, rid: p.id, secret: b64u(secret), name: this.me.name }, 8000, topic); }
+    catch (err) {
+      this.fail(p, `${e.name} didn't get the request.`);
+      throw httpError(502, `${e.name} didn't get the request: is VINAC Link running there, with the relay on? (${err.message})`);
+    }
+    this.audit.add('pair.team.request', { peer: { id: peerId, name: e.name } });
+    return p;
+  }
+
+  /** A teammate's computer asks to pair (through the team channel): kept for this person to accept. */
+  teamPairOffer(body, from) {
+    const d = this.teamDeviceById(from);
+    if (!d) throw httpError(403, 'NOT_ON_RELAY');
+    const rid = str(body?.rid, 24, HEX(24));
+    const secret = bin(body?.secret, 8);
+    if (rendezvousId(secret).toString('hex') !== rid) throw httpError(400, 'BAD_FIELD');
+    if (this.peerRecord(from)) throw httpError(409, 'ALREADY_PAIRED');
+    (this.teamOffers ??= new Map()).set(from, { from, name: d.name, email: d.email || null, fingerprint: d.fp, team: d.team, rid, secret, at: new Date().toISOString(), expiresAt: Date.now() + INVITE_TTL_MS });
+    this.audit.add('pair.team.offer', { peer: { id: from, name: d.name } });
+    try { this.notifier.show({ title: 'VINAC Link', body: `${d.email || 'A teammate'} wants to pair ${plainName(d.name)} with this computer.` }); } catch { /* notifications off */ }
+    this.changed();
+    return { ok: true };
+  }
+
+  teamOffersView() {
+    const now = Date.now();
+    for (const [k, o] of this.teamOffers || []) if (o.expiresAt < now) this.teamOffers.delete(k);
+    return [...(this.teamOffers?.values() || [])].map(o => ({ from: o.from, name: o.name, email: o.email, fingerprint: o.fingerprint, at: o.at }));
+  }
+
+  /** The person accepts a teammate's request: pair over the team channel (then both compare 6 digits). */
+  async acceptTeamPair(from) {
+    const o = this.teamOffers?.get(String(from));
+    if (!o || o.expiresAt < Date.now()) throw httpError(404, 'That request has expired. Ask them to send it again.');
+    if (!this.relay?.ready()) throw httpError(409, 'The relay isn\'t connected. Turn it on (Account › Relay) and try again.');
+    await this.teamFingerprints(true);
+    const d = this.teamDeviceById(o.from);
+    if (!d) throw httpError(409, 'That computer is no longer a teammate\'s linked computer.');
+    const topic = this.relay.teamTopic(d.team);
+    const p = this.startListen();
+    Object.assign(p, { via: 'team', secret: o.secret, beaconFp: Buffer.from(o.from, 'hex'), id: o.rid, target: null, relayPeer: o.from, relayTopic: topic, peerAddress: null,
+      team: { id: d.team, peerId: o.from, publicKey: d.publicKey, name: d.name, email: d.email, topic } });
+    p.expiresAt = Date.now() + INVITE_TTL_MS;
+    this.teamOffers.delete(o.from);
+    this.setState(p, 'connecting');
+    this.audit.add('pair.team.accept', { peer: { id: o.from, name: d.name } });
+    this.runListener3(p).catch(e => this.fail(p, e.status === 403 ? 'The other computer no longer expects this pairing.' : e.message || 'Pairing failed.'));
+    return p;
+  }
+
+  // ---- 0.16: the mailbox (sealed items for a computer that isn't connected) -----------------
+  // Sealed with a key derived from the PAIRING key (AES-256-GCM, the two device ids as associated
+  // data), so only the two paired computers can open an item; the account service stores sealed bytes
+  // and routing only. The receiver handles an item exactly like a live message (firewall, replay check).
+
+  mailboxKey(peer) { return Buffer.from(hkdfSync('sha256', this.pairKeyOf(peer), Buffer.alloc(0), 'vinac mailbox v1', 32)); }
+
+  /** Where a paired computer's mail goes: this account's own computers, or a teammate's (key checked). */
+  async mailboxRoute(peer) {
+    const a = this.cloud.account();
+    if (!this.relayOn() || !a?.device) return null;
+    const rec = this.peerRecord(peer.id);
+    if (!rec?.keyLabel) return null;
+    if ((await this.accountFingerprints()).has(rec.fingerprint)) return { toUser: a.userId, teamId: null };
+    await this.teamFingerprints();
+    const e = this.teamEntry(rec);
+    return e?.userId ? { toUser: e.userId, teamId: e.team } : null;
+  }
+
+  async mailboxSend(peer, inner) {
+    const route = await this.mailboxRoute(peer);
+    if (!route) return false;
+    const plain = Buffer.from(JSON.stringify(inner));
+    if (plain.length > 150_000) return false;
+    const nonce = randomBytes(12);
+    const c = createCipheriv('aes-256-gcm', this.mailboxKey(peer), nonce);
+    c.setAAD(Buffer.from(`vinac mailbox|${this.meId}|${peer.id}`));
+    const ct = Buffer.concat([c.update(plain), c.final(), c.getAuthTag()]);
+    await this.cloud.mailboxPut({ ...route, fromDevice: this.meId, toDevice: peer.id, sealed: b64u(Buffer.concat([nonce, ct])) });
+    return true;
+  }
+
+  /** Collects this computer's mail: opens each item with its sender's pairing key, handles it, deletes it. */
+  async checkMailbox() {
+    if (!this.relayOn() || !this.cloud.account()?.device || this.mailboxBusy) return 0;
+    this.mailboxBusy = true;
+    let n = 0;
+    try {
+      for (const item of await this.cloud.mailboxTake(this.meId)) {
+        const peer = this.peerRecord(String(item.from_device));
+        if (!peer?.keyLabel) continue;                         // not paired (yet): leave it until it expires
+        try {
+          const raw = fromB64u(String(item.sealed));
+          const d = createDecipheriv('aes-256-gcm', this.mailboxKey(peer), raw.subarray(0, 12));
+          d.setAAD(Buffer.from(`vinac mailbox|${peer.id}|${this.meId}`));
+          d.setAuthTag(raw.subarray(raw.length - 16));
+          const plain = Buffer.concat([d.update(raw.subarray(12, raw.length - 16)), d.final()]);
+          this.acceptMsg(peer, plain, { relay: true, mailbox: true });
+          n++;
+        } catch (e) { if (e.status !== 409) this.log(`mailbox item from ${peer.name} refused: ${e.message}`); }
+        await this.cloud.mailboxDelete(item.id).catch(() => {});
+      }
+    } catch (e) { this.log(`mailbox: ${e.message}`); }
+    finally { this.mailboxBusy = false; }
+    return n;
+  }
+
+  /** Pairing messages: to the other device's address, or (team pairing) through the team channel. */
+  pairPost(p, route, body, timeoutMs) {
+    if (p.relayPeer) return this.relay.request(p.relayPeer, route, { ...body, from: this.meId }, timeoutMs || 8000, p.relayTopic);
+    return postJson(`${p.target}${route}`, body, timeoutMs);
+  }
+
+  /** The teammate entry for a paired computer, only if the key it paired with is the one in the directory. */
+  teamEntry(rec) {
+    const e = this.teamRelay?.byFp.get(rec?.fingerprint);
+    return e && rec.publicKey && e.publicKey === rec.publicKey ? e : null;
+  }
+
+  /**
+   * May this paired device use the relay? When it is linked to the same account, or (0.16) when it
+   * belongs to a teammate and its key matches the team directory. Pairing in person stays required.
+   */
   async relayFor(peer) {
     if (!this.relayOn() || !this.relay?.ready()) return false;
     const rec = this.peerRecord(peer.id);
     if (!rec?.keyLabel) return false;
     if ((await this.accountFingerprints()).has(rec.fingerprint)) return true;
-    return (await this.accountFingerprints(true)).has(rec.fingerprint);
+    await this.teamFingerprints();
+    if (this.teamEntry(rec)) return true;
+    if ((await this.accountFingerprints(true)).has(rec.fingerprint)) return true;
+    await this.teamFingerprints(true);
+    return !!this.teamEntry(rec);
   }
 
-  /** A frame that came through the relay: handled like one from the network (never pairing). */
+  /**
+   * A frame that came through the relay: handled like one from the network. Pairing only for 0.16
+   * team pairing (the relay lets those routes through on a team channel only, after pairGate).
+   */
   async relayRequest(route, body, from) {
+    if (route === '/pair/offer') return this.teamPairOffer(body, from);
+    if (route.startsWith('/pair/')) {
+      // The announcer's handlers check the sender by "address": through the relay, that is its device id.
+      const req = { socket: { remoteAddress: `relay:${from}` } };
+      const h = { '/pair/hello': this.lanHello, '/pair/reveal': this.lanReveal, '/pair/confirm': this.lanConfirm, '/pair/status': this.lanStatus, '/pair/cancel': this.lanCancel }[route];
+      if (!h || body?.v !== undefined && route === '/pair/hello' && body.v !== PROTOCOL_V3) throw httpError(400, 'UNSUPPORTED_VERSION');
+      return h.call(this, body, req);
+    }
     if ((route === '/session' || route === '/noise') && !this.handshakeLimiter.allow(`relay:${from}`)) throw httpError(429, 'TOO_MANY_REQUESTS');
     const handlers = { '/session': this.lanSession, '/whoami': this.lanWhoami, '/msg': this.lanMsg, '/secret': this.lanSecret, '/secret-ack': this.lanSecretAck, '/unpair': this.lanUnpair };
     if (this.v3) handlers['/noise'] = this.lanNoise;
@@ -1016,17 +1222,33 @@ export class Daemon {
     this.relay ??= new Relay({
       cloud: this.cloud, meId: this.meId, log: m => this.log(m),
       onRequest: (route, body, from) => this.relayRequest(route, body, from),
-      allowed: async from => { const p = this.peerRecord(from); return !!p && this.relayFor(p); },
+      // A frame on a team channel must come from a teammate's computer of THAT team (key checked);
+      // one on the account channel, from this account's own computers or a teammate's.
+      allowed: async (from, topic) => {
+        const p = this.peerRecord(from);
+        if (!p || !(await this.relayFor(p))) return false;
+        if (!topic) return true;
+        const e = this.teamEntry(p);
+        return !!e && this.relay.teamTopic(e.team) === topic;
+      },
+      pairGate: (from, topic, route) => this.teamPairGate(from, topic, route),
+      topicFor: peerId => { const e = this.teamEntry(this.peerRecord(peerId)); return e && !this.relayFps?.fps?.has(this.peerRecord(peerId)?.fingerprint) ? this.relay.teamTopic(e.team) : null; },
     });
-    this.relay.start().catch(e => this.log(`relay: ${e.message}`));
+    this.relay.start().then(() => this.teamFingerprints(true)).then(() => this.checkMailbox()).catch(e => this.log(`relay: ${e.message}`));
+    clearInterval(this.teamRelayTimer); clearInterval(this.mailboxTimer);
+    this.teamRelayTimer = setInterval(() => { if (this.relayOn()) this.teamFingerprints().catch(() => {}); }, 600_000);
+    this.teamRelayTimer.unref?.();
+    // Mail for this computer: checked every minute while the relay is on (and when it connects).
+    this.mailboxTimer = setInterval(() => { this.checkMailbox().catch(() => {}); }, Number(process.env.VINAC_MAILBOX_MS) || 60_000);
+    this.mailboxTimer.unref?.();
   }
 
   async setRelay(on) {
     const a = this.cloud.account();
     if (on && !a?.device) throw httpError(409, 'Link this computer to your account first.');
     if (a) this.cloud.saveAccount({ ...a, relay: !!on });
-    if (on) this.startRelay(); else this.relay?.stop();
-    this.relayFps = null;
+    if (on) this.startRelay(); else { this.relay?.stop(); clearInterval(this.teamRelayTimer); clearInterval(this.mailboxTimer); }
+    this.relayFps = null; this.teamRelay = null;
     this.audit.add(on ? 'account.relay_on' : 'account.relay_off', { email: a?.email, device: this.me.name });
     return this.accountView();
   }
@@ -1334,6 +1556,17 @@ export class Daemon {
       if (e.status) throw httpError(502, `${peer.name} refused the message: ${e.message}`);
       this.setOnline(peer.id, false);
       const hint = macNetHint(e);
+      // 0.16: a computer on the account or a teammate's, that the relay can't reach either: leave it sealed in
+      // the mailbox (up to 7 days), so it arrives even if this computer is off by then.
+      if (queue && !auto && !transfer && intent !== FILE_SHARE) {
+        const boxed = await this.mailboxSend(peer, inner).catch(err => { this.log(`mailbox: ${err.message}`); return false; });
+        if (boxed) {
+          const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by, via: 'mailbox' };
+          this.store.saveMessages([...this.store.messages(), rec]);
+          this.audit.add('msg.out', { peer, id: inner.id, intent, by, chars: body.length, via: 'mailbox' });
+          return { sent: true, queued: true, delivered: false, ...this.messageView(rec), via: 'mailbox', note: `${peer.name} isn't connected now. The message waits for it, sealed, in your account's mailbox (up to ${MAILBOX_DAYS} days), even if this computer is off by then.` };
+        }
+      }
       // Unreachable: keep it in the outbox (inside the encrypted history) and send it when the device is back.
       if (queue && !auto && !transfer && intent !== FILE_SHARE && this.store.messages().filter(m => m.outbox).length < MAX_QUEUED) {
         const rec = { ...inner, ...(intent ? { args: reqArgs } : {}), dir: 'out', peer: { id: peer.id, name: peer.name }, by, outbox: { inner, queuedAt: new Date().toISOString() } };
@@ -1356,6 +1589,14 @@ export class Daemon {
 
   lanMsg(body, req) {
     const { peer, plain, receipt } = this.receiveSealed(body, req, 'msg');
+    return this.acceptMsg(peer, plain, req, receipt);
+  }
+
+  /**
+   * A message from a paired device, already unsealed: checked, put through the firewall, stored. From
+   * the network or the relay (live), or (0.16) from the mailbox: then it may be up to 8 days old.
+   */
+  acceptMsg(peer, plain, req, receipt = () => null) {
     if (!this.peerMsgLimiter.allow(peer.id)) throw httpError(429, 'TOO_MANY_MESSAGES');
     let inner;
     try { inner = JSON.parse(plain.toString('utf8')); } catch { throw httpError(400, 'BAD_MESSAGE'); }
@@ -1363,7 +1604,8 @@ export class Daemon {
     const id = str(inner.id, 16, MSG_ID);
     const text = str(inner.text, MAX_TEXT);
     const sentAt = Date.parse(str(inner.sentAt, 40));
-    if (!Number.isFinite(sentAt) || Math.abs(Date.now() - sentAt) > CLOCK_SKEW_MS) throw httpError(400, 'STALE_MESSAGE');
+    const oldest = req?.mailbox ? MAILBOX_DAYS * 86_400_000 + CLOCK_SKEW_MS : CLOCK_SKEW_MS;
+    if (!Number.isFinite(sentAt) || sentAt - Date.now() > CLOCK_SKEW_MS || Date.now() - sentAt > oldest) throw httpError(400, 'STALE_MESSAGE');
     if (inner.replyTo != null && !MSG_ID.test(String(inner.replyTo))) throw httpError(400, 'BAD_FIELD');
     if (inner.by != null && !['agent', 'person'].includes(inner.by)) throw httpError(400, 'BAD_FIELD');
     if (inner.auto != null && typeof inner.auto !== 'boolean') throw httpError(400, 'BAD_FIELD'); // automatic reply; older devices ignore the field
@@ -1394,7 +1636,7 @@ export class Daemon {
       if (args.card != null) args.card = checkCard(args.card, { fromNetwork: true });
       else args.cardUpdate = checkUpdate(args.cardUpdate, { fromNetwork: true });
     }
-    if (!this.store.rememberOnce(`m|${peer.id}|${id}`, sentAt + REPLAY_KEEP_MS)) throw httpError(409, 'ALREADY_RECEIVED');
+    if (!this.store.rememberOnce(`m|${peer.id}|${id}`, Math.max(sentAt + REPLAY_KEEP_MS, req?.mailbox ? Date.now() + (MAILBOX_DAYS + 1) * 86_400_000 : 0))) throw httpError(409, 'ALREADY_RECEIVED');
     if (transfer) this.store.dropParts(peer.id, transfer.transfer);
     const now = new Date().toISOString();
     const rec = {
@@ -1403,7 +1645,7 @@ export class Daemon {
       by: inner.by || undefined, // as the sender says; not proof
       ...(inner.auto === true ? { auto: true } : {}),
       ...(fromAgent ? { agent: fromAgent } : {}),
-      ...(req?.relay ? { via: 'relay' } : {}),
+      ...(req?.mailbox ? { via: 'mailbox' } : req?.relay ? { via: 'relay' } : {}),
     };
     if (fileBytes) { args.file = this.store.fileId(); this.store.saveFile(args.file, fileBytes); }
     // The firewall decides here, before any agent could see it: requests by intent,
@@ -1577,7 +1819,7 @@ export class Daemon {
       const o = this.online.get(p.id);
       facts.push(`${p.name}: ${o?.online === true ? `online${o.via ? ` (via ${o.via})` : ''}` : o?.online === false ? `not reachable when last tried${o.at ? `, ${when(new Date(o.at).toISOString())}` : ''}` : 'not checked yet'}.`);
       facts.push(p.address ? `Last known address: ${p.address}.` : 'No network address known for it yet.');
-      facts.push(this.relayOn() ? `The relay is on (${this.relay?.view()?.state || 'starting'}); it works only if ${p.name} is linked to the same account.` : 'The relay is off.');
+      facts.push(this.relayOn() ? `The relay is on (${this.relay?.view()?.state || 'starting'}); it works only if ${p.name} is linked to the same account, or to a teammate's account with the same key as in the team directory.` : 'The relay is off.');
       return o;
     };
     if (topic === 'message' || topic === 'request') {
@@ -1681,6 +1923,7 @@ export class Daemon {
       if (s.card.type === 'key' && s.state !== 'done') items.push({ kind: 'key', ...(local ? { local: true } : {}), title: `${String(s.from).replace(/^me › /, '')} needs ${s.card.name}${s.card.project ? ` (${s.card.project}${s.card.env ? `, ${s.card.env}` : ''})` : ''}`, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
       if (s.card.type === 'task' && s.state === 'open') items.push({ kind: 'task', title: s.card.title, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
     }
+    for (const o of this.teamOffersView()) items.push({ kind: 'pairOffer', title: `${o.email || 'A teammate'} wants to pair ${o.name} with this computer`, at: o.at, from: o.from });
     for (const s of this.store.secrets().items) if (s.offered || s.pending) items.push({ kind: 'keyOffer', title: `${s.name} from ${s.from?.name || 'a device'}: ${s.offered ? 'accept it?' : 'replace yours?'}`, at: s.receivedAt, secret: s.id });
     for (const u of this.secretUsesView()) items.push({ kind: 'run', title: `${u.agent || 'An agent'} wants to run ${u.command} with ${u.names.join(', ')}`, at: u.at, use: u.id });
     for (const q of this.secretRequestsView?.() || []) items.push({ kind: 'keyAsk', title: `${q.from?.name || q.peer?.name || 'A device'} asks for ${q.name}`, at: q.at || q.askedAt });
@@ -1764,7 +2007,7 @@ export class Daemon {
   checkProjectAgent(r, agent) {
     const p = r.project ? this.projects.get(r.project) : null;
     if (!p?.agents?.length) return;
-    if (!agent || !p.agents.includes(agent.id)) throw httpError(403, `Only the agents of the project ${p.name} post in "${r.name}". The person picks them on the project page (Projects), and Connect gives each app its own identity.`);
+    if (!p.agents.includes(agent?.id || 'default')) throw httpError(403, `Only the agents of the project ${p.name} post in "${r.name}". ${agent ? `"${agent.name}" isn't one of them` : 'This computer\'s default agent (a plugin, a terminal, an app without its own identity) isn\'t one of them'}: the person ticks the project's agents on its page (Projects).`);
   }
 
   /** One project as a workspace for the page: folder, agents, room, board, files, keys and allowed runs. */
@@ -1779,7 +2022,9 @@ export class Daemon {
     const manifest = folder ? readManifest(folder, folder) : null;
     return {
       project: { id: p.id, name: p.name, folders: p.folders || [], prodAsks: p.prodAsks !== false, agents: p.agents || [], ...(p.about ? { about: p.about } : {}) },
-      agents: agents.map(a => ({ id: a.id, name: a.name, inProject: (p.agents || []).includes(a.id), lastSeenAt: a.lastSeenAt })),
+      // Every agent that can act here, the default agent included (plugins, terminals, apps without an identity).
+      agents: [...agents.map(a => ({ id: a.id, name: a.name, inProject: (p.agents || []).includes(a.id), lastSeenAt: a.lastSeenAt })),
+        { id: 'default', name: 'This computer\'s default agent', note: 'plugins, terminals and apps without their own identity', inProject: (p.agents || []).includes('default') }],
       room: room ? { id: room.id, name: room.name, local: !!room.local, members: room.members.map(id => this.store.peers().find(x => x.id === id)?.name).filter(Boolean) } : null,
       board: {
         open: cards.filter(c => c.type === 'task' && c.state === 'open'),
@@ -1816,7 +2061,7 @@ export class Daemon {
     if (!folder) throw httpError(400, 'Give the project its folder first.');
     const names = [...new Set(this.store.secrets().items.filter(x => x.project === p.id && (x.env || 'dev') === 'dev' && !x.pending && !x.offered).map(x => x.name))].slice(0, 10);
     if (!names.length) throw httpError(400, `The project ${p.name} has no dev keys yet. Add keys to it (dev) on the Secrets page.`);
-    const who = (p.agents?.length ? p.agents : [null]).map(aid => ({ id: aid, name: aid ? this.agents.list().find(a => a.id === aid)?.name : null })).filter(a => a.id === null || a.name);
+    const who = (p.agents?.length ? p.agents : [null]).map(aid => (aid === 'default' ? null : aid)).map(aid => ({ id: aid, name: aid ? this.agents.list().find(a => a.id === aid)?.name : null })).filter(a => a.id === null || a.name);
     const made = who.map(a => {
       const g = this.grants.add({ agentId: a.id, agentName: a.name || undefined, names, command, cwd: folder, hours, prefix: !!prefix });
       this.audit.add('grant.created', { grant: g.id, names: g.names, command: g.command.slice(0, 120), prefix: g.prefix, cwd: g.cwd, hours: Number(hours), agent: g.agentName, project: p.name });
@@ -2817,6 +3062,31 @@ export class Daemon {
         return sendJson(res, 200, { account: this.accountView() });
       }
       case 'GET /ui/account/teams': return sendJson(res, 200, { teams: await this.cloud.teams() });
+      // 0.16 team directory: teammates' linked computers, and which of them this one is already paired with.
+      case 'GET /ui/account/team': {
+        const peers = this.store.peers();
+        const me = this.cloud.account();
+        const teams = (await this.cloud.teamDirectory()).map(t => ({
+          ...t, members: t.members.map(m => ({
+            email: m.email, role: m.role, name: m.name, you: m.userId === me?.userId,
+            devices: m.devices.map(d => {
+              const p = peers.find(x => x.fingerprint === d.fingerprint);
+              return {
+                name: d.name, fingerprint: d.fingerprint, platform: d.platform, version: d.version, lastSeenAt: d.lastSeenAt,
+                thisDevice: d.fingerprint === this.me.fpText,
+                ...(p ? { paired: true, peerId: p.id, online: this.online.get(p.id)?.online ?? null } : { paired: false }),
+                // The key this computer paired with must be the one in the directory; if not, say so loudly.
+                ...(p && p.publicKey && d.publicKey && p.publicKey !== d.publicKey ? { keyMismatch: true } : {}),
+              };
+            }),
+          })),
+        }));
+        return sendJson(res, 200, { teams, offers: this.teamOffersView() });
+      }
+      // 0.16 pairing with a teammate's computer over the internet: only the person, on the page.
+      case 'POST /ui/team/pair': { await this.startTeamPair(String(body.fingerprint ?? '')); return sendJson(res, 200, state()); }
+      case 'POST /ui/team/pair/accept': { await this.acceptTeamPair(String(body.from ?? '')); return sendJson(res, 200, state()); }
+      case 'POST /ui/team/pair/ignore': { this.teamOffers?.delete(String(body.from ?? '')); this.audit.add('pair.team.ignore', {}); return sendJson(res, 200, state()); }
       case 'POST /ui/account/share': {
         // One month's activity as counts, signed by this computer, shared with one of the account's teams.
         const team = (await this.cloud.teams()).find(t => t.id === body.team);
@@ -2836,7 +3106,7 @@ export class Daemon {
       case 'POST /ui/account/relay': return sendJson(res, 200, { account: await this.setRelay(body.on === true) });
       case 'POST /ui/account/signout': {
         const email = this.cloud.view().email;
-        this.relay?.stop(); this.relayFps = null; clearInterval(this.touchTimer);
+        this.relay?.stop(); this.relayFps = null; this.teamRelay = null; clearInterval(this.touchTimer); clearInterval(this.teamRelayTimer); clearInterval(this.mailboxTimer);
         await this.cloud.signOut();
         if (email) this.audit.add('account.signed_out', { email });
         return sendJson(res, 200, { account: this.accountView() });
@@ -2857,6 +3127,16 @@ export class Daemon {
       // Rooms: only the person makes or leaves them (agents post in existing ones through /api/send).
       case 'POST /ui/rooms': return sendJson(res, 200, state({ room: this.createRoom(body.name, body.members) }));
       case 'POST /ui/rooms/leave': this.leaveRoom(String(body.id ?? '')); break;
+      // 0.16 team projects: the person adds paired computers (a teammate's too) to a room, or removes them.
+      case 'POST /ui/rooms/members': {
+        const r = this.roomOf(String(body.id ?? ''));
+        const add = (Array.isArray(body.add) ? body.add : []).map(x => this.resolvePeer(String(x)).id);
+        const drop = new Set((Array.isArray(body.remove) ? body.remove : []).map(String));
+        const members = [...new Set([...r.members.filter(m => !drop.has(m)), ...add])].slice(0, 20);
+        this.store.saveRooms(this.store.rooms().map(x => (x.id === r.id ? { ...x, members } : x)));
+        this.audit.add('room.members', { room: r.name, added: add.length, removed: drop.size });
+        break;
+      }
       case 'GET /ui/rooms/messages': { const id = String(url.searchParams.get('id') || ''); return sendJson(res, 200, { messages: this.roomMessages(id), cards: this.cardsView({ room: id }) }); }
       case 'POST /ui/card': return sendJson(res, 200, state({ sent: await this.send({ room: body.room, to: body.to, card: body.card, cardUpdate: body.cardUpdate, text: body.text }, 'person') }));
       case 'POST /ui/card/fetch': return sendJson(res, 200, state({ fetched: await this.wantFile(String(body.card ?? ''), 'person') }));
@@ -2976,9 +3256,10 @@ export class Daemon {
         else {
           // The person pressed Connect: the app gets its own agent identity (made here, or a fresh token
           // for the same one), so the log, grants and project rooms can tell Codex and Claude Code apart.
-          const plugin = app === 'claude' && claudeStatus().mode === 'plugin';
+          const replacePlugin = app === 'claude' && body?.replacePlugin === true;
+          const plugin = app === 'claude' && claudeStatus().mode === 'plugin' && !replacePlugin;
           const id = plugin ? null : this.agents.identityFor(label);
-          r = app === 'codex' ? connectCodex({ agent: id ? { id: id.agent.id, token: id.token } : null }) : connectClaude({ agent: id ? { id: id.agent.id, token: id.token } : null });
+          r = app === 'codex' ? connectCodex({ agent: id ? { id: id.agent.id, token: id.token } : null }) : connectClaude({ agent: id ? { id: id.agent.id, token: id.token } : null, replacePlugin });
           if (id && r.ok) this.audit.add('agent.added', { agent: label, via: 'connect' });
         }
         if (r.changed.length) this.audit.add(body?.remove ? 'agentapp.disconnected' : 'agentapp.connected', { app: label, mode: r.mode || 'removed', files: r.changed.length });

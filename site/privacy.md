@@ -1,6 +1,6 @@
 # Privacy Policy
 
-*Effective November 23, 2026* · [What changed](#changes)
+*Effective November 26, 2026* · [What changed](#changes)
 
 This policy explains what personal information Mexley Marketing Inc. ("we", "us") collects through
 the website vinac.tech and the VINAC Link software, and how we handle it. We are based in Ontario,
@@ -57,15 +57,28 @@ your linked computers, your team memberships and the summaries you shared.
 
 ## The relay (optional)
 
-When two of your computers can't reach each other directly, VINAC Link can pass their messages
-through a relay instead. The relay works only between computers that you paired in person **and**
-linked to the same account, and only after you turn it on. Pairing itself never goes through it.
+When two computers can't reach each other directly, VINAC Link can pass their messages through a
+relay instead. The relay works only between computers that were paired by their people **and** are
+linked to the same account or to the accounts of members of the same team, and only after you turn
+it on. Teammates' computers use a channel for that team that only its members can join.
+
+**Pairing with a teammate over the internet.** From the list of your team's computers, you can ask
+to pair with a teammate's computer. The request and the pairing messages go through that team's
+channel. Both people must act (one sends the request, the other accepts it), both computers check
+the other's key against the team's list of linked computers, and both people compare 6 digits on
+their screens and press Allow. The pairing messages are protected by the same pairing method we use
+on a local network; the service can't complete a pairing on its own.
 
 What goes through the relay is the same sealed, end-to-end encrypted data your computers would
 otherwise send directly. We can't read it. Our provider handles, and may briefly log, only what any
 relay must: which of your linked computers a frame is from and to, what kind of frame it is (for
-example a message or a receipt), its size and the time. The relay doesn't store messages: if the
-other computer isn't connected, nothing waits on the relay.
+example a message or a receipt), its size and the time.
+
+**The mailbox.** If the other computer isn't connected, your computer can leave the message in your
+account's mailbox instead, so it arrives even if your computer is off by then. A mailbox item is
+sealed on your computer with a key that only the two paired computers have; we can't read it. We
+store the sealed item, which computers and accounts it is from and to, the team (if any) and the
+times, for at most 7 days. The receiving computer deletes it when it collects it.
 
 ## Teams and the Team console (optional)
 
@@ -149,6 +162,7 @@ Information stored or handled outside Canada may be subject to the laws of that 
   delete them (see above). Our provider's backups may keep a copy for a short time after that.
 - **Sign-in codes:** expire within an hour, and a new code cancels the previous one.
 - **Relay frames:** not stored; our provider's technical logs are kept only briefly.
+- **Mailbox items (sealed):** until the receiving computer collects them, and at most 7 days.
 - **Contact messages, newsletter and contributions:** as described in their sections.
 
 ## Your choices and rights
@@ -174,6 +188,9 @@ information is perfectly secure. To report a security issue, see our [security p
 If we change this policy, we will post the new version here with a new effective date. Significant
 changes will be noted on this page.
 
+- **November 26, 2026 (VINAC Link 0.16):** the relay between teammates' computers (a channel per
+  team), pairing with a teammate over the internet, and the mailbox for computers that aren't
+  connected (sealed, at most 7 days).
 - **November 23, 2026 (VINAC Link 0.13):** added optional accounts, linked computers and "last
   seen", the relay, teams and the Team console, shared rooms, our service providers for these, and
   how long we keep data.

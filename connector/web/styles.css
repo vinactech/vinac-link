@@ -1040,6 +1040,27 @@ button.kpi:hover { box-shadow: var(--shadow); border-color: var(--line); }
 :root[data-theme="dark"] .vl-banner.open { background: linear-gradient(120deg, #172440, #241a3d); border-color: #34508f; }
 @media (max-width: 560px) { .vault-lock.vl-banner { grid-template-columns: 40px minmax(0, 1fr); padding: 14px; } .vl-icon { width: 40px; height: 40px; } }
 
+/* 0.16 team directory (Account) */
+.team-dir { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
+.td-team { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
+.td-head { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+.td-member { padding: 8px 0; border-top: 1px solid var(--line); display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 8px; }
+.td-member > b { overflow-wrap: anywhere; }
+.td-role { color: var(--muted); }
+.td-devices { grid-column: 1 / -1; list-style: none; margin: 4px 0 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.td-device { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 0 8px; align-items: center; }
+.td-device small { grid-column: 1 / -1; color: var(--muted); }
+.td-name { overflow-wrap: anywhere; }
+.td-none { color: var(--muted); font-size: .85rem; }
+.td-offer { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; padding: 10px 14px; border-radius: 12px; border: 1px solid #f2b38a; background: linear-gradient(90deg, rgba(217, 116, 15, .1), transparent 70%); }
+.td-offer > span { flex: 1 1 220px; min-width: 0; }
+.td-pair { grid-column: 1 / -1; justify-self: start; margin-top: 4px; }
+.td-chip { font-size: .75rem; font-weight: 600; padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); white-space: nowrap; }
+.td-chip.ok { color: #1f9d5c; border-color: currentColor; }
+.td-chip.me { color: #2f6bed; border-color: currentColor; }
+.td-chip.warn { color: #c83a3a; border-color: currentColor; }
+.td-chip.dim { color: var(--muted); }
+
 /* Agents page */
 [data-main="agents"] .pair-body > * { max-width: none; }
 .agent-apps { display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 14px; align-items: start; }

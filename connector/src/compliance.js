@@ -19,7 +19,8 @@ export const CATEGORIES = {
   files: { label: 'Files', types: ['file.saved'] },
   settings: { label: 'Settings and vault', types: ['mode.changed', 'rule.changed', 'autoreply.changed', 'notify.changed', 'project.changed', 'project.removed', 'secret.assigned', 'room.rules', 'temporary.cleared', 'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed'] },
   log: { label: 'The log itself', types: ['audit.exported', 'audit.pruned', 'report.created'] },
-  rooms: { label: 'Rooms', types: ['room.created', 'room.left', 'room.joined'] },
+  rooms: { label: 'Rooms', types: ['room.created', 'room.left', 'room.joined', 'room.members'] },
+  pairing: { label: 'Team pairing', types: ['pair.team.request', 'pair.team.offer', 'pair.team.accept', 'pair.team.ignore'] },
   account: { label: 'Account', types: ['account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared'] },
 };
 const CATEGORY_OF = Object.fromEntries(Object.entries(CATEGORIES).flatMap(([c, { types }]) => types.map(t => [t, c])));
@@ -28,7 +29,7 @@ export const categoryOf = type => CATEGORY_OF[type] || 'other';
 // Decisions and settings only a person can make, on this device's page.
 const BY_PERSON = new Set(['pair', 'invite.created', 'phone.paired', 'phone.removed', 'request.decided', 'secret.added', 'secret.accepted', 'secret.revealed',
   'secret.use.denied', 'grant.created', 'grant.revoked', 'agent.added', 'agent.removed', 'agentapp.connected', 'agentapp.disconnected', 'mode.changed', 'rule.changed', 'autoreply.changed', 'notify.changed', 'project.changed', 'project.removed', 'secret.assigned', 'room.rules', 'temporary.cleared',
-  'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed', 'audit.exported', 'report.created', 'secret.out', 'account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared', 'room.created', 'room.left']);
+  'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed', 'audit.exported', 'report.created', 'secret.out', 'account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared', 'room.created', 'room.left', 'room.members', 'pair.team.request', 'pair.team.accept', 'pair.team.ignore']);
 
 /** { kind: 'person' | 'agent' | 'device' | 'service', name } */
 export function actorOf(e) {

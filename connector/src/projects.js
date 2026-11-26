@@ -58,7 +58,8 @@ export class Projects {
     // 0.15: the agents of this project (agent identity ids). When set, only they post in its room.
     // What the project is about (the person writes it; its agents read it as the project brief).
     if (about !== undefined) { const a = String(about ?? '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, '').trim().slice(0, 600); if (a) p.about = a; else delete p.about; }
-    if (Array.isArray(agents)) p.agents = [...new Set(agents.map(String).filter(a => /^[0-9a-f]{12}$/.test(a)))].slice(0, 10);
+    // 'default' = this computer's default agent (a plugin, a terminal, an app without its own identity).
+    if (Array.isArray(agents)) p.agents = [...new Set(agents.map(String).filter(a => /^[0-9a-f]{12}$/.test(a) || a === 'default'))].slice(0, 10);
     this.save(list);
     return p;
   }

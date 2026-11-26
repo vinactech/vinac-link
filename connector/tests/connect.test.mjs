@@ -87,6 +87,24 @@ test('with the plugin installed, connect removes the direct entries so no tool s
   assert.equal(connectClaude(opts(dir)).changed.length, 0);
 });
 
+test('switching from an (old) plugin: the plugin is turned off and the direct connection gets the identity', () => {
+  const dir = tmp();
+  fs.mkdirSync(path.join(dir, 'plugins'), { recursive: true });
+  fs.writeFileSync(path.join(dir, 'plugins', 'installed_plugins.json'), JSON.stringify({ version: 2, plugins: { [PLUGIN_ID]: [{ scope: 'user', version: '0.7.0' }] } }));
+  fs.writeFileSync(path.join(dir, 'settings.json'), JSON.stringify({ enabledPlugins: { [PLUGIN_ID]: true, 'other@x': true } }));
+  const before = claudeStatus(opts(dir));
+  assert.equal(before.mode, 'plugin'); assert.equal(before.plugin.outdated, true);
+  assert.equal(connectClaude(opts(dir)).mode, 'plugin', 'without the switch, the plugin stays');
+  const r = connectClaude({ ...opts(dir), agent: { id: 'abcdefabcdef', token: 'agt_test' }, replacePlugin: true });
+  assert.equal(r.mode, 'direct');
+  const s = read(path.join(dir, 'settings.json'));
+  assert.deepEqual(s.enabledPlugins, { [PLUGIN_ID]: false, 'other@x': true });
+  assert.match(s.hooks.Stop[0].hooks[0].command, /--as abcdefabcdef$/);
+  assert.equal(read(path.join(dir, '.claude.json')).mcpServers.vinac.env.VINAC_AGENT_TOKEN, 'agt_test');
+  const after = claudeStatus(opts(dir));
+  assert.equal(after.mode, 'direct'); assert.equal(after.direct.identity, true);
+});
+
 test('refuses a copy on a disk image, and broken JSON is left alone', () => {
   assert.match(connectableCopy('/Volumes/VINAC Link/VINAC Link.app/Contents/Resources/connector/bin/vinac.mjs'), /disk image/);
   assert.equal(connectableCopy('/Applications/VINAC Link.app/Contents/Resources/connector/bin/vinac.mjs'), null);

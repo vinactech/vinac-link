@@ -70,6 +70,11 @@ test('two agents on one computer work in a project room: posts, claims, per-agen
     const def = await api(A, 'POST', '/api/send', { room, text: 'hello' });
     assert.equal(def.status, 403); assert.match(def.body.error, /Only the agents of the project Shop/);
     assert.equal((await api(A, 'POST', '/ui/projects/workspace', { name: 'X', folder })).status >= 400, true, 'agents cannot make workspaces');
+    // The default agent (a plugin, a terminal, OpenClaw without its own identity) is listed and can be ticked.
+    const view2 = (await ui(A, 'GET', `/ui/project?id=${w.body.project.id}`)).body;
+    assert.deepEqual(view2.agents.map(a => [a.id === 'default' ? 'default' : a.name, a.inProject]), [['Claude Code', true], ['Codex', true], ['default', false]]);
+    await ui(A, 'POST', '/ui/projects/agents', { id: w.body.project.id, agents: [claude.id, codex.id, 'default'] });
+    assert.equal((await api(A, 'POST', '/api/send', { room, text: 'hello from the default agent' })).status, 200);
   } finally { await A.stop(); }
 });
 

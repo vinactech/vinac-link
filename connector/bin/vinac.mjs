@@ -35,7 +35,7 @@ import {macLifecycleAvailable,managedConnect,readOnlyStartupDiagnostics,withLaun
 import {maybeInstallFromVolume} from '../src/mac-install.js';
 
 const [command = 'start', ...rest] = process.argv.slice(2);
-const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output', 'csv', 'recover', 'force-recovery', 'sample', 'remove', 'status']);
+const FLAGS = new Set(['open', 'tab', 'json', 'no-open', 'simple', 'verify', 'all', 'show-output', 'csv', 'recover', 'force-recovery', 'sample', 'remove', 'status', 'replace-plugin']);
 const REPEAT = new Set(['secret']);
 const opt = { _: [], cmd: [] };
 for (let i = 0; i < rest.length; i++) {
@@ -104,7 +104,7 @@ Next: pair another computer on the page, then connect your agent:
       ? ['Codex', c.codexStatus, c.connectCodex, c.disconnectCodex, c.describeCodex]
       : ['Claude Code', c.claudeStatus, c.connectClaude, c.disconnectClaude, c.describeClaude];
     if (opt.status) { const s = status(); console.log(opt.json ? JSON.stringify(s, null, 2) : `${label}: ${describe(s)}`); process.exit(0); }
-    const r = opt.remove ? disconnect() : connect();
+    const r = opt.remove ? disconnect() : connect({ replacePlugin: !!opt['replace-plugin'] });
     if (opt.json) console.log(JSON.stringify(r, null, 2));
     else {
       console.log(r.message);

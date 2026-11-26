@@ -211,5 +211,5 @@ $('sendPlay').addEventListener('click', async () => {
 });
 $('sendCancel').addEventListener('click', closeSheets);
 
-if ('serviceWorker' in navigator) navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(() => {});
+if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js', { scope: './' }).catch(() => {});
 render();

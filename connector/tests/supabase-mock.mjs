@@ -32,6 +32,7 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
   const requests = [];          // { method, path, body } for assertions
   const teams = [];             // { id, name, members: [{ user_id, role }] }
   const reports = [];           // team_reports rows
+  const mailbox = [];           // 0.16 mailbox rows
   const state = { signups, expiresIn };
 
   const session = userId => {
@@ -71,7 +72,10 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
       const u = who();
       if (!u) return send(401, { message: 'JWT expired' });
       const mine = devices.filter(d => d.user_id === u);
-      if (req.method === 'GET') return send(200, mine);
+      // "devices: teammates read": with a user_id=in.(…) filter, the rows of those users who share a team.
+      const inList = (url.searchParams.get('user_id') || '').match(/^in\.\((.*)\)$/)?.[1]?.split(',') || null;
+      const shares = other => other === u || teams.some(t => t.members.some(m => m.user_id === u) && t.members.some(m => m.user_id === other));
+      if (req.method === 'GET') return send(200, inList ? devices.filter(d => inList.includes(d.user_id) && shares(d.user_id)) : mine);
       if (req.method === 'POST') {
         if (body.user_id !== u) return send(403, { message: 'new row violates row-level security policy' });
         let row = devices.find(d => d.user_id === u && d.fingerprint === body.fingerprint);
@@ -96,6 +100,35 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
       const u = who();
       if (!u) return send(401, { message: 'JWT expired' });
       return send(200, teams.flatMap(t => t.members.filter(m => m.user_id === u).map(m => ({ team_id: t.id, role: m.role, teams: { name: t.name } }))));
+    }
+    // 0.16 mailbox: the rules of the mailbox migration (own account or a teammate; recipient reads/deletes).
+    if (url.pathname === '/rest/v1/mailbox') {
+      const u = who();
+      if (!u) return send(401, { message: 'JWT expired' });
+      const shares = other => other === u || teams.some(t => t.members.some(m => m.user_id === u) && t.members.some(m => m.user_id === other));
+      if (req.method === 'POST') {
+        if (!shares(body.to_user) || !/^[0-9a-f]{16}$/.test(body.to_device) || !/^[A-Za-z0-9_-]+$/.test(body.sealed)) return send(403, { message: 'new row violates row-level security policy' });
+        mailbox.push({ id: randomUUID(), from_user: u, created_at: new Date().toISOString(), expires_at: new Date(Date.now() + 7 * 86_400_000).toISOString(), ...body });
+        return send(201);
+      }
+      if (req.method === 'GET') {
+        const to = (url.searchParams.get('to_device') || '').replace(/^eq\./, '');
+        return send(200, mailbox.filter(m => (m.to_user === u || m.from_user === u) && m.to_device === to).map(({ id, from_device, sealed, created_at }) => ({ id, from_device, sealed, created_at })));
+      }
+      if (req.method === 'DELETE') {
+        const id = (url.searchParams.get('id') || '').replace(/^eq\./, '');
+        const i = mailbox.findIndex(m => m.id === id && (m.to_user === u || m.from_user === u));
+        if (i >= 0) mailbox.splice(i, 1);
+        return send(204);
+      }
+    }
+    if (url.pathname === '/rest/v1/rpc/team_roster' && req.method === 'POST') {
+      const u = who();
+      if (!u) return send(401, { message: 'JWT expired' });
+      const t = teams.find(x => x.id === body.team);
+      if (!t?.members.some(m => m.user_id === u)) return send(200, []);
+      const email = id => [...users].find(([, v]) => v.id === id)?.[0] || null;
+      return send(200, t.members.map(m => ({ user_id: m.user_id, email: email(m.user_id), role: m.role, joined_at: new Date().toISOString(), display_name: null })));
     }
     if (url.pathname === '/rest/v1/team_reports' && req.method === 'POST') {
       const u = who();
@@ -141,7 +174,10 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
     if (m.topic === 'phoenix' && m.event === 'heartbeat') return reply('ok');
     if (m.event === 'phx_join') {
       const u = access.get(m.payload?.access_token);
-      if (!u || m.payload?.config?.private !== true || m.topic !== `realtime:relay:${u}`) { joinsRefused.push(m.topic); return reply('error', { reason: 'Unauthorized: You do not have permissions to read from this Channel topic: ' + m.topic }); }
+      // Own account channel, or (0.16 migration) a team channel of a team this account is a member of.
+      const teamId = m.topic.startsWith('realtime:relay-team:') ? m.topic.slice('realtime:relay-team:'.length) : null;
+      const okTopic = m.topic === `realtime:relay:${u}` || (teamId && teams.some(t => t.id === teamId && t.members.some(x => x.user_id === u)));
+      if (!u || m.payload?.config?.private !== true || !okTopic) { joinsRefused.push(m.topic); return reply('error', { reason: 'Unauthorized: You do not have permissions to read from this Channel topic: ' + m.topic }); }
       c.topics.set(m.topic, { user: u }); return reply('ok', { postgres_changes: [] });
     }
     const t = c.topics.get(m.topic);
@@ -156,7 +192,7 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
 
   await new Promise(r => server.listen(0, '127.0.0.1', r));
   return {
-    url: `http://127.0.0.1:${server.address().port}`, key, requests, devices, codes, state, relayed, joinsRefused, teams, reports,
+    url: `http://127.0.0.1:${server.address().port}`, key, requests, devices, codes, state, relayed, joinsRefused, teams, reports, mailbox,
     /** A team with these accounts (by email) as members; the first is its owner. */
     addTeam: (name, emails) => { const t = { id: randomUUID(), name, members: emails.map((e, i) => ({ user_id: users.get(e).id, role: i ? 'member' : 'owner' })) }; teams.push(t); return t; },
     expireAccessTokens: () => access.clear(),

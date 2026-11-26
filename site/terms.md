@@ -1,6 +1,6 @@
 # Terms of Use
 
-*Effective November 23, 2026*
+*Effective November 26, 2026*
 
 These terms apply to the website vinac.tech, the downloads offered on it, the optional online
 services described in section 4 (accounts, the relay and the Team console), and any communication
@@ -60,8 +60,13 @@ VINAC Link works without an account. If you create one, these extra terms apply.
 - **Free, with limits.** The online services are free during early access and run on our providers'
   free plans. They have usage limits (for example how often codes can be emailed and how much the
   relay carries per device), may be slow, paused or unavailable at times, and come with no
-  guaranteed uptime. Messages that can't be relayed are not kept. Don't rely on the relay as your
-  only way to reach a computer for anything urgent or critical.
+  guaranteed uptime. Sealed messages left in the mailbox for a computer that isn't connected are
+  kept for at most 7 days and may be removed earlier when limits are reached (for example, at most
+  500 waiting per account). Don't rely on the relay or the mailbox as your only way to reach a
+  computer for anything urgent or critical.
+- **Teams.** Pairing with a teammate's computer over the internet needs both people to act and to
+  compare the 6 digits on their screens. Only pair with people you trust: a paired computer can send
+  your agents messages and requests, which your firewall then checks.
 - **Changes and ending.** We may change, limit or stop the online services. If we stop them for
   good, we will say so on this website in advance when we can; VINAC Link keeps working directly
   between your devices without them. You can stop using them and ask us to delete your account at any

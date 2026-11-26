@@ -18,6 +18,7 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
 const BIN = path.join(ROOT, 'connector', 'bin', 'vinac.mjs');
+const CURRENT = (() => { try { return JSON.parse(fs.readFileSync(path.join(ROOT, 'connector', 'package.json'), 'utf8')).version; } catch { return null; } })();
 export const PLUGIN_ID = 'vinac-link@vinac';
 export const SERVER = 'vinac';
 const HOOKS = [
@@ -67,6 +68,8 @@ export function claudeStatus({ dir, env, node = process.execPath, bin = BIN } = 
     installed: Array.isArray(inst) ? inst.length > 0 : !!inst,
     version: Array.isArray(inst) ? inst[0]?.version || null : null,
   };
+  // The plugin is a copy Claude Code made when it was installed: it can fall behind this VINAC Link.
+  plugin.outdated = !!(plugin.installed && plugin.version && CURRENT && plugin.version !== CURRENT);
   const server = config?.mcpServers?.[SERVER] || null;
   const hooks = HOOKS.filter(([ev]) => (settings?.hooks?.[ev] || []).some(g => (g.hooks || []).some(h => isOurHook(h.command)))).length;
   const direct = {
@@ -94,13 +97,23 @@ export function connectableCopy(bin = BIN) {
  * Connects Claude Code to this copy of VINAC Link (or tidies up when the plugin already does).
  * Returns { ok, mode, changed: [files], message, status }.
  */
-export function connectClaude({ dir, env, node = process.execPath, bin = BIN, agent = null } = {}) {
+export function connectClaude({ dir, env, node = process.execPath, bin = BIN, agent = null, replacePlugin = false } = {}) {
   const p = claudePaths({ dir, env });
   const before = claudeStatus({ dir, env, node, bin });
   if (before.error) return { ok: false, mode: before.mode, changed: [], message: before.error, status: before };
   const changed = [];
   const settings = readJson(p.settings) || {};
   const config = readJson(p.config) || {};
+
+  // Switch from the plugin to the direct connection (own identity, always this copy's code): turn the
+  // plugin off in Claude Code's settings (it stays installed; turning it on again is one click there).
+  if (replacePlugin && before.plugin.enabled) {
+    const why = connectableCopy(bin);
+    if (why) return { ok: false, mode: before.mode, changed: [], message: why, status: before };
+    settings.enabledPlugins = { ...(settings.enabledPlugins || {}), [PLUGIN_ID]: false };
+    writeJson(p.settings, settings); changed.push(p.settings);
+    before.plugin.enabled = false;
+  }
 
   if (before.plugin.enabled && before.plugin.installed) {
     // The plugin already brings tools and hooks: remove our direct entries and a hand-made one.
@@ -133,8 +146,8 @@ export function connectClaude({ dir, env, node = process.execPath, bin = BIN, ag
     writeJson(p.settings, settings); changed.push(p.settings);
   }
 
-  return { ok: true, mode: 'direct', changed, status: claudeStatus({ dir, env, node, bin }),
-    message: changed.length ? 'Connected. Start a new Claude Code session (or restart the app) to use VINAC Link.' : 'Already connected. Nothing to change.' };
+  return { ok: true, mode: 'direct', changed: [...new Set(changed)], status: claudeStatus({ dir, env, node, bin }),
+    message: changed.length ? `Connected${replacePlugin ? ' directly (the plugin is turned off)' : ''}. Start a new Claude Code session (or restart the app) to use VINAC Link.` : 'Already connected. Nothing to change.' };
 }
 
 /** Removes the hooks (and, with config, the MCP entry) that point at a vinac.mjs. Returns what changed. */
@@ -169,8 +182,8 @@ export function disconnectClaude({ dir, env, node = process.execPath, bin = BIN 
 /** One line for people: how Claude Code is connected. */
 export function describeClaude(s) {
   if (!s.present) return 'Claude Code was not found on this computer (no ~/.claude folder).';
-  if (s.mode === 'plugin') return `Connected through the VINAC Link plugin${s.plugin.version ? ` (${s.plugin.version})` : ''}: tools, skills and wake-ups.${s.manual || s.direct.server ? ' An extra VINAC Link entry duplicates its tools: connect again to tidy it.' : ''}`;
-  if (s.mode === 'direct') return 'Connected: tools and wake-ups, using this copy of VINAC Link.';
+  if (s.mode === 'plugin') return `Connected through the VINAC Link plugin${s.plugin.version ? ` (${s.plugin.version})` : ''}, as this computer's default agent (no identity of its own).${s.plugin.outdated ? ` The plugin is older than this VINAC Link (${CURRENT}), so Claude has older tools.` : ''} Switch to VINAC Link's own connection for its own identity and the current tools.${s.manual || s.direct.server ? ' An extra VINAC Link entry duplicates its tools.' : ''}`;
+  if (s.mode === 'direct') return `Connected: tools and wake-ups, using this copy of VINAC Link${s.direct.identity ? ', as its own agent' : ''}.`;
   if (s.mode === 'partial') return s.manual ? 'Added by hand (tools only, and it needs Node.js on the PATH): no wake-ups. Connect again to fix it.' : 'Partly connected (tools without wake-ups, or an older copy). Connect again to fix it.';
   return 'Not connected yet.';
 }

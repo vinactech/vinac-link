@@ -152,6 +152,40 @@ export class Cloud {
     return (Array.isArray(rows) ? rows : []).map(r => ({ id: r.team_id, name: r.teams?.name || '', role: r.role }));
   }
 
+  /**
+   * 0.16 team directory: each team with its members (email, role) and their linked computers (name,
+   * fingerprint, public key, platform, version, last seen). Row Level Security lets a member read
+   * only teams they belong to and teammates' computers. Read only.
+   */
+  async teamDirectory() {
+    const teams = (await this.teams()).slice(0, 5);
+    const token = await this.token();
+    const out = [];
+    for (const t of teams) {
+      const roster = await this.call('POST', '/rest/v1/rpc/team_roster', { token, body: { team: t.id } });
+      out.push({ ...t, members: (Array.isArray(roster) ? roster : []).slice(0, 50).map(r => ({ userId: r.user_id, email: r.email || null, role: r.role, name: r.display_name || null, devices: [] })) });
+    }
+    const ids = [...new Set(out.flatMap(t => t.members.map(m => m.userId)))].filter(id => /^[0-9a-f-]{36}$/.test(id));
+    const rows = ids.length ? await this.call('GET', `/rest/v1/devices?select=user_id,fingerprint,public_key,name,platform,app_version,last_seen_at&user_id=in.(${ids.join(',')})`, { token }) : [];
+    for (const t of out) for (const m of t.members) m.devices = (Array.isArray(rows) ? rows : []).filter(d => d.user_id === m.userId)
+      .map(d => ({ fingerprint: d.fingerprint, publicKey: d.public_key, name: d.name, platform: d.platform, version: d.app_version, lastSeenAt: d.last_seen_at }));
+    return out;
+  }
+
+  // ---- 0.16 mailbox: sealed items for a computer that isn't connected (up to 7 days) ----------
+  // The service stores only the sealed bytes, which device it is from and to, and times. Only the two
+  // computers can open an item (it is sealed with their pairing key).
+  async mailboxPut({ teamId = null, toUser, fromDevice, toDevice, sealed }) {
+    await this.call('POST', '/rest/v1/mailbox', { token: await this.token(), body: { team_id: teamId, to_user: toUser, from_device: fromDevice, to_device: toDevice, sealed }, headers: { prefer: 'return=minimal' } });
+  }
+  async mailboxTake(toDevice) {
+    const rows = await this.call('GET', `/rest/v1/mailbox?select=id,from_device,sealed,created_at&to_device=eq.${encodeURIComponent(toDevice)}&expires_at=gt.${encodeURIComponent(new Date().toISOString())}&order=created_at.asc&limit=50`, { token: await this.token() });
+    return Array.isArray(rows) ? rows : [];
+  }
+  async mailboxDelete(id) {
+    await this.call('DELETE', `/rest/v1/mailbox?id=eq.${encodeURIComponent(id)}`, { token: await this.token() });
+  }
+
   /** Shares one month's signed activity summary (counts only) with a team; again for the same month replaces it. */
   async shareReport({ team, fingerprint, period, payload, signature }) {
     const a = this.account();

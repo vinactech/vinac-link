@@ -178,6 +178,14 @@ const exact = {
   'Other agent apps': 'Autres applications d\'agents',
   'The AI apps on this computer that use VINAC Link: connect them in one click, and see which agent did what.': 'Les applications d\'IA de cet ordinateur qui utilisent VINAC Link : connectez-les en un clic, et voyez quel agent a fait quoi.',
   'These connect through a setting you paste into the app once (they use this computer\'s VINAC Link; nothing to install).': 'Celles-ci se connectent avec un réglage à coller une fois dans l\'application (elles utilisent le VINAC Link de cet ordinateur; rien à installer).',
+  'Switch to VINAC Link\'s own connection': 'Passer à la connexion propre de VINAC Link',
+  'This computer\'s default agent (plugins, terminals)': 'Agent par défaut de cet ordinateur (extensions, terminaux)',
+  'This computer\'s default agent': 'Agent par défaut de cet ordinateur', 'Not connected yet:': 'Pas encore connectés :',
+  'Your teams\' computers': 'Les ordinateurs de vos équipes', 'No computer linked yet.': 'Aucun ordinateur lié pour l\'instant.',
+  'Add to the room': 'Ajouter au salon', 'Ignore': 'Ignorer', 'Pair over the internet': 'Jumeler par Internet', 'Pairing request': 'Demande de jumelage',
+  'Paired · online': 'Jumelé · en ligne', 'Not paired': 'Non jumelé', 'Key does not match: check this pairing': 'La clé ne correspond pas : vérifiez ce jumelage',
+  'Teammates\' linked computers, and whether this one is paired with them. Pairing a teammate\'s computer over the internet is coming next; today, pair in person or with an invite.':
+    'Les ordinateurs liés de vos coéquipiers, et si celui-ci est jumelé avec eux. Le jumelage avec l\'ordinateur d\'un coéquipier par Internet arrive bientôt; aujourd\'hui, jumelez en personne ou avec une invitation.',
   'Everything waits for you': 'Tout attend votre accord', 'Questions go through, changes wait': 'Les questions passent, les changements attendent',
   'Trusted devices: more goes through': 'Appareils de confiance : plus de choses passent', 'Follow the mode for all devices': 'Suivre le mode de tous les appareils',
   'No projects yet. A project gives the agents on this computer one room and one task board, so Codex and Claude Code can hand work to each other, and lets them use the project\'s keys without seeing them.':
@@ -378,8 +386,8 @@ const exact = {
   'Linking sends this computer\'s name, key fingerprint and public key, its system and VINAC Link version to the account service (Supabase, stored in Canada). Never messages, keys, files or the activity log. With the relay on, sealed messages pass through it; it sees which computers talk and when, never what they say. Agents can\'t sign in, link computers or turn on the relay.':
     'Lier cet ordinateur envoie son nom, l\'empreinte et la clé publique de sa clé, son système et sa version de VINAC Link au service de comptes (Supabase, hébergé au Canada). Jamais les messages, les clés, les fichiers ni le journal d\'activité. Avec le relais activé, les messages scellés y transitent : il voit quels ordinateurs communiquent et quand, jamais ce qu\'ils disent. Les agents ne peuvent ni se connecter, ni lier des ordinateurs, ni activer le relais.',
   'Relay': 'Relais', 'Use when a direct link fails': 'Utiliser quand le lien direct échoue',
-  'When a computer paired with this one and linked to this account can\'t be reached on the same network or through Tailscale, messages go through the account service instead. They stay sealed end to end, so the service can\'t read them. Pairing never goes through it. Up to 200 KB at a time.':
-    'Quand un ordinateur jumelé avec celui-ci et lié à ce compte est injoignable sur le même réseau ou par Tailscale, les messages passent par le service de comptes. Ils restent scellés de bout en bout : le service ne peut pas les lire. Le jumelage n\'y passe jamais. Jusqu\'à 200 Ko à la fois.',
+  'When a computer paired with this one, and linked to this account or to a teammate\'s, can\'t be reached on the same network or through Tailscale, messages go through the account service instead. They stay sealed end to end, so the service can\'t read them. Pairing never goes through it. Up to 200 KB at a time.':
+    'Quand un ordinateur jumelé avec celui-ci, et lié à ce compte ou à celui d\'un coéquipier, est injoignable sur le même réseau ou par Tailscale, les messages passent par le service de comptes. Ils restent scellés de bout en bout : le service ne peut pas les lire. Le jumelage n\'y passe jamais. Jusqu\'à 200 Ko à la fois.',
   'Off': 'Désactivé', 'On · connected': 'Activé · connecté', 'On · connecting…': 'Activé · connexion…', 'Relay on.': 'Relais activé.', 'Relay off.': 'Relais désactivé.',
   'via relay': 'par le relais', 'Online via relay': 'En ligne par le relais', 'Online now, via relay': 'En ligne, par le relais',
   'Sealed end to end; passed through the account service because no direct link worked.': 'Scellé de bout en bout ; passé par le service de comptes faute de lien direct.',

@@ -4,6 +4,9 @@
 //    receiver checks them exactly as it does on the network) AND linked to the same account.
 //  - The channel is private: `relay:<account id>`. Realtime Authorization policies (see
 //    supabase/migrations) let a signed-in person join and send only on their own account's channel.
+//  - 0.16 team relay: the same connection also joins one private channel per team the account is in,
+//    `relay-team:<team id>` (members only, see the 0.16 migration). Frames to a TEAMMATE's computer go
+//    there; the daemon allows it only for computers paired in person whose key matches the team directory.
 //  - Pairing never goes through the relay; neither do the page or agent APIs.
 //  - Off until the person turns it on (page only). Supabase sees device ids, which route was asked
 //    (session, message, ...), sizes and times; never contents, keys or names of what is inside.
@@ -16,6 +19,9 @@ const JOIN_TIMEOUT_MS = 10_000;
 const TOKEN_PUSH_MS = 30 * 60_000;           // pushes a fresh access token well before it expires
 export const RELAY_MAX = 200 * 1024;          // one frame as JSON (Supabase Free drops broadcasts over 256 KB)
 export const RELAY_ROUTES = new Set(['/noise', '/session', '/whoami', '/msg', '/secret', '/secret-ack', '/unpair']);
+// 0.16: pairing with a TEAMMATE over the internet. Only on a team channel, only while that pairing is
+// open (the daemon's pairGate decides), and the people still compare 6 digits on both screens.
+export const TEAM_PAIR_ROUTES = new Set(['/pair/offer', '/pair/hello', '/pair/reveal', '/pair/confirm', '/pair/status', '/pair/cancel']);
 const ID = /^[A-Za-z0-9_-]{16}$/;
 const PEER = /^[0-9a-f]{16}$/;
 
@@ -26,16 +32,35 @@ export class Relay {
    * cloud: the account (token(), account()); meId: this device's id; onRequest(route, body, from) runs
    * a frame like the network side would; allowed(peerId) says if that device may use the relay.
    */
-  constructor({ cloud, meId, onRequest, allowed, log = () => {}, WebSocketImpl = globalThis.WebSocket }) {
-    Object.assign(this, { cloud, meId, onRequest, allowed, log, WS: WebSocketImpl });
+  constructor({ cloud, meId, onRequest, allowed, topicFor = () => null, pairGate = async () => false, log = () => {}, WebSocketImpl = globalThis.WebSocket }) {
+    Object.assign(this, { cloud, meId, onRequest, allowed, topicFor, pairGate, log, WS: WebSocketImpl });
+    this.teamIds = []; this.teamJoins = new Map();   // team topic -> join ref (joined) 
     this.ws = null; this.state = 'off'; this.error = null; this.ref = 0; this.joinRef = null;
     this.pending = new Map();                   // request id -> { resolve, reject, timer }
     this.inLimiter = new RateLimiter(240);      // frames per device per minute, each way
     this.outLimiter = new RateLimiter(240);
-    this.retryMs = 2000; this.wanted = false;
+    this.retryMs = 2000; this.wanted = false; this.pendingJoins = new Map();
   }
 
   get topic() { return `realtime:relay:${this.cloud.account()?.userId}`; }
+  teamTopic(teamId) { return `realtime:relay-team:${teamId}`; }
+  joinedTopics() { return [this.topic, ...[...this.teamJoins.keys()]]; }
+
+  /** The teams whose channels to join (from the team directory); joins new ones, leaves old ones. */
+  setTeams(ids) {
+    this.teamIds = [...new Set((ids || []).filter(id => /^[0-9a-f-]{36}$/.test(String(id))))].slice(0, 5);
+    if (this.ready()) this.syncTeams();
+  }
+  async syncTeams() {
+    const want = new Set(this.teamIds.map(id => this.teamTopic(id)));
+    for (const [topic, ref] of this.teamJoins) if (!want.has(topic)) { this.send({ topic, event: 'phx_leave', payload: {}, ref: String(++this.ref), join_ref: ref }); this.teamJoins.delete(topic); }
+    let token; try { token = await this.cloud.token(); } catch { return; }
+    for (const topic of want) if (!this.teamJoins.has(topic)) {
+      const ref = String(++this.ref);
+      this.pendingJoins.set(ref, topic);
+      this.send({ topic, event: 'phx_join', payload: { config: { broadcast: { self: false, ack: false }, presence: { enabled: false }, postgres_changes: [], private: true }, access_token: token }, ref, join_ref: ref });
+    }
+  }
   view() { return { state: this.state, ...(this.error ? { error: this.error } : {}) }; }
   ready() { return this.state === 'connected'; }
 
@@ -69,6 +94,7 @@ export class Relay {
       this.beat = setInterval(() => this.send({ topic: 'phoenix', event: 'heartbeat', payload: {}, ref: String(++this.ref) }), HEARTBEAT_MS);
       this.refresh = setInterval(() => this.pushToken(), TOKEN_PUSH_MS);
       this.beat.unref?.(); this.refresh.unref?.();
+      this.syncTeams();
     } catch (e) {
       clearTimeout(t);
       this.error = e.message; this.state = 'error';
@@ -77,7 +103,7 @@ export class Relay {
   }
 
   async pushToken() {
-    try { this.push('access_token', { access_token: await this.cloud.token() }); } catch (e) { this.error = e.message; }
+    try { const access_token = await this.cloud.token(); this.push('access_token', { access_token }); for (const [topic, ref] of this.teamJoins) this.send({ topic, event: 'access_token', payload: { access_token }, ref: String(++this.ref), join_ref: ref }); } catch (e) { this.error = e.message; }
   }
 
   stop() {
@@ -96,6 +122,7 @@ export class Relay {
 
   cleanup() {
     clearInterval(this.beat); clearInterval(this.refresh);
+    this.teamJoins.clear(); this.pendingJoins.clear();
     for (const [, p] of this.pending) { clearTimeout(p.timer); p.reject(httpError(0, 'relay closed')); }
     this.pending.clear();
   }
@@ -110,7 +137,11 @@ export class Relay {
 
   send(msg) { if (this.ws?.readyState === 1) this.ws.send(JSON.stringify(msg)); }
   push(event, payload, ref = String(++this.ref)) { this.send({ topic: this.topic, event, payload, ref, join_ref: this.joinRef }); }
-  broadcast(event, payload) { this.push('broadcast', { type: 'broadcast', event, payload }); }
+  broadcast(event, payload, topic = this.topic) {
+    if (topic === this.topic) return this.push('broadcast', { type: 'broadcast', event, payload });
+    const ref = this.teamJoins.get(topic); if (!ref) return;
+    this.send({ topic, event: 'broadcast', payload: { type: 'broadcast', event, payload }, ref: String(++this.ref), join_ref: ref });
+  }
 
   onFrame(data) {
     let m; try { m = JSON.parse(typeof data === 'string' ? data : Buffer.from(data).toString('utf8')); } catch { return; }
@@ -126,12 +157,19 @@ export class Relay {
       }
       return;
     }
+    // A team channel's join answer: joined, or refused (not a member any more): only that channel.
+    if (m.event === 'phx_reply' && this.pendingJoins.has(m.ref)) {
+      const topic = this.pendingJoins.get(m.ref); this.pendingJoins.delete(m.ref);
+      if (m.payload?.status === 'ok') this.teamJoins.set(topic, m.ref); else this.log(`relay: team channel refused (${topic.split(':').pop().slice(0, 8)}…)`);
+      return;
+    }
+    if ((m.event === 'phx_error' || m.event === 'phx_close') && this.teamJoins.has(m.topic)) { this.teamJoins.delete(m.topic); return; }
     if (m.event === 'phx_error' || m.event === 'phx_close') { try { this.ws?.close(); } catch { /* closed */ } return; }
-    if (m.event !== 'broadcast' || m.topic !== this.topic) return;
+    if (m.event !== 'broadcast' || (m.topic !== this.topic && !this.teamJoins.has(m.topic))) return;
     const b = m.payload?.payload;
     if (!b || typeof b !== 'object' || b.to !== this.meId || !PEER.test(String(b.from)) || !ID.test(String(b.id))) return;
     if (m.payload.event === 'res') return this.onResponse(b);
-    if (m.payload.event === 'req') return this.onRequestFrame(b);
+    if (m.payload.event === 'req') return this.onRequestFrame(b, m.topic);
   }
 
   onResponse(b) {
@@ -143,20 +181,22 @@ export class Relay {
     else p.reject(Object.assign(httpError(Number(b.status) || 502, typeof body.error === 'string' ? body.error.slice(0, 300) : 'relay error'), { data: body }));
   }
 
-  async onRequestFrame(b) {
-    const reply = (status, body) => this.broadcast('res', { id: b.id, from: this.meId, to: b.from, status, body });
-    if (!RELAY_ROUTES.has(b.route)) return reply(404, { error: 'Not found' });
+  async onRequestFrame(b, topic = this.topic) {
+    const reply = (status, body) => this.broadcast('res', { id: b.id, from: this.meId, to: b.from, status, body }, topic);
+    const pairing = TEAM_PAIR_ROUTES.has(b.route) && topic !== this.topic;
+    if (!RELAY_ROUTES.has(b.route) && !pairing) return reply(404, { error: 'Not found' });
     if (!b.body || typeof b.body !== 'object' || Array.isArray(b.body) || b.body.from !== b.from) return reply(400, { error: 'BAD_REQUEST' });
     if (!this.inLimiter.allow(b.from)) return reply(429, { error: 'TOO_MANY_REQUESTS' });
-    if (!(await this.allowed(b.from))) return reply(403, { error: 'NOT_ON_RELAY' });
+    if (pairing ? !(await this.pairGate(b.from, topic, b.route)) : !(await this.allowed(b.from, topic === this.topic ? null : topic))) return reply(403, { error: 'NOT_ON_RELAY' });
     try { reply(200, await this.onRequest(b.route, b.body, b.from)); }
     catch (e) { reply(e.status || 500, { error: e.status ? e.message : 'Internal error' }); }
   }
 
   /** Like postJson to the device, but through the relay. */
-  request(peerId, route, body, timeoutMs = 8000) {
+  request(peerId, route, body, timeoutMs = 8000, teamTopic = null) {
     if (!this.ready()) return Promise.reject(httpError(0, 'relay not connected'));
-    if (!RELAY_ROUTES.has(route)) return Promise.reject(httpError(400, 'This does not go through the relay.'));
+    const pairing = TEAM_PAIR_ROUTES.has(route) && teamTopic && this.teamJoins.has(teamTopic);
+    if (!RELAY_ROUTES.has(route) && !pairing) return Promise.reject(httpError(400, 'This does not go through the relay.'));
     if (!this.outLimiter.allow(peerId)) return Promise.reject(httpError(429, 'Too many messages through the relay. Wait a minute.'));
     const id = randomBytes(12).toString('base64url');
     const payload = { id, from: this.meId, to: peerId, route, body };
@@ -164,7 +204,9 @@ export class Relay {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => { this.pending.delete(id); reject(httpError(0, 'relay timeout')); }, timeoutMs);
       this.pending.set(id, { resolve, reject, timer, peer: peerId });
-      this.broadcast('req', payload);
+      // A teammate's computer: on the team channel you share; your own computers: on your account's channel.
+      const team = teamTopic || this.topicFor(peerId);
+      this.broadcast('req', payload, team && this.teamJoins.has(team) ? team : this.topic);
     });
   }
 }

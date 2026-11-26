@@ -98,6 +98,61 @@ async function loadAccountTeams(a) {
     $('sharePeriod').replaceChildren(...months.map((m, i) => new Option(`${new Date(`${m}-15`).toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}${i ? '' : ' (so far)'}`, m)));
   } catch { box.hidden = true; }
 }
+// 0.16 pairing with a teammate's computer over the internet: then the pairing screen (6 digits).
+async function startTeamPair(d) {
+  if (!confirm(`Send a pairing request to ${d.name}? Its owner accepts it on that computer, then you both compare 6 digits (by phone or chat) and press Allow. The relay must be on, on both computers.`)) return;
+  try { const s = await api('POST', '/ui/team/pair', { fingerprint: d.fingerprint }); accountModal.hidden = true; wantPair = true; mobileMain = true; render(s); }
+  catch (e) { toast(e.message); }
+}
+async function acceptTeamPair(from) {
+  try { const s = await api('POST', '/ui/team/pair/accept', { from }); accountModal.hidden = true; closeNeedsPop?.(); wantPair = true; mobileMain = true; render(s); }
+  catch (e) { toast(e.message); }
+}
+// 0.16 team directory: teammates' linked computers and whether this one is paired with each.
+async function loadTeamDirectory(a) {
+  const box = $('accountTeamDir'), list = $('teamDirList');
+  if (!a.signedIn) { box.hidden = true; return; }
+  let teams, offers;
+  try { ({ teams, offers = [] } = await api('GET', '/ui/account/team')); } catch { box.hidden = true; return; }
+  box.hidden = !teams.length;
+  const OS = { win32: 'Windows', darwin: 'macOS', linux: 'Linux' };
+  // Requests from teammates' computers to pair with this one (both people act; then 6 digits to compare).
+  const offerEls = offers.map(o => {
+    const d = document.createElement('div'); d.className = 'td-offer';
+    d.append(text('span', `${o.email || 'A teammate'} wants to pair ${o.name} with this computer.`));
+    const yes = button('Accept', () => acceptTeamPair(o.from)); yes.className = 'primary small-btn';
+    const no = button('Ignore', async () => { try { render(await api('POST', '/ui/team/pair/ignore', { from: o.from })); loadTeamDirectory(a); } catch (e) { toast(e.message); } }); no.className = 'ghost small-btn';
+    d.append(yes, no); return d;
+  });
+  list.replaceChildren(...offerEls, ...teams.map(t => {
+    const card = document.createElement('section'); card.className = 'td-team';
+    const h = document.createElement('div'); h.className = 'td-head';
+    h.append(text('b', t.name), Object.assign(text('span', t.role), { className: 'rc-tag' }));
+    card.append(h);
+    for (const m of t.members) {
+      const row = document.createElement('div'); row.className = 'td-member';
+      row.append(text('b', `${m.name || m.email || 'A teammate'}${m.you ? ' (you)' : ''}`), Object.assign(text('small', m.role), { className: 'td-role' }));
+      const ul = document.createElement('ul'); ul.className = 'td-devices';
+      if (!m.devices.length) { const li = text('li', 'No computer linked yet.'); li.className = 'td-none'; ul.append(li); }
+      for (const d of m.devices) {
+        const li = document.createElement('li'); li.className = 'td-device';
+        const nm = text('span', d.name); nm.className = 'td-name'; nm.setAttribute('translate', 'no');
+        const meta = text('small', [OS[d.platform], d.version ? `v${d.version}` : '', d.lastSeenAt ? `seen ${new Date(d.lastSeenAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })}` : ''].filter(Boolean).join(' · '));
+        meta.title = d.fingerprint;
+        const st = d.keyMismatch ? ['Key does not match: check this pairing', 'warn'] : d.thisDevice ? ['This computer', 'me'] : d.paired ? [d.online ? 'Paired · online' : 'Paired', 'ok'] : ['Not paired', 'dim'];
+        const chip = text('span', st[0]); chip.className = `td-chip ${st[1]}`;
+        li.append(nm, chip, meta);
+        if (!m.you && !d.thisDevice && !d.paired) {
+          const go = button('Pair over the internet', () => startTeamPair(d)); go.className = 'ghost small-btn td-pair';
+          li.append(go);
+        }
+        ul.append(li);
+      }
+      row.append(ul); card.append(row);
+    }
+    return card;
+  }));
+}
 $('shareBtn').onclick = async () => {
   try {
     const r = await api('POST', '/ui/account/share', { team: $('shareTeam').value, period: $('sharePeriod').value });
@@ -105,7 +160,7 @@ $('shareBtn').onclick = async () => {
   } catch (e) { toast(e.message); }
 };
 async function accountDo(method, path, body) {
-  try { const { account } = await api(method, path, body); renderAccount(account); if (account.signedIn) { loadAccountDevices(); loadAccountTeams(account); } return account; }
+  try { const { account } = await api(method, path, body); renderAccount(account); if (account.signedIn) { loadAccountDevices(); loadAccountTeams(account); loadTeamDirectory(account); } return account; }
   catch (e) { toast(e.message); return null; }
 }
 $('accountNav').onclick = async () => { accountModal.hidden = false; const a = await accountDo('GET', '/ui/account'); if (a && !a.signedIn && !a.pendingEmail) $('accountEmail').focus(); };
@@ -759,7 +814,8 @@ function renderClaude(c) {
   $('claudeText').className = `claude-line ${connected && !tidy ? 'ok' : c.present ? 'warn' : ''}`;
   $('claudeState').textContent = !c.present ? '' : connected ? '· connected' : '· not connected';
   $('claudeConnect').textContent = connected ? (tidy ? 'Tidy up' : 'Connect again') : 'Connect Claude Code';
-  $('claudeConnect').hidden = (connected && !tidy && c.mode === 'plugin') || !!(c.copyProblem && !connected);
+  if (c.mode === 'plugin') $('claudeConnect').textContent = 'Switch to VINAC Link\'s own connection';
+  $('claudeConnect').hidden = !!(c.copyProblem && !connected);
   $('claudeRemove').hidden = c.mode !== 'direct' && !c.direct?.server;
   $('claudeBanner').hidden = !c.present || connected || c.dismissed || !!c.copyProblem;
   if (c.mode === 'partial') $('claudeBannerText').textContent = 'It was added by hand, without wake-ups. Connect it again to fix that.';
@@ -772,7 +828,11 @@ async function connectClaudeNow(body = {}) {
   } catch (e) { toast(e.message); }
   refreshClaude();
 }
-$('claudeConnect')?.addEventListener('click', () => connectClaudeNow());
+$('claudeConnect')?.addEventListener('click', () => {
+  const plugin = $('claudeConnect').textContent.startsWith('Switch');
+  if (plugin && !confirm('Turn off the VINAC Link plugin in Claude Code and connect directly instead? Claude Code gets its own identity and the current tools; its skills (/vinac-link:…) go away. You can turn the plugin back on in Claude Code.')) return;
+  connectClaudeNow(plugin ? { replacePlugin: true } : {});
+});
 $('claudeBannerConnect')?.addEventListener('click', () => connectClaudeNow());
 $('claudeBannerLater')?.addEventListener('click', () => { $('claudeBanner').hidden = true; connectClaudeNow({ dismiss: true }); });
 $('claudeRemove')?.addEventListener('click', () => { if (confirm('Disconnect Claude Code from VINAC Link? Its agents lose the VINAC Link tools after their next start.')) connectClaudeNow({ remove: true }); });
@@ -814,7 +874,7 @@ function checks(box, items, picked = []) {
 const picked = box => [...box.querySelectorAll('input:checked')].map(c => c.value);
 $('projNewBtn').onclick = () => {
   const f = $('projNewForm'); f.hidden = !f.hidden;
-  checks($('projNewAgents'), state.agents || [], (state.agents || []).filter(a => /claude|codex/i.test(a.name)).map(a => a.id));
+  checks($('projNewAgents'), [...(state.agents || []), { id: 'default', name: 'This computer\'s default agent (plugins, terminals)' }], (state.agents || []).filter(a => /claude|codex/i.test(a.name)).map(a => a.id));
   const has = re => (state.agents || []).some(a => re.test(a.name));
   $('projConnectClaude').hidden = has(/claude/i); $('projConnectCodex').hidden = has(/codex/i);
   $('projNewAgentsNote').hidden = has(/claude/i) && has(/codex/i);
@@ -874,7 +934,7 @@ $('fbUse').onclick = async () => { if (fbAt) { await setFolder(fbAt.path); $('fo
 async function connectFromProject(app) {
   try { toast((await api('POST', `/ui/connect/${app}`, {})).message); } catch (e) { toast(e.message); }
   const s = await api('GET', '/ui/state'); render(s);
-  checks($('projNewAgents'), s.agents || [], [...picked($('projNewAgents')), ...(s.agents || []).filter(a => /claude|codex/i.test(a.name)).map(a => a.id)]);
+  checks($('projNewAgents'), [...(s.agents || []), { id: 'default', name: 'This computer\'s default agent (plugins, terminals)' }], [...picked($('projNewAgents')), ...(s.agents || []).filter(a => /claude|codex/i.test(a.name)).map(a => a.id)]);
   const has = re => (s.agents || []).some(a => re.test(a.name));
   $('projConnectClaude').hidden = has(/claude/i); $('projConnectCodex').hidden = has(/codex/i);
   $('projNewAgentsNote').hidden = has(/claude/i) && has(/codex/i);
@@ -973,17 +1033,37 @@ function drawProject() {
   const tb = document.createElement('button'); tb.className = 'primary'; tb.type = 'submit'; tb.textContent = 'Add task';
   addTask.append(ti, tb);
   addTask.onsubmit = async e => { e.preventDefault(); if (!ti.value.trim() || !d.room) return; try { await api('POST', '/ui/card', { room: d.room.id, card: { type: 'task', title: ti.value.trim() } }); ti.value = ''; ti.blur(); loadProject(d.project.id); } catch (err) { toast(err.message); } };
-  const boardSec = sec('Task board', roomNote, cols, ...(d.room ? [addTask] : []),
+  // 0.16 team projects: add a paired computer (your own, or a teammate's) to the project room.
+  const addDev = document.createElement('form'); addDev.className = 'proj-inline';
+  const others = (state.peers || []).filter(x => d.room && !d.room.members.includes(x.name));
+  if (d.room && others.length) {
+    const sel = document.createElement('select'); sel.setAttribute('aria-label', 'Computer to add');
+    for (const x of others) sel.append(new Option(x.name, x.id));
+    const ab = document.createElement('button'); ab.type = 'submit'; ab.className = 'ghost'; ab.textContent = 'Add to the room';
+    addDev.append(sel, ab);
+    addDev.onsubmit = async e => {
+      e.preventDefault();
+      try { render(await api('POST', '/ui/rooms/members', { id: d.room.id, add: [sel.value] })); loadProject(d.project.id); toast('Added. Its agents see the project\'s posts from now on, through its own firewall.'); } catch (err) { toast(err.message); }
+    };
+  }
+  const boardSec = sec('Task board', roomNote, cols, ...(d.room ? [addTask] : []), ...(addDev.childElementCount ? [addDev] : []),
     ...(d.board.decisions.length ? [note(`${d.board.decisions.length} decision(s) wait for you in the room.`)] : []));
   boardSec.classList.add('wide');
 
   // Agents
   let agentsSec;
-  if (d.agents.length) {
+  const named = d.agents.filter(a => a.id !== 'default');
+  const hasApp = re => named.some(a => re.test(a.name));
+  if (true) {
     const ag = document.createElement('div'); ag.className = 'proj-checks';
     checks(ag, d.agents, d.project.agents);
     const saveAgents = small('ghost', 'Save agents', async () => { try { projData = await api('POST', '/ui/projects/agents', { id: d.project.id, agents: picked(ag) }); drawProject(); toast('Saved.'); } catch (e) { toast(e.message); } });
-    agentsSec = sec('Agents', note('Only the agents ticked here post in the project room. None ticked: any agent here may.'), ag, saveAgents);
+    const connectRow = document.createElement('div'); connectRow.className = 'row';
+    for (const [app, label, re] of [['claude', 'Connect Claude Code', /claude/i], ['codex', 'Connect Codex', /codex/i]]) if (!hasApp(re)) connectRow.append(small('ghost', label, async () => {
+      try { toast((await api('POST', `/ui/connect/${app}`, {})).message); } catch (e) { toast(e.message); }
+      render(await api('GET', '/ui/state')); refreshClaude(); refreshCodex(); loadProject(d.project.id);
+    }));
+    agentsSec = sec('Agents', note('Only the agents ticked here post in the project room; the others are refused there. None ticked: any agent here may. "Default agent" is anything without its own identity: a plugin, a terminal, OpenClaw.'), ag, saveAgents, ...(connectRow.childElementCount ? [note('Not connected yet:'), connectRow] : []));
   } else {
     const row = document.createElement('div'); row.className = 'row';
     for (const [app, label] of [['claude', 'Connect Claude Code'], ['codex', 'Connect Codex']]) row.append(small('ghost', label, async () => {
@@ -1979,7 +2059,7 @@ $('explainClose').onclick = () => { $('explainModal').hidden = true; };
 $('explainModal').addEventListener('click', e => { if (e.target === $('explainModal')) $('explainModal').hidden = true; });
 
 // "Needs me": everything waiting for the person, across rooms and conversations, with the action at hand.
-const NEED_LABEL = { request: 'Held request', decision: 'Decision', key: 'Key request', task: 'Open task', keyOffer: 'Key to accept', run: 'Program asks', keyAsk: 'Key asked for', mention: 'Mention' };
+const NEED_LABEL = { pairOffer: 'Pairing request', request: 'Held request', decision: 'Decision', key: 'Key request', task: 'Open task', keyOffer: 'Key to accept', run: 'Program asks', keyAsk: 'Key asked for', mention: 'Mention' };
 // It lives in two places: the panel at the top of the Overview, and the bell (count + dropdown).
 function renderNeeds() {
   const needs = state.needsMe || [];
@@ -2015,6 +2095,7 @@ function fillNeeds(list, needs, max) {
     if (n.kind === 'decision') for (const o of n.options || []) acts.append(button(o, () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'answer', option: o } })));
     else if (n.kind === 'request' || n.kind === 'run' || n.kind === 'keyAsk') acts.append(button('Open', () => { closeNeedsPop(); if (n.kind === 'request') openFirewall(); else $('secretsNav').click(); }));
     else if (n.kind === 'keyOffer') acts.append(button('Open', () => { closeNeedsPop(); $('secretsNav').click(); }));
+    else if (n.kind === 'pairOffer') acts.append(button('Accept', () => acceptTeamPair(n.from)), button('Ignore', () => act('POST', '/ui/team/pair/ignore', { from: n.from })));
     else if (n.kind === 'key' && n.local) acts.append(button('Add key', () => { closeNeedsPop(); $('secretsNav').click(); }), button('Open', go));
     else if (n.kind === 'key') acts.append(button('Send', async () => { if (!confirm(`Send this key to ${n.from}? It goes sealed to that device only.`)) return; try { render(await api('POST', '/ui/card/send-key', { card: n.card })); toast('Sent.'); } catch (e) { toast(e.message); } }), button('Open', go));
     else if (n.kind === 'task') acts.append(button('Claim', () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'claim' } })), button('Open', go));
@@ -2353,7 +2434,7 @@ function renderNearby() {
 }
 
 function renderPairing(p) {
-  const view = !p ? 'idle' : isWaitingToBePicked(p) ? 'idle' : p.state === 'announcing' && p.invite ? 'invite' : VIEW_OF[p.state] || 'idle';
+  const view = !p ? 'idle' : isWaitingToBePicked(p) ? 'idle' : p.state === 'announcing' && p.invite ? 'invite' : p.state === 'announcing' && p.team ? 'connecting' : VIEW_OF[p.state] || 'idle';
   $('tailscaleRow').hidden = !state?.device?.tailscale;
   $('inviteTsRow').hidden = !state?.device?.tailscale;
   card.dataset.viewNow = view;
@@ -2383,12 +2464,14 @@ function renderPairing(p) {
     $('codeBox').classList.toggle('plain', !!p.quiet);
     if (p.quiet) $('codeBox').open = true;
   }
-  if (view === 'connecting') $('connectText').textContent = p.message;
+  if (view === 'connecting') $('connectText').textContent = p.team && p.state === 'announcing'
+    ? `Request sent. Waiting for ${p.team.email || 'your teammate'} to accept it on ${p.team.name}…`
+    : p.team ? `Connecting to ${p.team.name} through your team's channel…` : p.message;
   if (view === 'comparing') {
     const six = c => (c ? `${c.slice(0, 3)} ${c.slice(3)}` : '--- ---');
     $('digits').textContent = six(p.matchCode || p.showCode);
     $('myCode').textContent = six(p.showCode);
-    $('peerName').textContent = p.peer?.name || 'the other device';
+    $('peerName').textContent = p.team ? `${p.peer?.name || p.team.name} (${p.team.email || 'your teammate'}; compare the digits by phone or chat)` : p.peer?.name || 'the other device';
     $('peerFp').textContent = p.peer?.fingerprint || '';
     $('matchActions').hidden = p.confirmedHere;
     $('olderBox').hidden = p.confirmedHere || !!p.join || !!p.invite;

@@ -350,6 +350,30 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     fs.mkdirSync(path.join(APP, 'lab', 'js'), { recursive: true });
     for (const f of ['audio.js', 'modem.js', 'frame.js', 'fec.js', 'bytes.js', 'crypto.js', 'logos.js']) fs.copyFileSync(path.join(ROOT, 'lab', 'js', f), path.join(APP, 'lab', 'js', f));
     fs.cpSync(path.join(ROOT, 'lab', 'worklets'), path.join(APP, 'lab', 'worklets'), { recursive: true });
+    // 0.16: the same folder is also app.vinac.tech (a subdomain whose document root is this folder), so
+    // it carries its own icons and its own complete server rules (a subdomain inherits nothing).
+    for (const s of ['128', '512']) fs.copyFileSync(path.join(SITE, 'brand', `icon-${s}.png`), path.join(APP, `icon-${s}.png`));
+    fs.writeFileSync(path.join(APP, '.htaccess'), `# The phone vault web app: vinac.tech/app/ and app.vinac.tech (same files).
+Options -Indexes
+DirectoryIndex index.html
+<IfModule mod_rewrite.c>
+  RewriteEngine On
+  RewriteRule (^|/)\\.(?!well-known/) - [F]
+</IfModule>
+AddType application/manifest+json .webmanifest
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "camera=(self), microphone=(self), geolocation=()"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Robots-Tag "noindex, nofollow"
+  <FilesMatch "^(sw\\.js|index\\.html|manifest\\.webmanifest)$">
+    Header set Cache-Control "no-cache"
+  </FilesMatch>
+</IfModule>
+`);
   }
 
   // The Team console (/console/): the one page that talks to another site, the account service. Its own
