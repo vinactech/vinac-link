@@ -20,6 +20,17 @@
 //        phone id = SHA-256(ppub)[0..8]; additional data = the 25-byte header; inside:
 //        name (1..40, [A-Za-z0-9_.-]) | 0x00 | value (UTF-8, 1..200 bytes)
 //      The counter only grows, so a recording played again is refused.
+//
+// Phone vault 2.0 (0.16): keys go both ways, and a phone can pair with another phone.
+//   - The side that showed the pairing link is the HOST (a computer, or a phone); the side that
+//     opened it is the GUEST (always a phone). A phone host's link starts with 0x02 instead of 0x01.
+//   - GUEST to HOST: the SECRET above (0xC7, key kenc). HOST to GUEST: KEY DOWN
+//        0xC8 | pairing id (8) | counter (4) | nonce (12) | AES-256-GCM(kdown) | CRC-16
+//        kdown = HMAC-SHA256(kenc, "VINAC phone down v1"); the same 25-byte header as additional
+//        data, the same name | 0x00 | value inside, its own counter.
+//   - Anything for a phone can travel as a link its camera opens (the part after # never leaves the
+//     phone): https://vinac.tech/app/#h=<HELLO> for a phone host, #k=<SECRET or KEY DOWN>. Sound
+//     still works both ways; a computer can't read a QR code, so a phone always plays to it.
 import { crc16 } from './beacon.js';
 
 export const PHONE_HELLO = 0xc6;
@@ -46,10 +57,10 @@ export function cleanName(name, max) {
   return s;
 }
 
-export function encodePairLink({ cpub, secret, name }) {
+export function encodePairLink({ cpub, secret, name, host = 'computer' }) {
   const n = te.encode(cleanName(name, 24));
   const out = new Uint8Array(1 + 32 + 16 + n.length);
-  out[0] = PAIR_LINK_VERSION; out.set(cpub, 1); out.set(secret, 33); out.set(n, 49);
+  out[0] = host === 'phone' ? PAIR_LINK_PHONE : PAIR_LINK_VERSION; out.set(cpub, 1); out.set(secret, 33); out.set(n, 49);
   return `${APP_URL}#p=${b64u(out)}`;
 }
 
@@ -58,10 +69,11 @@ export function decodePairLink(fragmentOrUrl) {
   if (!m) return null;
   let b;
   try { b = unb64u(m[1]); } catch { return null; }
-  if (b.length < 49 || b.length > 49 + 24 || b[0] !== PAIR_LINK_VERSION) return null;
+  if (b.length < 49 || b.length > 49 + 24 || (b[0] !== PAIR_LINK_VERSION && b[0] !== PAIR_LINK_PHONE)) return null;
   let name;
   try { name = td.decode(b.subarray(49)); } catch { return null; }
-  return { cpub: b.slice(1, 33), secret: b.slice(33, 49), name: name || 'your computer' };
+  const host = b[0] === PAIR_LINK_PHONE ? 'phone' : 'computer';
+  return { cpub: b.slice(1, 33), secret: b.slice(33, 49), name: name || (host === 'phone' ? 'the other phone' : 'your computer'), host };
 }
 
 /** HKDF info for one pairing: "VINAC phone v1" | cpub | ppub. */
@@ -114,11 +126,15 @@ export function secretHeader(phoneId, counter, nonce) {
   return h;
 }
 
-export function parseSecretFrame(bytes) {
+/** A SECRET (guest to host, the default) or, with `type` PHONE_DOWN, a KEY DOWN (host to guest). */
+export function parseSecretFrame(bytes, type = PHONE_SECRET) {
   const b = Uint8Array.from(bytes);
-  if (b.length < PHONE_SECRET_MIN || b.length > PHONE_SECRET_MAX || b[0] !== PHONE_SECRET || !crcOk(b)) return null;
-  return { header: b.slice(0, SECRET_HEAD), phoneId: b.slice(1, 9), counter: new DataView(b.buffer).getUint32(9, false), nonce: b.slice(13, 25), sealed: b.slice(SECRET_HEAD, b.length - 2) };
+  if (b.length < PHONE_SECRET_MIN || b.length > PHONE_SECRET_MAX || b[0] !== type || !crcOk(b)) return null;
+  return { type, header: b.slice(0, SECRET_HEAD), phoneId: b.slice(1, 9), counter: new DataView(b.buffer).getUint32(9, false), nonce: b.slice(13, 25), sealed: b.slice(SECRET_HEAD, b.length - 2) };
 }
+
+/** Either direction: { type, ... } or null. */
+export const parseKeyFrame = bytes => parseSecretFrame(bytes, PHONE_SECRET) || parseSecretFrame(bytes, PHONE_DOWN);
 
 /** Inside a SECRET: name | 0 | value. */
 export function secretPlain(name, value) {
@@ -129,5 +145,37 @@ export function secretPlain(name, value) {
 }
 
 export function phoneFrameLooksValid(bytes) {
-  return !!(bytes && (parseHello(bytes) || parseSecretFrame(bytes)));
+  return !!(bytes && (parseHello(bytes) || parseKeyFrame(bytes)));
+}
+
+// ---- phone vault 2.0 -------------------------------------------------------------------------
+
+export const PHONE_DOWN = 0xc8;
+export const PAIR_LINK_PHONE = 2;
+export const DOWN_INFO = 'VINAC phone down v1';
+
+/** The header of a KEY DOWN (host to guest): like secretHeader, with its own type byte. */
+export function downHeader(phoneId, counter, nonce) {
+  const h = secretHeader(phoneId, counter, nonce);
+  h[0] = PHONE_DOWN;
+  return h;
+}
+
+/** A link a phone's camera opens: kind 'h' (a HELLO for a phone host) or 'k' (a key for this phone). */
+export function phoneLink(kind, bytes) {
+  if (kind !== 'h' && kind !== 'k') throw new Error('kind');
+  return `${APP_URL}#${kind}=${b64u(bytes)}`;
+}
+
+/** What a link or scanned code carries: { kind: 'p' | 'h' | 'k', bytes?, pair? } or null. */
+export function readPhoneLink(text) {
+  const s = String(text ?? '');
+  const pair = decodePairLink(s);
+  if (pair) return { kind: 'p', pair: { ...pair, raw: s } };
+  const m = s.match(/[#&]([hk])=([A-Za-z0-9_-]+)/);
+  if (!m) return null;
+  let bytes;
+  try { bytes = unb64u(m[2]); } catch { return null; }
+  if (m[1] === 'h' ? !parseHello(bytes) : !parseKeyFrame(bytes)) return null;
+  return { kind: m[1], bytes };
 }

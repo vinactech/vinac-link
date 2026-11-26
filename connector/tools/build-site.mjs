@@ -346,7 +346,7 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     fs.cpSync(path.join(SITE, 'app'), APP, { recursive: true });
     fs.writeFileSync(path.join(APP, 'sw.js'), fs.readFileSync(path.join(SITE, 'app', 'sw.js'), 'utf8').replaceAll('{{version}}', version));
     fs.mkdirSync(path.join(APP, 'web'), { recursive: true });
-    for (const f of ['phone-crypto.js', 'phone-frame.js', 'beacon.js', 'secret-frame.js']) fs.copyFileSync(path.join(ROOT, 'connector', 'web', f), path.join(APP, 'web', f));
+    for (const f of ['phone-crypto.js', 'phone-frame.js', 'beacon.js', 'secret-frame.js', 'qr.js']) fs.copyFileSync(path.join(ROOT, 'connector', 'web', f), path.join(APP, 'web', f));
     fs.mkdirSync(path.join(APP, 'lab', 'js'), { recursive: true });
     for (const f of ['audio.js', 'modem.js', 'frame.js', 'fec.js', 'bytes.js', 'crypto.js', 'logos.js']) fs.copyFileSync(path.join(ROOT, 'lab', 'js', f), path.join(APP, 'lab', 'js', f));
     fs.cpSync(path.join(ROOT, 'lab', 'worklets'), path.join(APP, 'lab', 'worklets'), { recursive: true });
@@ -384,6 +384,34 @@ AddType application/manifest+json .webmanifest
     for (const f of ['index.html', 'console.css']) fs.copyFileSync(path.join(SITE, 'console', f), path.join(CON, f));
     fs.writeFileSync(path.join(CON, 'console.js'), fs.readFileSync(path.join(SITE, 'console', 'console.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
     fs.writeFileSync(path.join(CON, '.htaccess'), `# Team console: may fetch from the account service (Supabase), nothing else from outside.\n<IfModule mod_headers.c>\n  Header always set Content-Security-Policy "${CONSOLE_CSP}"\n  Header always set X-Robots-Tag "noindex, nofollow"\n  Header set Cache-Control "no-cache"\n</IfModule>\n`);
+  }
+
+  // VINAC Web (/web/, 0.16): this browser as a device. Like the console, it may talk to the account
+  // service only (REST + the Realtime relay over wss), nothing else from outside; it also has its own
+  // icons and complete rules, so the folder can be served by a subdomain later.
+  if (fs.existsSync(path.join(SITE, 'web'))) {
+    const WEB = path.join(OUT, 'web');
+    fs.mkdirSync(path.join(WEB, 'lib'), { recursive: true });
+    for (const f of ['index.html', 'web.css', 'manifest.webmanifest']) fs.copyFileSync(path.join(SITE, 'web', f), path.join(WEB, f));
+    fs.writeFileSync(path.join(WEB, 'web.js'), fs.readFileSync(path.join(SITE, 'web', 'web.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
+    for (const f of ['phone-frame.js', 'beacon.js']) fs.copyFileSync(path.join(ROOT, 'connector', 'web', f), path.join(WEB, 'lib', f));
+    for (const s of ['128', '512']) fs.copyFileSync(path.join(SITE, 'brand', `icon-${s}.png`), path.join(WEB, `icon-${s}.png`));
+    const wss = CLOUD_URL.replace(/^https:/, 'wss:');
+    fs.writeFileSync(path.join(WEB, '.htaccess'), `# VINAC Web: may talk to the account service (REST and the relay), nothing else from outside.
+Options -Indexes
+DirectoryIndex index.html
+AddType application/manifest+json .webmanifest
+<IfModule mod_headers.c>
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' ${CLOUD_URL} ${wss}; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  Header always set X-Content-Type-Options "nosniff"
+  Header always set X-Frame-Options "DENY"
+  Header always set Referrer-Policy "no-referrer"
+  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+  Header always set Strict-Transport-Security "max-age=31536000"
+  Header always set X-Robots-Tag "noindex, nofollow"
+  Header set Cache-Control "no-cache"
+</IfModule>
+`);
   }
 
   if (fs.existsSync(path.join(SITE, 'logos'))) fs.cpSync(path.join(SITE, 'logos'), path.join(OUT, 'logos'), { recursive: true, filter: f => !f.endsWith('.md') });

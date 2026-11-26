@@ -45,6 +45,7 @@ import { Agents, Grants, GRANT_HOURS, startRun, insideFolder } from './grants.js
 import { Cloud } from './cloud.js';
 import { Relay } from './relay.js';
 import { Phones } from './phones.js';
+import { WebDevices } from './webdevices.js';
 import { query as auditQuery, toCsv, buildReport, reportHtml, applyRetention, RETENTION_CHOICES, DEFAULT_RETENTION, CATEGORIES, teamSummary } from './compliance.js';
 import { PHONE_SECRET } from '../web/phone-frame.js';
 import { AuditLog } from './audit.js';
@@ -242,6 +243,7 @@ export class Daemon {
     this.agents = new Agents(this.store);   // agent identities (tokens made on the page)
     this.grants = new Grants(this.store);   // standing key grants: runs the service starts itself
     this.phones = new Phones(this.store);   // phone vault: paired phones that send keys by sound
+    this.web = new WebDevices(this.store);  // 0.16 VINAC Web: browsers added as devices (through the account relay)
     this.projects = new Projects(this.store.home); // keys grouped per project (page only changes them)
     this.cloud = new Cloud(this.store);     // optional account (sign-in code, linked computer); only the page uses it
     this.relay = null; this.relayFps = null; this.relayChecks = new Map(); // relay through the account (off unless the person turns it on)
@@ -1112,6 +1114,75 @@ export class Daemon {
     return p;
   }
 
+  // ---- 0.16 VINAC Web: a browser as a device (see webdevices.js) ------------------------------
+  // Only on this account's relay channel (the relay checks that). A browser can add itself only while
+  // the person has "Add a browser" open; after that it sends sealed requests for a short list of actions.
+
+  async webGate(from, route) {
+    if (!/^[0-9a-f]{16}$/.test(String(from))) return false;
+    if (!(this.webLimiter ??= new RateLimiter(60)).allow(from)) return false;
+    if (route === '/web/hello') return !!this.web.pairingView();
+    if (route === '/web/check') return true;
+    return !!this.web.get(from);
+  }
+
+  async webHandle(route, body, from) {
+    if (route === '/web/hello') {
+      const r = this.web.hello({ from, ppub: body?.ppub, name: body?.name, tag: body?.tag });
+      this.changed();
+      return r;
+    }
+    if (route === '/web/check') return this.web.check(from);
+    const { device, req, reply } = this.web.openCall({ from, n: body?.n, c: body?.c }, this.meId);
+    let out;
+    try { out = { ok: true, result: await this.webOp(device, req.op, req.args || {}) }; }
+    catch (e) { out = { ok: false, status: e.status || 500, error: e.status ? e.message : 'Something went wrong on the computer.' }; }
+    return reply(out);
+  }
+
+  /** The actions a browser may ask for: reading, and what a person does on the page for decisions, requests, tasks, posts and key requests. */
+  async webOp(device, op, a) {
+    const s = v => String(v ?? '');
+    const as = `browser ${device.name}`;
+    const audit = (what, extra = {}) => this.audit.add('web.action', { browser: device.name, what, ...extra });
+    switch (op) {
+      case 'state': {
+        const rooms = this.roomsView().map(r => ({ id: r.id, name: r.name, project: r.project || null, members: r.members.map(m => m.name), last: r.last ? { text: String(r.last.text).slice(0, 160), at: r.last.sentAt, by: r.last.agent?.name || r.last.by || null } : null }));
+        return {
+          device: { name: this.me.name, version: APP_VERSION }, needsMe: this.needsMe().slice(0, 50),
+          projects: this.projects.list().map(p => ({ id: p.id, name: p.name, about: p.about || null })), rooms: rooms.slice(0, 50),
+          peers: this.peers().map(p => ({ name: p.name, online: p.online ?? null })),
+        };
+      }
+      case 'project': { const v = this.projectView(s(a.id)); return { project: v.project, room: v.room, board: v.board, keys: v.keys }; }
+      case 'room': { const r = this.roomOf(s(a.id)); return { room: { id: r.id, name: r.name }, messages: this.roomMessages(r.id).slice(-40).map(m => ({ id: m.id, text: String(m.text).slice(0, 2000), at: m.sentAt, from: m.direction === 'sent' ? (m.agent?.name || 'You') : `${m.peer.name}${m.agent ? ` › ${m.agent.name}` : ''}`, card: m.args?.card || null })) }; }
+      case 'answer': {
+        const r = await this.send({ room: a.room || undefined, to: a.to || undefined, cardUpdate: { card: s(a.card), action: 'answer', option: s(a.option) } }, 'person');
+        audit('answer', { card: s(a.card) }); return { done: true, note: r?.note || null };
+      }
+      case 'task': {
+        if (!['claim', 'done', 'release', 'reopen'].includes(a.action)) throw httpError(400, 'Unknown action.');
+        await this.send({ room: a.room || undefined, to: a.to || undefined, cardUpdate: { card: s(a.card), action: a.action } }, 'person');
+        audit(`task.${a.action}`, { card: s(a.card) }); return { done: true };
+      }
+      case 'request': {
+        const r = this.decideRequest(s(a.id), a.approve === true, {});
+        audit(a.approve === true ? 'request.approved' : 'request.rejected', { id: s(a.id) }); return { done: true, request: r?.intent || null };
+      }
+      case 'post': {
+        const text = s(a.text).trim().slice(0, 4000);
+        if (!text) throw httpError(400, 'Write something first.');
+        await this.send({ room: s(a.room), text }, 'person');
+        audit('post', { room: s(a.room) }); return { done: true };
+      }
+      case 'sendKey': {
+        const r = await this.sendKeyForCard({ card: s(a.card) });
+        audit('key.sent', { card: s(a.card) }); return { done: true, sent: !!r };
+      }
+      default: throw httpError(400, `A browser can't do "${op.slice(0, 40)}".`);
+    }
+  }
+
   // ---- 0.16: the mailbox (sealed items for a computer that isn't connected) -----------------
   // Sealed with a key derived from the PAIRING key (AES-256-GCM, the two device ids as associated
   // data), so only the two paired computers can open an item; the account service stores sealed bytes
@@ -1202,6 +1273,7 @@ export class Daemon {
    * team pairing (the relay lets those routes through on a team channel only, after pairGate).
    */
   async relayRequest(route, body, from) {
+    if (route.startsWith('/web/')) return this.webHandle(route, body, from);
     if (route === '/pair/offer') return this.teamPairOffer(body, from);
     if (route.startsWith('/pair/')) {
       // The announcer's handlers check the sender by "address": through the relay, that is its device id.
@@ -1232,6 +1304,7 @@ export class Daemon {
         return !!e && this.relay.teamTopic(e.team) === topic;
       },
       pairGate: (from, topic, route) => this.teamPairGate(from, topic, route),
+      webGate: (from, route) => this.webGate(from, route),
       topicFor: peerId => { const e = this.teamEntry(this.peerRecord(peerId)); return e && !this.relayFps?.fps?.has(this.peerRecord(peerId)?.fingerprint) ? this.relay.teamTopic(e.team) : null; },
     });
     this.relay.start().then(() => this.teamFingerprints(true)).then(() => this.checkMailbox()).catch(e => this.log(`relay: ${e.message}`));
@@ -3011,7 +3084,7 @@ export class Daemon {
       device: this.device(), pairing: this.pairingView({ forHuman: true }), peers: this.peers(), conversations: this.conversations(),
       secrets: this.secretsView(), receiving: this.receiving() ? Math.round((this.receiveUntil - Date.now()) / 1000) : 0,
       waitingRequests: this.pendingCount(), secretUses: this.secretUsesView(), groups: this.groupsView(), vaultLock: this.vault.view(),
-      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), rooms: this.roomsView(), needsMe: this.needsMe(), projects: this.projects.list().map(p => ({ id: p.id, name: p.name, folders: p.folders, prodAsks: p.prodAsks !== false, agents: p.agents || [], room: this.store.rooms().find(r => r.project === p.id)?.id || null, ...(p.about ? { about: p.about } : {}) })), desktopNotify: readNotifySettings(this.store.home).desktop, agents: this.agents.view(), grants: this.grants.view(), phones: this.phones.view(), phonePairing: this.phones.pairingView(), ...extra,
+      nearby: this.nearbyView(), secretRequests: this.secretRequestsView(), rooms: this.roomsView(), needsMe: this.needsMe(), projects: this.projects.list().map(p => ({ id: p.id, name: p.name, folders: p.folders, prodAsks: p.prodAsks !== false, agents: p.agents || [], room: this.store.rooms().find(r => r.project === p.id)?.id || null, ...(p.about ? { about: p.about } : {}) })), desktopNotify: readNotifySettings(this.store.home).desktop, agents: this.agents.view(), grants: this.grants.view(), phones: this.phones.view(), phonePairing: this.phones.pairingView(), webDevices: this.web.view(), webPairing: this.web.pairingView(), ...extra,
     });
     if (req.method === 'POST' && url.pathname === '/ui/send-file') {
       // The person attaches a file in a conversation (raw bytes; name and device in the query).
@@ -3045,6 +3118,19 @@ export class Daemon {
       }
       case 'POST /ui/phone/cancel': this.phones.cancel(); break;
       case 'POST /ui/phones/remove': { const p = this.phones.remove(body.id); this.audit.add('phone.removed', { phone: p.name }); break; }
+      // Phone vault 2.0: the person sends one of this computer's keys to a paired phone (a QR code its
+      // camera opens, or sound). Sealed for that phone only; the page never shows the value here.
+      case 'POST /ui/phones/send': {
+        const { item } = this.findSecret(String(body.secret || ''));
+        if (item.offered || item.pending) throw httpError(409, 'Accept this secret first.');
+        const value = this.readValue(item);
+        try {
+          const out = this.phones.seal(String(body.phone || ''), item.name, value);
+          this.audit.add('secret.out', { phone: out.phone.name, name: item.name, via: 'phone code' });
+          this.log(`secret "${item.name}" → phone ${out.phone.name} (sealed code)`);
+          return sendJson(res, 200, out);
+        } finally { value.fill(0); }
+      }
       // ---- optional account: only this page (the person) can sign in, link or sign out ----
       case 'GET /ui/account': return sendJson(res, 200, { account: this.accountView() });
       case 'GET /ui/account/devices': return sendJson(res, 200, { devices: await this.cloud.devices() });
@@ -3083,6 +3169,19 @@ export class Daemon {
         }));
         return sendJson(res, 200, { teams, offers: this.teamOffersView() });
       }
+      // 0.16 VINAC Web: only the person, on the page, adds, allows, cancels or removes a browser.
+      case 'POST /ui/web/start': {
+        const acc = this.cloud.account();
+        if (!acc?.device || !this.relayOn()) throw httpError(409, 'Sign in, link this computer and turn on the Relay first (Account): the browser reaches this computer through it.');
+        return sendJson(res, 200, state({ webPairing: this.web.start({ deviceId: this.meId, name: this.me.name, account: acc.userId, base: process.env.VINAC_WEB_BASE || 'https://vinac.tech/web/' }) }));
+      }
+      case 'POST /ui/web/confirm': {
+        const r = this.web.confirm(body.allow === true);
+        if (r) this.audit.add('web.added', { browser: r.name });
+        return sendJson(res, 200, state({ webAdded: r }));
+      }
+      case 'POST /ui/web/cancel': this.web.cancel(); break;
+      case 'POST /ui/web/remove': { const r = this.web.remove(String(body.id ?? '')); this.audit.add('web.removed', { browser: r.name }); break; }
       // 0.16 pairing with a teammate's computer over the internet: only the person, on the page.
       case 'POST /ui/team/pair': { await this.startTeamPair(String(body.fingerprint ?? '')); return sendJson(res, 200, state()); }
       case 'POST /ui/team/pair/accept': { await this.acceptTeamPair(String(body.from ?? '')); return sendJson(res, 200, state()); }

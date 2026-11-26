@@ -778,6 +778,27 @@
     </div>
   </div>
 
+  <!-- ===== phone vault 2.0: one of this computer's keys to a paired phone ===== -->
+  <div class="overlay" id="toPhoneModal" hidden>
+    <div class="modal" role="dialog" aria-modal="true" aria-labelledby="toPhoneTitle">
+      <header class="info-head">
+        <b id="toPhoneTitle">Send to a phone</b>
+        <button class="icon" id="toPhoneClose" aria-label="Close"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </header>
+      <div class="modal-body account-form">
+        <p class="hint">Send <b id="toPhoneKey"></b> to your phone vault. The code is sealed for that phone only and opens there once.</p>
+        <label for="toPhoneSel" id="toPhoneSelLabel">Phone</label>
+        <select id="toPhoneSel"></select>
+        <button class="primary wide" id="toPhoneMake" type="button">Show the code</button>
+        <div class="to-phone" id="toPhoneOut" hidden>
+          <div class="phone-qr" id="toPhoneQr"></div>
+          <p class="hint">On the phone: point its camera at the code, or open the vault and press <b>Receive</b> › <b>Scan</b>. No camera handy? Press <b>Listen</b> there, then play it as sound here.</p>
+          <button class="ghost" id="toPhonePlay" type="button">Play as sound</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="overlay" id="roomModal" hidden>
     <div class="modal" role="dialog" aria-modal="true" aria-labelledby="roomModalTitle">
       <header class="info-head">
@@ -840,6 +861,23 @@
               <select id="sharePeriod" aria-label="Month"></select>
               <button class="ghost" id="shareBtn" type="button">Share summary</button>
             </div>
+          </div>
+          <div id="accountWeb" hidden>
+            <h3 class="fw-h">Your browsers</h3>
+            <p class="hint">Reach this computer from a browser (a phone, a laptop): what needs you, projects and rooms, answers and approvals. It goes through your account's relay, sealed for this computer only. A browser can't pair devices, change rules or see key values.</p>
+            <ul class="secret-list" id="webList"></ul>
+            <div class="web-pair" id="webPair" hidden>
+              <div class="phone-qr" id="webQr"></div>
+              <div>
+                <p id="webPairText">Open this link in the browser to add (or scan the code with a phone), sign in with this account, and press <b>Add this browser</b>. It works for 10 minutes.</p>
+                <p><button class="ghost small-btn" type="button" id="webCopy">Copy the link</button> <button class="linkish" type="button" id="webCancel">Cancel</button></p>
+                <div class="web-confirm" id="webConfirm" hidden>
+                  <p>Does <b id="webName"></b> show <b class="phone-code" id="webCode"></b>?</p>
+                  <div class="row"><button class="primary small-btn" id="webAllow" type="button">Same code: Allow</button><button class="ghost" id="webDeny" type="button">Different: cancel</button></div>
+                </div>
+              </div>
+            </div>
+            <button class="ghost small-btn" id="webAddBtn" type="button">Add a browser</button>
           </div>
           <div id="accountTeamDir" hidden>
             <h3 class="fw-h">Your teams' computers</h3>

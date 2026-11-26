@@ -33,6 +33,11 @@ The **phone vault** (vinac.tech/app) runs in your phone's browser. Your keys, yo
 the computers you pair stay on the phone, encrypted; the app sends nothing to us. The pairing code in
 its link sits after the `#`, which browsers never send to a web server.
 
+**VINAC Web** (vinac.tech/web) lets a browser you add reach your computer through your account's
+relay. The browser keeps its own key and your sign-in session in that browser's storage; its
+requests and the answers are sealed so that only that browser and that computer can read them. The
+relay passes them on as described below and keeps none of them.
+
 ## Accounts (optional)
 
 You can create an account to link your computers, use the relay and join teams. To sign in, you enter

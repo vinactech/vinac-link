@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VINAC Link · Phone vault</title>
-<meta name="description" content="Keep API keys on your phone and hand one to your computer by sound. Encrypted on the phone; nothing is sent to any server.">
+<meta name="description" content="Keep API keys on your phone and hand them to your computer or another phone, by code or by sound. Encrypted on the phone; nothing is sent to any server.">
 <meta name="theme-color" content="#0b0b10">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
@@ -21,7 +21,7 @@
 <main class="auth" id="vCreate" hidden>
   <img class="auth-icon" src="icon-128.png" alt="" width="72" height="72">
   <h1>Your keys, on your phone</h1>
-  <p class="lead">Keep API keys and tokens here, encrypted with a passphrase only you know, and hand one to your computer by sound. Nothing goes to any server.</p>
+  <p class="lead">Keep API keys and tokens here, encrypted with a passphrase only you know, and hand them to your computer or another phone, by code or by sound. Nothing goes to any server.</p>
   <form id="createForm" class="stack">
     <label class="field"><span>Name of this phone</span><input id="phoneName" maxlength="20" value="My phone" autocomplete="off" required></label>
     <label class="field"><span>Passphrase</span><input id="newPass" type="password" minlength="8" autocomplete="new-password" placeholder="8 characters or more" required></label>
@@ -46,6 +46,9 @@
 <div class="shell" id="vOpen" hidden>
   <header class="top">
     <h1 id="title">Keys</h1>
+    <button class="icon-btn" id="receiveBtn" type="button" aria-label="Receive a key">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+    </button>
     <button class="icon-btn" id="lockBtn" type="button" aria-label="Lock the vault">
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     </button>
@@ -56,7 +59,9 @@
       <div class="pb-head"><span class="pb-dot"></span><b>Pair with <span id="pairName"></span></b></div>
       <p id="pairIntro">Hold the phone close to that computer, volume up, then play the sound. The computer is listening for it.</p>
       <p class="code" id="pairCode" hidden></p>
+      <div class="qr" id="pairQr" hidden></div>
       <div class="btn-row">
+        <button class="btn primary" id="pairShow" type="button" hidden>Show my code</button>
         <button class="btn primary" id="pairPlay" type="button">Play pairing sound</button>
         <button class="btn" id="pairDone" type="button" hidden>The computer says Paired</button>
         <button class="btn quiet" id="pairCancel" type="button">Cancel</button>
@@ -75,16 +80,21 @@
         <b>Pair a computer</b>
         <p>On the computer: <b>Secrets › Phones › Pair a phone</b>. Then point this phone's camera at the code it shows.</p>
       </div>
+      <div class="note">
+        <b>Pair another phone</b>
+        <p>Show a code here and open it on the other phone (its camera, or Receive in its vault). Then you compare 6 digits.</p>
+        <button class="btn primary" id="hostBtn" type="button">Pair another phone</button>
+      </div>
     </section>
 
-    <p class="foot">Encrypted on this phone (AES-256, PBKDF2). Keys leave it only as sound, sealed for one paired computer. Add this page to your Home Screen so the phone keeps it.</p>
+    <p class="foot">Encrypted on this phone (AES-256, PBKDF2). Keys leave it only sealed for one paired device: as a code the other phone opens, or as sound. Add this page to your Home Screen so the phone keeps it.</p>
   </div>
 
   <button class="fab" id="addKeyBtn" type="button" aria-label="Add a key"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 
   <nav class="tabs" aria-label="Sections">
     <button class="tab" id="tabKeysBtn" type="button" aria-current="page" aria-label="Keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg><span>Keys</span></button>
-    <button class="tab" id="tabComputersBtn" type="button" aria-label="Computers"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"/><path d="M2 19h20"/></svg><span>Computers</span></button>
+    <button class="tab" id="tabComputersBtn" type="button" aria-label="Devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"/><path d="M2 19h20"/></svg><span>Devices</span></button>
   </nav>
 </div>
 
@@ -106,7 +116,7 @@
   <div class="grip"></div>
   <div class="key-head"><span class="avatar big" id="keyAvatar"></span><div><h2 id="keyTitle"></h2><small id="keyAdded"></small></div></div>
   <div class="value-box"><code id="keyValueShown">••••••••••••</code><button class="btn small" id="keyShow" type="button">Show</button></div>
-  <button class="btn primary block" id="keySend" type="button">Send to a computer</button>
+  <button class="btn primary block" id="keySend" type="button">Send to a device</button>
   <button class="btn danger block" id="keyDelete" type="button">Delete from this phone</button>
 </section>
 
@@ -114,13 +124,65 @@
   <div class="grip"></div>
   <h2 id="sendTitle">Send <span id="sendName"></span></h2>
   <label class="field" id="sendToRow"><span>To</span><select id="sendTo"></select></label>
-  <ol class="steps">
+  <ol class="steps" id="sendStepsPc">
     <li>On the computer: <b>Secrets › Receive… › From your phone</b>.</li>
     <li>Hold the phone close to it, volume up, and press <b>Play</b>. It takes 10–20 seconds.</li>
   </ol>
-  <button class="btn primary block" id="sendPlay" type="button">Play</button>
+  <div id="sendPhone" hidden>
+    <p class="hint">Open this code on the other phone: its camera, or <b>Receive</b> in its vault. It opens only there, once.</p>
+    <div class="qr" id="sendQr"></div>
+    <button class="btn primary block" id="sendMakeQr" type="button">Show the code</button>
+  </div>
+  <button class="btn block" id="sendPlay" type="button">Play</button>
   <button class="btn quiet block" id="sendCancel" type="button">Close</button>
   <p class="status" id="sendStatus" role="status"></p>
+</section>
+
+<section class="sheet" id="sheetHost" hidden aria-labelledby="hostTitle">
+  <div class="grip"></div>
+  <h2 id="hostTitle">Pair another phone</h2>
+  <div id="hostWait">
+    <p class="hint">1. On the other phone, open this code (its camera, or <b>Receive</b> in its vault). It works for 10 minutes.</p>
+    <div class="qr" id="hostQr"></div>
+    <p class="hint">2. It then shows its own code: open it here with <b>Scan</b>, or with this phone's camera. Or let it play its sound while this phone listens.</p>
+    <div class="btn-row">
+      <button class="btn primary" id="hostScan" type="button">Scan</button>
+      <button class="btn" id="hostListen" type="button">Listen</button>
+    </div>
+  </div>
+  <div id="hostConfirm" hidden>
+    <p>Does <b id="hostName"></b> show</p>
+    <p class="code" id="hostCode"></p>
+    <button class="btn primary block" id="hostAllow" type="button">Same digits: Allow</button>
+  </div>
+  <button class="btn quiet block" id="hostCancel" type="button">Cancel</button>
+  <p class="status" id="hostStatus" role="status"></p>
+</section>
+
+<section class="sheet" id="sheetReceive" hidden aria-labelledby="recvTitle">
+  <div class="grip"></div>
+  <h2 id="recvTitle">Receive a key</h2>
+  <div id="recvWays">
+    <p class="hint">Open the code the other device shows: <b>Scan</b> here, or point this phone's camera at it. A computer can also play it as sound while this phone listens.</p>
+    <div class="btn-row">
+      <button class="btn primary" id="recvScan" type="button">Scan</button>
+      <button class="btn" id="recvListen" type="button">Listen</button>
+    </div>
+  </div>
+  <div id="recvGot" hidden>
+    <p><b id="recvName"></b> from <b id="recvFrom"></b></p>
+    <p class="hint" id="recvReplace" hidden>It replaces the key with this name on this phone.</p>
+    <button class="btn primary block" id="recvSave" type="button">Save on this phone</button>
+  </div>
+  <button class="btn quiet block" id="recvCancel" type="button">Close</button>
+  <p class="status" id="recvStatus" role="status"></p>
+</section>
+
+<section class="sheet" id="sheetScan" hidden aria-label="Scan a code">
+  <div class="grip"></div>
+  <video id="scanVideo" playsinline muted></video>
+  <p class="hint">Point at the code on the other screen.</p>
+  <button class="btn quiet block" id="scanCancel" type="button">Cancel</button>
 </section>
 
 <div class="toast" id="toast" role="status" hidden></div>

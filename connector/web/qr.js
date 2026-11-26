@@ -1,13 +1,18 @@
-// A small QR code encoder (byte mode, error correction level M, versions 1-10: up to 213 bytes),
-// written for the phone pairing link so the page loads nothing from outside. Follows ISO/IEC 18004;
-// structure after Nayuki's public reference implementation. Checked against a real decoder in tests.
+// A small QR code encoder (byte mode, error correction level M, versions 1-20: up to 666 bytes),
+// written for the pairing links and sealed keys so the pages load nothing from outside. Follows
+// ISO/IEC 18004; structure after Nayuki's public reference implementation. Checked in tests.
 
 const EC_M = 0; // format bits for level M
+const MAX_VERSION = 20;
 // [ec codewords per block, blocks in group 1, data codewords each, blocks in group 2, data codewords each]
 const BLOCKS_M = [null,
   [10, 1, 16, 0, 0], [16, 1, 28, 0, 0], [26, 1, 44, 0, 0], [18, 2, 32, 0, 0], [24, 2, 43, 0, 0],
-  [16, 4, 27, 0, 0], [18, 4, 31, 0, 0], [22, 2, 38, 2, 39], [22, 3, 36, 2, 37], [26, 4, 43, 1, 44]];
-const ALIGN = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50]];
+  [16, 4, 27, 0, 0], [18, 4, 31, 0, 0], [22, 2, 38, 2, 39], [22, 3, 36, 2, 37], [26, 4, 43, 1, 44],
+  [30, 1, 50, 4, 51], [22, 6, 36, 2, 37], [22, 8, 37, 1, 38], [24, 4, 40, 5, 41], [24, 5, 41, 5, 42],
+  [28, 7, 45, 3, 46], [28, 10, 46, 1, 47], [26, 9, 43, 4, 44], [26, 3, 44, 11, 45], [26, 3, 41, 13, 42]];
+const ALIGN = [null, [], [6, 18], [6, 22], [6, 26], [6, 30], [6, 34], [6, 22, 38], [6, 24, 42], [6, 26, 46], [6, 28, 50],
+  [6, 30, 54], [6, 32, 58], [6, 34, 62], [6, 26, 46, 66], [6, 26, 48, 70], [6, 26, 50, 74], [6, 30, 54, 78],
+  [6, 30, 56, 82], [6, 30, 58, 86], [6, 34, 62, 90]];
 
 function gfMul(x, y) {
   let z = 0;
@@ -38,8 +43,8 @@ const dataCodewords = v => { const b = BLOCKS_M[v]; return b[1] * b[2] + b[3] * 
 export function qrEncode(text) {
   const bytes = new TextEncoder().encode(text);
   let v = 1;
-  for (; v <= 10; v++) if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= dataCodewords(v) * 8) break;
-  if (v > 10) throw new Error('Too long for this QR encoder.');
+  for (; v <= MAX_VERSION; v++) if (4 + (v < 10 ? 8 : 16) + bytes.length * 8 <= dataCodewords(v) * 8) break;
+  if (v > MAX_VERSION) throw new Error('Too long for this QR encoder.');
   const capBits = dataCodewords(v) * 8;
   const bits = [];
   const put = (val, n) => { for (let i = n - 1; i >= 0; i--) bits.push((val >>> i) & 1); };

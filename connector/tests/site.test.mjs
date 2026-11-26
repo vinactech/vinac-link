@@ -43,7 +43,22 @@ test('site: builds every page with no leftover placeholders, no outside requests
   const r = build({ out, withKit: false });
   assert.equal(r.missing.length, 0);
   // The phone vault app (/app/) is its own small page, checked below.
-  const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !/^(app|console)\//.test(f.replaceAll('\\', '/'))).map(f => path.join(out, f));
+  const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !/^(app|console|web)\//.test(f.replaceAll('\\', '/'))).map(f => path.join(out, f));
+  // VINAC Web (/web/): like the console, the account service only (REST and the relay over wss).
+  const webPage = fs.readFileSync(path.join(out, 'web', 'index.html'), 'utf8');
+  assert.doesNotMatch(webPage, /<(script|img|link)[^>]+(src|href)="https?:/i, 'VINAC Web loads nothing from other sites');
+  const webJs = fs.readFileSync(path.join(out, 'web', 'web.js'), 'utf8');
+  assert.doesNotMatch(webJs, /\{\{\w+\}\}/);
+  assert.match(webJs, /const CLOUD_URL = 'https:\/\/[a-z0-9]+\.supabase\.co'/);
+  assert.match(webJs, /CLOUD_KEY = 'sb_publishable_/, 'only the publishable key');
+  assert.doesNotMatch(webJs, /sb_secret_|service_role|innerHTML/, 'no secret key, no HTML from data');
+  const webCsp = fs.readFileSync(path.join(out, 'web', '.htaccess'), 'utf8');
+  assert.match(webCsp, /connect-src 'self' https:\/\/[a-z0-9]+\.supabase\.co wss:\/\/[a-z0-9]+\.supabase\.co;/);
+  // Every module the web app imports is published next to it.
+  for (const lib of ['phone-frame.js', 'beacon.js']) {
+    const src = fs.readFileSync(path.join(out, 'web', 'lib', lib), 'utf8');
+    for (const [, dep] of src.matchAll(/from '\.\/([\w-]+\.js)'/g)) assert.ok(fs.existsSync(path.join(out, 'web', 'lib', dep)), `web/lib/${dep}`);
+  }
   // The Team console (/console/): talks to the account service only, under its own CSP; the rest of the
   // site keeps connect-src 'self'.
   const con = fs.readFileSync(path.join(out, 'console', 'index.html'), 'utf8');
@@ -70,7 +85,18 @@ test('site: builds every page with no leftover placeholders, no outside requests
   assert.match(fs.readFileSync(path.join(out, 'fr', 'index.html'), 'utf8'), /Un lien sécurisé entre/);
   const appPage = fs.readFileSync(path.join(out, 'app', 'index.html'), 'utf8');
   assert.doesNotMatch(appPage, /<(script|img|link)[^>]+(src|href)="https?:/i, 'the phone vault loads nothing from other sites');
-  for (const f of ['app/app.js', 'app/sw.js', 'app/web/phone-crypto.js', 'app/web/phone-frame.js', 'app/lab/js/audio.js', 'app/lab/worklets/vinac-tx-processor.js']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  for (const f of ['app/app.js', 'app/sw.js', 'app/web/phone-crypto.js', 'app/web/phone-frame.js', 'app/web/qr.js', 'app/lab/js/audio.js', 'app/lab/js/modem.js', 'app/lab/worklets/vinac-tx-processor.js']) assert.ok(fs.existsSync(path.join(out, f)), f);
+  // Every module the phone vault imports (and theirs) is published, and the offline cache lists them all.
+  const sw = fs.readFileSync(path.join(out, 'app', 'sw.js'), 'utf8');
+  const walk = (rel, seen = new Set()) => {
+    if (seen.has(rel)) return seen;
+    seen.add(rel);
+    assert.ok(fs.existsSync(path.join(out, 'app', rel)), `app/${rel}`);
+    const src = fs.readFileSync(path.join(out, 'app', rel), 'utf8');
+    for (const [, dep] of src.matchAll(/^import [^;]*? from '(\.{1,2}\/[^']+)'/gm)) walk(path.posix.normalize(path.posix.join(path.posix.dirname(rel), dep)), seen);
+    return seen;
+  };
+  for (const f of walk('app.js')) assert.ok(sw.includes(`'${f}'`), `sw.js caches ${f}`);
   assert.doesNotMatch(fs.readFileSync(path.join(out, 'app', 'sw.js'), 'utf8'), /\{\{version\}\}/);
   for (const f of ['privacy.html', 'terms.html', 'about.html']) assert.ok(fs.existsSync(path.join(out, f)), f);
   for (const f of files) {

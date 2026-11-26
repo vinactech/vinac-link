@@ -102,3 +102,12 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .toast { position: fixed; left: 50%; bottom: calc(var(--tabbar) + var(--s5) + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 30; max-width: calc(100% - 32px);
   padding: var(--s3) var(--s4); border-radius: var(--r); background: var(--ink); color: var(--bg); font-weight: 600; font-size: .9375rem; box-shadow: 0 10px 30px rgba(0, 0, 0, .5); }
 @media (prefers-reduced-motion: reduce) { .sheet { animation: none; } }
+
+/* phone vault 2.0: codes to show, and the camera view for scanning */
+.qr:empty { display: none; }
+.qr svg { display: block; width: 100%; max-width: 300px; height: auto; margin: 10px auto; border-radius: 14px; stroke: none; }
+#scanVideo { display: block; width: 100%; aspect-ratio: 1; object-fit: cover; border-radius: 16px; background: #000; }
+.note .btn { margin-top: 10px; }
+.icon-btn + .icon-btn { margin-left: 4px; }
+.top { gap: 4px; }
+.top h1 { margin-right: auto; }

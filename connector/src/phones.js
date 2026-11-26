@@ -5,6 +5,7 @@ import crypto from 'node:crypto';
 import { protect, unprotect, forget, detectKeystore } from './keystore.js';
 import {
   encodePairLink, pairInfo, codeFromMac, parseHello, parseSecretFrame, cleanName, PHONE_NAME_MAX,
+  downHeader, secretPlain, withCrc, phoneLink, DOWN_INFO,
 } from '../web/phone-frame.js';
 
 export const PHONE_PAIR_MS = 10 * 60_000;
@@ -112,5 +113,31 @@ export class Phones {
     const out = Buffer.from(value);
     plain.fill(0);
     return { phone: { id: ph.id, name: ph.name }, name, value: out };
+  }
+
+  /**
+   * Phone vault 2.0: a key sealed for one paired phone (KEY DOWN), as a link its camera opens and
+   * as bytes to play by sound. Only the person on the page asks for this. `value` is a Buffer.
+   */
+  seal(id, name, value) {
+    if (!NAME_PATTERN.test(name)) throw httpError(400, 'Names use letters, digits, _ . - (up to 40).');
+    if (!value.length || value.length > 200) throw httpError(413, 'A phone holds keys of 1 to 200 bytes.');
+    const list = this.list();
+    const ph = list.find(x => x.id === String(id));
+    if (!ph) throw httpError(404, 'No such phone.');
+    const kenc = unprotect(ph.keystore, ph.keyLabel, ph.wrappedKey);
+    const kdown = hmac(kenc, DOWN_INFO);
+    kenc.fill(0);
+    const counter = (ph.downCounter || 0) + 1;
+    const header = downHeader(Buffer.from(id, 'hex'), counter, crypto.randomBytes(12));
+    const plain = Buffer.from(secretPlain(name, value.toString('utf8')));
+    const c = crypto.createCipheriv('aes-256-gcm', kdown, Buffer.from(header.subarray(13, 25)));
+    c.setAAD(Buffer.from(header));
+    const sealed = Buffer.concat([c.update(plain), c.final(), c.getAuthTag()]);
+    plain.fill(0); kdown.fill(0);
+    const frame = withCrc(Buffer.concat([Buffer.from(header), sealed]));
+    ph.downCounter = counter; ph.lastUsedAt = new Date().toISOString();
+    this.store.savePhones(list);
+    return { phone: { id: ph.id, name: ph.name }, link: phoneLink('k', frame), hex: Buffer.from(frame).toString('hex'), bytes: frame.length };
   }
 }

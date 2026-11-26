@@ -51,7 +51,9 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape' && !helpModal
 
 // Optional account (beta): only this page can sign in, link this computer or sign out.
 const accountModal = $('accountModal');
+let lastAccount = null;
 function renderAccount(a) {
+  lastAccount = a;
   $('accountEmailForm').hidden = a.signedIn || !!a.pendingEmail;
   $('accountCodeForm').hidden = a.signedIn || !a.pendingEmail;
   $('accountSignedIn').hidden = !a.signedIn;
@@ -98,6 +100,34 @@ async function loadAccountTeams(a) {
     $('sharePeriod').replaceChildren(...months.map((m, i) => new Option(`${new Date(`${m}-15`).toLocaleDateString(locale(), { month: 'long', year: 'numeric' })}${i ? '' : ' (so far)'}`, m)));
   } catch { box.hidden = true; }
 }
+// 0.16 VINAC Web: browsers added as devices of this computer (through the account relay).
+let webQrKey = '';
+function renderWeb(a) {
+  $('accountWeb').hidden = !(a?.signedIn && a?.linked);
+  const list = state?.webDevices || [], wp = state?.webPairing;
+  const when = iso => (iso ? new Date(iso).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' }) : '');
+  $('webList').replaceChildren(...list.map(d => {
+    const li = document.createElement('li'); li.className = 'secret';
+    const row = document.createElement('div'); row.className = 'row';
+    const rm = button('Remove', () => { if (confirm(`Remove ${d.name}? It can't reach this computer any more.`)) act('POST', '/ui/web/remove', { id: d.id }); }); rm.className = 'ghost';
+    row.append(rm);
+    li.append(text('b', d.name), row, text('small', `Added ${when(d.pairedAt)}${d.lastUsedAt ? ` · last used ${when(d.lastUsedAt)}` : ' · not used yet'}`));
+    return li;
+  }));
+  $('webPair').hidden = !wp; $('webAddBtn').hidden = !!wp;
+  if (wp) {
+    if (webQrKey !== wp.link) { webQrKey = wp.link; $('webQr').innerHTML = qrSvg(wp.link, { scale: 4 }); }
+    $('webConfirm').hidden = wp.state !== 'confirm';
+    $('webName').textContent = wp.browserName || 'the browser';
+    $('webCode').textContent = wp.code ? `${wp.code.slice(0, 3)} ${wp.code.slice(3)}` : '';
+  }
+}
+$('webAddBtn').onclick = async () => { try { render(await api('POST', '/ui/web/start', {})); renderWeb(await api('GET', '/ui/account').then(r => r.account)); } catch (e) { toast(e.message); } };
+$('webCopy').onclick = async () => { try { await navigator.clipboard.writeText(state.webPairing.link); toast('Link copied. Open it only in the browser you want to add.'); } catch { toast('Could not copy.'); } };
+$('webCancel').onclick = () => act('POST', '/ui/web/cancel', {});
+$('webAllow').onclick = async () => { try { const s = await api('POST', '/ui/web/confirm', { allow: true }); render(s); toast(`${s.webAdded?.name || 'The browser'} added.`); } catch (e) { toast(e.message); } };
+$('webDeny').onclick = () => act('POST', '/ui/web/confirm', { allow: false });
+
 // 0.16 pairing with a teammate's computer over the internet: then the pairing screen (6 digits).
 async function startTeamPair(d) {
   if (!confirm(`Send a pairing request to ${d.name}? Its owner accepts it on that computer, then you both compare 6 digits (by phone or chat) and press Allow. The relay must be on, on both computers.`)) return;
@@ -160,7 +190,7 @@ $('shareBtn').onclick = async () => {
   } catch (e) { toast(e.message); }
 };
 async function accountDo(method, path, body) {
-  try { const { account } = await api(method, path, body); renderAccount(account); if (account.signedIn) { loadAccountDevices(); loadAccountTeams(account); loadTeamDirectory(account); } return account; }
+  try { const { account } = await api(method, path, body); renderAccount(account); if (account.signedIn) { loadAccountDevices(); loadAccountTeams(account); loadTeamDirectory(account); } renderWeb(account); return account; }
   catch (e) { toast(e.message); return null; }
 }
 $('accountNav').onclick = async () => { accountModal.hidden = false; const a = await accountDo('GET', '/ui/account'); if (a && !a.signedIn && !a.pendingEmail) $('accountEmail').focus(); };
@@ -257,6 +287,7 @@ function render(s) {
   renderNeeds();
 
   renderPairing(p);
+  if (typeof accountModal !== 'undefined' && !accountModal.hidden && lastAccount) renderWeb(lastAccount);
   renderConvos();
   renderRooms();
   if (main === 'room') { renderRoomHead(); loadRoom(); markRoomSeen(); }
@@ -805,6 +836,35 @@ $('phoneAllow')?.addEventListener('click', async () => {
 });
 $('phoneDeny')?.addEventListener('click', async () => { await act('POST', '/ui/phone/confirm', { allow: false }); });
 
+// Phone vault 2.0: one of this computer's keys to a paired phone, as a sealed code (or its sound).
+let toPhone = null;
+function openToPhone(s) {
+  toPhone = { secret: s.id, frame: null };
+  $('toPhoneKey').textContent = s.name;
+  const sel = $('toPhoneSel'); sel.replaceChildren();
+  for (const p of state.phones || []) { const o = document.createElement('option'); o.value = p.id; o.textContent = p.name; sel.append(o); }
+  $('toPhoneSel').hidden = $('toPhoneSelLabel').hidden = (state.phones || []).length < 2;
+  $('toPhoneOut').hidden = true; $('toPhoneMake').hidden = false; $('toPhoneQr').replaceChildren();
+  $('toPhoneModal').hidden = false;
+}
+function closeToPhone() { $('toPhoneModal').hidden = true; toPhone = null; $('toPhoneQr').replaceChildren(); }
+$('toPhoneClose').onclick = closeToPhone;
+$('toPhoneModal').addEventListener('click', e => { if (e.target === $('toPhoneModal')) closeToPhone(); });
+$('toPhoneSel').onchange = () => { if (toPhone) { toPhone.frame = null; $('toPhoneOut').hidden = true; $('toPhoneMake').hidden = false; } };
+$('toPhoneMake').onclick = async () => {
+  try {
+    const r = await api('POST', '/ui/phones/send', { phone: $('toPhoneSel').value, secret: toPhone.secret });
+    toPhone.frame = fromHex(r.hex);
+    $('toPhoneQr').innerHTML = qrSvg(r.link, { scale: 4 });
+    $('toPhoneOut').hidden = false; $('toPhoneMake').hidden = true;
+  } catch (e) { toast(e.message); }
+};
+$('toPhonePlay').onclick = async () => {
+  if (!toPhone?.frame) return;
+  try { await engine.playFrame(toPhone.frame, { rawBps: BEACON_BPS, tones: BEACON_TONES, fec: SECRET_FEC, amplitude: 0.3 }); toast('Played. The phone shows the key when it heard it.'); }
+  catch (e) { toast(`Could not play sound: ${e.message}`); }
+};
+
 // Claude Code on this computer: connect it from here (the service backs up its settings first).
 function renderClaude(c) {
   if (!c || !$('claudeText')) return;
@@ -1255,6 +1315,7 @@ function renderSecrets(force = false) {
       const sum = document.createElement('summary'); sum.textContent = '⋯'; sum.title = 'More'; sum.setAttribute('aria-label', `More for ${s.name}`);
       const menu = document.createElement('div'); menu.className = 'key-menu';
       if (!s.pending) menu.append(button('Send to a device…', () => { more.open = false; openSecretModal('stored', { item: s }); }));
+      if (!s.pending && (state.phones || []).length) menu.append(button('Send to a phone…', () => { more.open = false; openToPhone(s); }));
       if (projects.length) {
         const lab = document.createElement('label'); lab.className = 'key-move'; lab.append(text('span', 'Project'));
         const sel = document.createElement('select'); sel.setAttribute('aria-label', `Project for ${s.name}`);

@@ -22,6 +22,9 @@ export const RELAY_ROUTES = new Set(['/noise', '/session', '/whoami', '/msg', '/
 // 0.16: pairing with a TEAMMATE over the internet. Only on a team channel, only while that pairing is
 // open (the daemon's pairGate decides), and the people still compare 6 digits on both screens.
 export const TEAM_PAIR_ROUTES = new Set(['/pair/offer', '/pair/hello', '/pair/reveal', '/pair/confirm', '/pair/status', '/pair/cancel']);
+// 0.16 VINAC Web: a browser signed in to the SAME account (so: only on the account channel) adds itself
+// (hello, check) and then sends sealed requests (call). The daemon's webGate decides each one.
+export const WEB_ROUTES = new Set(['/web/hello', '/web/check', '/web/call']);
 const ID = /^[A-Za-z0-9_-]{16}$/;
 const PEER = /^[0-9a-f]{16}$/;
 
@@ -32,8 +35,8 @@ export class Relay {
    * cloud: the account (token(), account()); meId: this device's id; onRequest(route, body, from) runs
    * a frame like the network side would; allowed(peerId) says if that device may use the relay.
    */
-  constructor({ cloud, meId, onRequest, allowed, topicFor = () => null, pairGate = async () => false, log = () => {}, WebSocketImpl = globalThis.WebSocket }) {
-    Object.assign(this, { cloud, meId, onRequest, allowed, topicFor, pairGate, log, WS: WebSocketImpl });
+  constructor({ cloud, meId, onRequest, allowed, topicFor = () => null, pairGate = async () => false, webGate = async () => false, log = () => {}, WebSocketImpl = globalThis.WebSocket }) {
+    Object.assign(this, { cloud, meId, onRequest, allowed, topicFor, pairGate, webGate, log, WS: WebSocketImpl });
     this.teamIds = []; this.teamJoins = new Map();   // team topic -> join ref (joined) 
     this.ws = null; this.state = 'off'; this.error = null; this.ref = 0; this.joinRef = null;
     this.pending = new Map();                   // request id -> { resolve, reject, timer }
@@ -184,10 +187,12 @@ export class Relay {
   async onRequestFrame(b, topic = this.topic) {
     const reply = (status, body) => this.broadcast('res', { id: b.id, from: this.meId, to: b.from, status, body }, topic);
     const pairing = TEAM_PAIR_ROUTES.has(b.route) && topic !== this.topic;
-    if (!RELAY_ROUTES.has(b.route) && !pairing) return reply(404, { error: 'Not found' });
+    const web = WEB_ROUTES.has(b.route) && topic === this.topic;
+    if (!RELAY_ROUTES.has(b.route) && !pairing && !web) return reply(404, { error: 'Not found' });
     if (!b.body || typeof b.body !== 'object' || Array.isArray(b.body) || b.body.from !== b.from) return reply(400, { error: 'BAD_REQUEST' });
     if (!this.inLimiter.allow(b.from)) return reply(429, { error: 'TOO_MANY_REQUESTS' });
-    if (pairing ? !(await this.pairGate(b.from, topic, b.route)) : !(await this.allowed(b.from, topic === this.topic ? null : topic))) return reply(403, { error: 'NOT_ON_RELAY' });
+    const ok = web ? await this.webGate(b.from, b.route) : pairing ? await this.pairGate(b.from, topic, b.route) : await this.allowed(b.from, topic === this.topic ? null : topic);
+    if (!ok) return reply(403, { error: 'NOT_ON_RELAY' });
     try { reply(200, await this.onRequest(b.route, b.body, b.from)); }
     catch (e) { reply(e.status || 500, { error: e.status ? e.message : 'Internal error' }); }
   }
@@ -196,7 +201,8 @@ export class Relay {
   request(peerId, route, body, timeoutMs = 8000, teamTopic = null) {
     if (!this.ready()) return Promise.reject(httpError(0, 'relay not connected'));
     const pairing = TEAM_PAIR_ROUTES.has(route) && teamTopic && this.teamJoins.has(teamTopic);
-    if (!RELAY_ROUTES.has(route) && !pairing) return Promise.reject(httpError(400, 'This does not go through the relay.'));
+    const web = WEB_ROUTES.has(route) && !teamTopic; // a browser device (the web app speaks the same frames)
+    if (!RELAY_ROUTES.has(route) && !pairing && !web) return Promise.reject(httpError(400, 'This does not go through the relay.'));
     if (!this.outLimiter.allow(peerId)) return Promise.reject(httpError(429, 'Too many messages through the relay. Wait a minute.'));
     const id = randomBytes(12).toString('base64url');
     const payload = { id, from: this.meId, to: peerId, route, body };

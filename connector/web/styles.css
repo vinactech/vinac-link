@@ -1040,6 +1040,12 @@ button.kpi:hover { box-shadow: var(--shadow); border-color: var(--line); }
 :root[data-theme="dark"] .vl-banner.open { background: linear-gradient(120deg, #172440, #241a3d); border-color: #34508f; }
 @media (max-width: 560px) { .vault-lock.vl-banner { grid-template-columns: 40px minmax(0, 1fr); padding: 14px; } .vl-icon { width: 40px; height: 40px; } }
 
+/* 0.16 VINAC Web: adding a browser (Account) */
+.web-pair { display: flex; gap: 14px; flex-wrap: wrap; align-items: flex-start; margin: 8px 0 12px; padding: 12px; border: 1px solid var(--line); border-radius: 12px; }
+.web-pair > div:last-child { flex: 1 1 220px; min-width: 0; }
+.web-pair .linkish { background: none; border: 0; padding: 0 4px; font: inherit; color: var(--accent); text-decoration: underline; cursor: pointer; }
+.web-pair .phone-code { white-space: nowrap; }
+.web-pair .phone-qr svg { width: 160px; height: 160px; background: #fff; border-radius: 8px; padding: 6px; }
 /* 0.16 team directory (Account) */
 .team-dir { display: flex; flex-direction: column; gap: 12px; margin-bottom: 16px; }
 .td-team { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; }
@@ -1118,3 +1124,4 @@ button.kpi:hover { box-shadow: var(--shadow); border-color: var(--line); }
 :root[data-theme="dark"] .needs-ico { background: #163628; color: #6fdca2; }
 :root[data-theme="dark"] .needs-panel.has .needs-ico { background: #3a2713; color: #ffb36b; }
 :root[data-theme="dark"] .need-empty b { color: #6fdca2; }
+.to-phone .phone-qr svg { display: block; width: 220px; height: 220px; margin: 10px auto; background: #fff; border-radius: 8px; padding: 6px; }

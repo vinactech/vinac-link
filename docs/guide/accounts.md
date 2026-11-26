@@ -65,6 +65,24 @@ networks, each with their own computers and agents.
 Teammates' computers use a channel for their team that only members can join, and each computer
 checks the other's key against the team's list before anything goes through.
 
+## Your computer from a browser (VINAC Web)
+
+VINAC Web (vinac.tech/web) lets a browser, on a phone or another laptop, reach one of your computers
+through your account's relay: what needs you, your projects (claim a task, mark it done) and rooms
+(read and post), answers and approvals.
+
+1. On the computer: sign in, link it and turn on the **Relay** (Account).
+2. **Account › Your browsers › Add a browser.** Open the link it shows in the browser you want to add
+   (or scan the code with a phone). It works for 10 minutes, once.
+3. In that browser, sign in with **the same account**, name the browser and press **Add this browser**.
+4. Both screens show 6 digits. If they match, press **Allow** on the computer.
+
+The browser makes its own key (it can't be copied out of the browser) and seals every request for
+that computer only; the relay sees neither the request nor the answer. Old or replayed requests are
+refused. A browser can't pair devices, change firewall rules or see key values, and the computer
+handles only a short list of actions from it, each recorded in the activity log. To take a browser's
+access away, press **Remove** next to it in **Your browsers**.
+
 ## The Team console
 
 Open **vinac.tech/console** in a browser and sign in with your email code (the session stays in

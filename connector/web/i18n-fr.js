@@ -182,6 +182,17 @@ const exact = {
   'This computer\'s default agent (plugins, terminals)': 'Agent par défaut de cet ordinateur (extensions, terminaux)',
   'This computer\'s default agent': 'Agent par défaut de cet ordinateur', 'Not connected yet:': 'Pas encore connectés :',
   'Your teams\' computers': 'Les ordinateurs de vos équipes', 'No computer linked yet.': 'Aucun ordinateur lié pour l\'instant.',
+  'Your browsers': 'Vos navigateurs', 'Add a browser': 'Ajouter un navigateur',
+  'Open this link in the browser to add (or scan the code with a phone), sign in with this account, and press': 'Ouvrez ce lien dans le navigateur à ajouter (ou balayez le code avec un téléphone), connectez-vous avec ce compte et appuyez sur',
+  'Add this browser': 'Ajouter ce navigateur', '. It works for 10 minutes.': '. Il fonctionne 10 minutes.',
+  'Send to a phone': 'Envoyer à un téléphone', 'Send to a phone…': 'Envoyer à un téléphone…',
+  'to your phone vault. The code is sealed for that phone only and opens there once.': 'vers le coffre de votre téléphone. Le code est scellé pour ce téléphone seulement et ne s\'ouvre qu\'une fois.',
+  'Phone': 'Téléphone', 'Show the code': 'Afficher le code', 'Receive': 'Recevoir', 'Scan': 'Scanner', 'Listen': 'Écouter',
+  'On the phone: point its camera at the code, or open the vault and press': 'Sur le téléphone : visez le code avec son appareil photo, ou ouvrez le coffre et appuyez sur',
+  '. No camera handy? Press': '. Pas d\'appareil photo ? Appuyez sur', 'there, then play it as sound here.': 'là-bas, puis faites-le jouer en son ici.',
+  'Play as sound': 'Jouer en son',
+  'Reach this computer from a browser (a phone, a laptop): what needs you, projects and rooms, answers and approvals. It goes through your account\'s relay, sealed for this computer only. A browser can\'t pair devices, change rules or see key values.':
+    'Joignez cet ordinateur depuis un navigateur (un téléphone, un portable) : ce qui vous attend, projets et salons, réponses et approbations. Tout passe par le relais de votre compte, scellé pour cet ordinateur seulement. Un navigateur ne peut pas jumeler d\'appareils, changer les règles ni voir les valeurs des clés.',
   'Add to the room': 'Ajouter au salon', 'Ignore': 'Ignorer', 'Pair over the internet': 'Jumeler par Internet', 'Pairing request': 'Demande de jumelage',
   'Paired · online': 'Jumelé · en ligne', 'Not paired': 'Non jumelé', 'Key does not match: check this pairing': 'La clé ne correspond pas : vérifiez ce jumelage',
   'Teammates\' linked computers, and whether this one is paired with them. Pairing a teammate\'s computer over the internet is coming next; today, pair in person or with an invite.':

@@ -5,7 +5,7 @@ const CACHE = 'vinac-vault-{{version}}';
 const BASE = new URL('./', self.location.href);
 const FILES = [
   './', 'app.js', 'app.css', 'manifest.webmanifest', 'icon-128.png', 'icon-512.png',
-  'web/phone-crypto.js', 'web/phone-frame.js', 'web/beacon.js', 'web/secret-frame.js',
+  'web/phone-crypto.js', 'web/phone-frame.js', 'web/beacon.js', 'web/secret-frame.js', 'web/qr.js',
   'lab/js/audio.js', 'lab/js/modem.js', 'lab/js/frame.js', 'lab/js/fec.js', 'lab/js/bytes.js',
   'lab/js/crypto.js', 'lab/js/logos.js', 'lab/worklets/vinac-tx-processor.js', 'lab/worklets/vinac-rx-processor.js',
 ].map(f => new URL(f, BASE).href);

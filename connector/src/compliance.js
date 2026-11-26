@@ -16,6 +16,7 @@ export const CATEGORIES = {
   secrets: { label: 'Secrets', types: ['secret.in', 'secret.out', 'secret.added', 'secret.accepted', 'secret.revealed'] },
   runs: { label: 'Key use, grants', types: ['secret.used', 'secret.use.denied', 'grant.created', 'grant.revoked'] },
   agents: { label: 'Agents', types: ['agent.added', 'agent.removed', 'agentapp.connected', 'agentapp.disconnected'] },
+  web: { label: 'Browsers', types: ['web.added', 'web.removed', 'web.action'] },
   files: { label: 'Files', types: ['file.saved'] },
   settings: { label: 'Settings and vault', types: ['mode.changed', 'rule.changed', 'autoreply.changed', 'notify.changed', 'project.changed', 'project.removed', 'secret.assigned', 'room.rules', 'temporary.cleared', 'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed'] },
   log: { label: 'The log itself', types: ['audit.exported', 'audit.pruned', 'report.created'] },
@@ -29,7 +30,7 @@ export const categoryOf = type => CATEGORY_OF[type] || 'other';
 // Decisions and settings only a person can make, on this device's page.
 const BY_PERSON = new Set(['pair', 'invite.created', 'phone.paired', 'phone.removed', 'request.decided', 'secret.added', 'secret.accepted', 'secret.revealed',
   'secret.use.denied', 'grant.created', 'grant.revoked', 'agent.added', 'agent.removed', 'agentapp.connected', 'agentapp.disconnected', 'mode.changed', 'rule.changed', 'autoreply.changed', 'notify.changed', 'project.changed', 'project.removed', 'secret.assigned', 'room.rules', 'temporary.cleared',
-  'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed', 'audit.exported', 'report.created', 'secret.out', 'account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared', 'room.created', 'room.left', 'room.members', 'pair.team.request', 'pair.team.accept', 'pair.team.ignore']);
+  'vault.locked', 'vault.unlocked', 'vault.passphrase.set', 'vault.passphrase.removed', 'retention.changed', 'audit.exported', 'report.created', 'secret.out', 'account.signed_in', 'account.signed_out', 'account.linked', 'account.unlinked', 'account.relay_on', 'account.relay_off', 'account.summary_shared', 'room.created', 'room.left', 'room.members', 'web.added', 'web.removed', 'web.action', 'pair.team.request', 'pair.team.accept', 'pair.team.ignore']);
 
 /** { kind: 'person' | 'agent' | 'device' | 'service', name } */
 export function actorOf(e) {

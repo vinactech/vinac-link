@@ -136,7 +136,8 @@ sealed to the computer that asked, never to the room, and lands in the same proj
 
 ### Your keys on your phone (phone vault, beta)
 
-Keep keys on your phone and hand one to a computer by sound, with no network between them.
+Keep keys on your phone and hand them between your phone, your computers and other phones, with no
+network between them.
 
 1. **Pair once.** On the computer: **Secrets › Phones › Pair a phone**. Point your phone's camera at
    the code; it opens the phone vault at vinac.tech/app (the computer's one-time code is after the `#`
@@ -144,14 +145,30 @@ Keep keys on your phone and hand one to a computer by sound, with no network bet
    then press **Play pairing sound** close to the computer. Both screens show the same 6 digits:
    press **Allow** on the computer.
 2. **Add keys** on the phone (**Add a key**). They are encrypted on the phone with your passphrase
-   (AES-256, key from PBKDF2) and never leave it except as sound.
-3. **Send one:** on the computer, **Receive…** › **From your phone**; on the phone, **Send** next to the key, then
-   **Play** (10–20 seconds, phone close to the computer). It's sealed for that one computer (X25519,
-   AES-256-GCM); a recording played again is refused.
+   (AES-256, key from PBKDF2) and leave it only sealed for one paired device.
+3. **Phone to computer:** on the computer, **Receive…** › **From your phone**; on the phone, **Send**
+   next to the key, then **Play** (10–20 seconds, phone close to the computer). It's sealed for that
+   one computer (X25519, AES-256-GCM); a recording played again is refused.
+4. **Computer to phone:** on the computer, **⋯ › Send to a phone…** next to a key, then **Show the
+   code**. On the phone, point its camera at the code (or open the vault and press **↓ Receive ›
+   Scan**), unlock, and press **Save on this phone**. No camera handy: press **Listen** on the phone
+   and **Play as sound** on the computer.
+
+**Phone to phone.** On one phone: **Devices › Pair another phone** shows a code. The other phone opens
+it (its camera, or **↓ Receive › Scan** in its vault) and presses **Show my code**; the first phone
+opens that one the same way (or listens while the other plays a sound). Both show the same 6 digits:
+press **Allow** on the first phone, then **The other phone says Paired** on the second. After that,
+**Send** on a key shows a code that only the other phone can open, once.
+
+Scanning inside the vault needs a browser that reads QR codes (Chrome on Android, for example); on
+other phones use the camera app, which opens the link in the browser. If you added the vault to your
+Home Screen on an iPhone, the camera opens links in Safari, which keeps its own copy of the vault:
+there, use **Listen** and sound instead.
 
 The phone vault locks after 5 minutes. Add it to your Home Screen so the phone keeps it; if you
 forget the passphrase, its keys can't be opened. **Remove** a phone on the computer (Secrets ›
-Phones) to stop accepting its keys. Like sound pairing, it's in beta while we test more phones.
+Phones), or a device in the vault's **Devices**, to stop accepting its keys. Like sound pairing, it's
+in beta while we test more phones.
 
 ### Agents on this computer
 

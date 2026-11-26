@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>VINAC Web</title>
+<meta name="description" content="Your VINAC Link computer from any browser: what needs you, projects, rooms and approvals. Sealed end to end.">
+<meta name="theme-color" content="#0b0b10">
+<meta name="robots" content="noindex">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="128x128" href="icon-128.png">
+<link rel="apple-touch-icon" href="icon-512.png">
+<link rel="stylesheet" href="web.css">
+<script type="module" src="web.js"></script>
+</head>
+<body>
+<header class="top">
+  <img src="icon-128.png" alt="" width="32" height="32">
+  <div><b>VINAC Web</b><small id="topSub">Your computer, from this browser</small></div>
+  <button class="ghost" id="refreshBtn" type="button" hidden>Refresh</button>
+</header>
+
+<main>
+  <!-- sign in (an email code, as in the Team console) -->
+  <section class="card" id="signIn" hidden>
+    <h1>Sign in</h1>
+    <p class="note" id="signInFor" hidden>To add this browser to <b id="signInComputer"></b>.</p>
+    <p class="lead">Use the same account as the computer you want to reach. We send an 8-digit code; there is no password.</p>
+    <form id="emailForm" class="stack"><label>Email <input id="email" type="email" autocomplete="email" required></label><button class="primary" type="submit">Send me a code</button></form>
+    <form id="codeForm" class="stack" hidden><label>Code <input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required></label><button class="primary" type="submit">Sign in</button><button class="linkish" type="button" id="otherEmail">Use another email</button></form>
+  </section>
+
+  <!-- add this browser (from the link the computer shows) -->
+  <section class="card" id="addBrowser" hidden>
+    <h1>Add this browser to <span id="addComputer"></span></h1>
+    <p class="lead">It will reach that computer through your account, sealed end to end, and can answer what needs you there. It can't pair devices, change rules or see key values.</p>
+    <form id="addForm" class="stack"><label>Name of this browser <input id="browserName" maxlength="40" required></label><button class="primary" type="submit">Add this browser</button></form>
+    <div id="addCompare" hidden>
+      <p>Check that the computer shows the same 6 digits, then press <b>Allow</b> there:</p>
+      <p class="digits" id="addDigits">--- ---</p>
+      <p class="muted" id="addStatus">Waiting for Allow on the computer…</p>
+    </div>
+  </section>
+
+  <!-- nothing paired yet -->
+  <section class="card" id="noComputer" hidden>
+    <h1>Add this browser</h1>
+    <p class="lead">On your computer, open VINAC Link › <b>Account</b> › <b>Your browsers</b> › <b>Add a browser</b>, then open the link it shows here (or scan its QR code with this phone).</p>
+    <button class="linkish" type="button" id="signOut1">Sign out</button>
+  </section>
+
+  <!-- paired: the computer's view -->
+  <section id="home" hidden>
+    <div class="tabs" role="tablist">
+      <button type="button" data-tab="needs" aria-selected="true">Needs me <span class="count" id="needsCount"></span></button>
+      <button type="button" data-tab="projects" aria-selected="false">Projects</button>
+      <button type="button" data-tab="rooms" aria-selected="false">Rooms</button>
+    </div>
+    <div class="panel" data-panel="needs"><ul class="list" id="needsList"></ul></div>
+    <div class="panel" data-panel="projects" hidden><ul class="list" id="projectList"></ul><div id="projectView" hidden></div></div>
+    <div class="panel" data-panel="rooms" hidden><ul class="list" id="roomList"></ul><div id="roomView" hidden></div></div>
+    <p class="foot">Sealed for <b id="homeComputer"></b> only. <button class="linkish" type="button" id="forgetBtn">Remove this browser here</button> · <button class="linkish" type="button" id="signOut2">Sign out</button></p>
+  </section>
+</main>
+<div class="toast" id="toast" hidden></div>
+</body>
+</html>
