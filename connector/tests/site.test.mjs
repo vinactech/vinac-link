@@ -84,6 +84,7 @@ test('site: builds every page with no leftover placeholders, no outside requests
   assert.match(fs.readFileSync(path.join(out, 'fr', 'index.html'), 'utf8'), /Un lien sécurisé entre/);
   const appPage = fs.readFileSync(path.join(out, 'app', 'index.html'), 'utf8');
   assert.doesNotMatch(appPage, /<(script|img|link)[^>]+(src|href)="https?:/i, 'the phone vault loads nothing from other sites');
+  assert.doesNotMatch(appPage, /\{\{\w+\}\}/); assert.match(appPage, /class="brand"[\s\S]*icon-128\.png/, 'the app shows its logo');
   for (const f of ['app/app.js', 'app/sw.js', 'app/web/phone-crypto.js', 'app/web/phone-frame.js', 'app/web/qr.js', 'app/lab/js/audio.js', 'app/lab/js/modem.js', 'app/lab/worklets/vinac-tx-processor.js']) assert.ok(fs.existsSync(path.join(out, f)), f);
   // Every module the phone vault imports (and theirs) is published, and the offline cache lists them all.
   const sw = fs.readFileSync(path.join(out, 'app', 'sw.js'), 'utf8');

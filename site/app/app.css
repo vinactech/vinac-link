@@ -110,7 +110,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .note .btn { margin-top: 10px; }
 .icon-btn + .icon-btn { margin-left: 4px; }
 .top { gap: 4px; }
-.top h1 { margin-right: auto; }
+.brand { margin-right: auto; }
 
 /* the app (0.16.2): your computers' work, and sections */
 .auth h2 { font-size: 1.5rem; letter-spacing: -.02em; line-height: 1.15; }
@@ -136,3 +136,13 @@ textarea { width: 100%; padding: var(--s3) var(--s4); font: inherit; color: var(
 .tab { position: relative; }
 .badge { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: .6875rem; line-height: 18px; text-align: center; }
 @media (min-width: 900px) { .content { max-width: 720px; } }
+/* header: logo and status; the section title under it */
+.brand { display: flex; align-items: center; gap: var(--s3); min-width: 0; color: var(--ink); text-decoration: none; }
+.brand img { flex: none; border-radius: 10px; box-shadow: 0 6px 20px -8px rgba(111, 125, 255, .7); }
+.brand span { display: grid; min-width: 0; line-height: 1.2; }
+.brand b { font-size: 1.0625rem; letter-spacing: -.01em; }
+.brand small { color: var(--faint); font-size: .75rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.top { border-bottom: 1px solid var(--line); margin-bottom: var(--s2); }
+.page-title { font-size: 1.75rem; letter-spacing: -.02em; margin: var(--s2) 0 0; }
+.foot { display: grid; gap: var(--s2); }
+.foot-links a { color: var(--muted); }

@@ -164,6 +164,9 @@ $('keyDelete').addEventListener('click', async () => {
 let pendingEmail = null, adding = null, views = new Map(), pick = { projects: null, rooms: null }, loading = false;
 function renderAccount() {
   const signed = cloud.signedIn(), mine = cloud.myComputers();
+  $('brandSub').textContent = !signed ? 'Not signed in · keys work without an account'
+    : mine.length ? `${cloud.accountEmail() || 'Signed in'} · ${mine.length} computer${mine.length > 1 ? 's' : ''}`
+      : `${cloud.accountEmail() || 'Signed in'} · no computer added yet`;
   show('signIn', !signed); show('emailForm', !pendingEmail); show('codeForm', !!pendingEmail);
   show('acctNote', signed); $('acctEmail').textContent = cloud.accountEmail();
   show('webList', signed && mine.length > 0);

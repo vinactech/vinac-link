@@ -18,7 +18,10 @@
 <body>
 <div class="shell">
   <header class="top">
-    <h1 id="title">VINAC</h1>
+    <a class="brand" href="./" aria-label="VINAC Link app, home">
+      <img src="icon-128.png" alt="" width="36" height="36">
+      <span><b>VINAC Link</b><small id="brandSub">Your agents' secure link</small></span>
+    </a>
     <button class="icon-btn" id="refreshBtn" type="button" aria-label="Refresh" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
     </button>
@@ -31,6 +34,7 @@
   </header>
 
   <div class="content">
+    <h1 class="page-title" id="title">VINAC</h1>
     <!-- pairing this device with a computer or a phone that showed its code (by code or sound) -->
     <section class="pair-banner" id="pairCard" hidden>
       <div class="pb-head"><span class="pb-dot"></span><b>Pair with <span id="pairName"></span></b></div>
@@ -142,7 +146,10 @@
       </div>
     </section>
 
-    <p class="foot">Keys are encrypted on this device (AES-256, PBKDF2). Anything sent leaves it sealed for one device only. Add this page to your Home Screen so the device keeps it.</p>
+    <footer class="foot">
+      <p>Keys are encrypted on this device (AES-256, PBKDF2). Anything sent leaves it sealed for one device only. Add this page to your Home Screen so the device keeps it.</p>
+      <p class="foot-links"><span>VINAC Link {{version}}</span> · <a href="https://vinac.tech/docs/guide/accounts.html" rel="noopener">Help</a> · <a href="https://vinac.tech/privacy.html" rel="noopener">Privacy</a> · <a href="https://vinac.tech/" rel="noopener">vinac.tech</a></p>
+    </footer>
   </div>
 
   <button class="fab" id="addKeyBtn" type="button" aria-label="Add a key" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>

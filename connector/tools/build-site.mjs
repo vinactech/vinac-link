@@ -344,7 +344,7 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   if (fs.existsSync(path.join(SITE, 'app'))) {
     const APP = path.join(OUT, 'app');
     fs.cpSync(path.join(SITE, 'app'), APP, { recursive: true });
-    fs.writeFileSync(path.join(APP, 'sw.js'), fs.readFileSync(path.join(SITE, 'app', 'sw.js'), 'utf8').replaceAll('{{version}}', version));
+    for (const f of ['sw.js', 'index.html']) fs.writeFileSync(path.join(APP, f), fs.readFileSync(path.join(SITE, 'app', f), 'utf8').replaceAll('{{version}}', version));
     // 0.16.2: the app also reaches your computers through the account (VINAC Web folded in).
     fs.writeFileSync(path.join(APP, 'cloud.js'), fs.readFileSync(path.join(SITE, 'app', 'cloud.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
     const appWss = CLOUD_URL.replace(/^https:/, 'wss:');
