@@ -44,21 +44,20 @@ test('site: builds every page with no leftover placeholders, no outside requests
   assert.equal(r.missing.length, 0);
   // The phone vault app (/app/) is its own small page, checked below.
   const files = fs.readdirSync(out, { recursive: true }).filter(f => f.endsWith('.html') && !/^(app|console|web)\//.test(f.replaceAll('\\', '/'))).map(f => path.join(out, f));
-  // VINAC Web (/web/): like the console, the account service only (REST and the relay over wss).
-  const webPage = fs.readFileSync(path.join(out, 'web', 'index.html'), 'utf8');
-  assert.doesNotMatch(webPage, /<(script|img|link)[^>]+(src|href)="https?:/i, 'VINAC Web loads nothing from other sites');
-  const webJs = fs.readFileSync(path.join(out, 'web', 'web.js'), 'utf8');
-  assert.doesNotMatch(webJs, /\{\{\w+\}\}/);
-  assert.match(webJs, /const CLOUD_URL = 'https:\/\/[a-z0-9]+\.supabase\.co'/);
-  assert.match(webJs, /CLOUD_KEY = 'sb_publishable_/, 'only the publishable key');
-  assert.doesNotMatch(webJs, /sb_secret_|service_role|innerHTML/, 'no secret key, no HTML from data');
-  const webCsp = fs.readFileSync(path.join(out, 'web', '.htaccess'), 'utf8');
-  assert.match(webCsp, /connect-src 'self' https:\/\/[a-z0-9]+\.supabase\.co wss:\/\/[a-z0-9]+\.supabase\.co;/);
-  // Every module the web app imports is published next to it.
-  for (const lib of ['phone-frame.js', 'beacon.js']) {
-    const src = fs.readFileSync(path.join(out, 'web', 'lib', lib), 'utf8');
-    for (const [, dep] of src.matchAll(/from '\.\/([\w-]+\.js)'/g)) assert.ok(fs.existsSync(path.join(out, 'web', 'lib', dep)), `web/lib/${dep}`);
-  }
+  // The app (/app/, 0.16.2) reaches your computers through the account: like the console, it may talk
+  // to the account service only (REST and the relay over wss), with the publishable key only.
+  const cloudJs = fs.readFileSync(path.join(out, 'app', 'cloud.js'), 'utf8');
+  assert.doesNotMatch(cloudJs, /\{\{\w+\}\}/);
+  assert.match(cloudJs, /const CLOUD_URL = 'https:\/\/[a-z0-9]+\.supabase\.co'/);
+  assert.match(cloudJs, /CLOUD_KEY = 'sb_publishable_/, 'only the publishable key');
+  assert.doesNotMatch(cloudJs, /sb_secret_|service_role|innerHTML/, 'no secret key, no HTML from data');
+  assert.match(cloudJs, /create_user: false/, 'the app never creates accounts');
+  const appCsp = fs.readFileSync(path.join(out, 'app', '.htaccess'), 'utf8');
+  assert.match(appCsp, /connect-src 'self' https:\/\/[a-z0-9]+\.supabase\.co wss:\/\/[a-z0-9]+\.supabase\.co;/);
+  // /web/ (VINAC Web in 0.16.1) forwards to the app, keeping the link after #.
+  assert.match(fs.readFileSync(path.join(out, 'web', '.htaccess'), 'utf8'), /RedirectMatch 301 \^\/web\(\/\.\*\)\?\$ \/app\//);
+  assert.match(fs.readFileSync(path.join(out, 'web', 'go.js'), 'utf8'), /location\.replace\('\.\.\/app\/' \+ location\.hash\)/);
+  assert.ok(!fs.existsSync(path.join(out, 'web', 'web.js')));
   // The Team console (/console/): talks to the account service only, under its own CSP; the rest of the
   // site keeps connect-src 'self'.
   const con = fs.readFileSync(path.join(out, 'console', 'index.html'), 'utf8');

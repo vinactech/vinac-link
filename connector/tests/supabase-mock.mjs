@@ -41,6 +41,11 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
     return { access_token: a, refresh_token: r, expires_in: state.expiresIn, token_type: 'bearer', user: { id: userId } };
   };
   const server = http.createServer(async (req, res) => {
+    // Like Supabase, browser pages may call it (the app and the console in a local check).
+    res.setHeader('access-control-allow-origin', '*');
+    res.setHeader('access-control-allow-headers', 'apikey, authorization, content-type, prefer');
+    res.setHeader('access-control-allow-methods', 'GET, POST, PATCH, DELETE, OPTIONS');
+    if (req.method === 'OPTIONS') { res.writeHead(204); return res.end(); }
     let raw = ''; for await (const c of req) raw += c;
     const body = raw ? JSON.parse(raw) : null;
     const url = new URL(req.url, 'http://x');
@@ -50,7 +55,7 @@ export async function startSupabaseMock({ key = 'sb_publishable_test', signups =
     const who = () => access.get(String(req.headers.authorization || '').replace(/^Bearer /, ''));
 
     if (req.method === 'POST' && url.pathname === '/auth/v1/otp') {
-      if (!users.has(body.email) && !state.signups) return send(422, { error_code: 'signup_disabled', msg: 'Signups not allowed for otp' });
+      if (!users.has(body.email) && (!state.signups || body.create_user === false)) return send(422, { error_code: 'signup_disabled', msg: 'Signups not allowed for otp' });
       if (!users.has(body.email)) users.set(body.email, { id: randomUUID() });
       codes.set(body.email, String(10_000_000 + Math.floor(Math.random() * 89_999_999)));
       return send(200, {});

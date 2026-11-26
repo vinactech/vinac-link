@@ -1179,6 +1179,12 @@ export class Daemon {
         const r = await this.sendKeyForCard({ card: s(a.card) });
         audit('key.sent', { card: s(a.card) }); return { done: true, sent: !!r };
       }
+      // A key from the browser's own vault, sealed for this computer by the browser's key (0.16.2).
+      case 'giveKey': {
+        const value = Buffer.from(s(a.value), 'utf8');
+        const r = this.keepOwnDeviceSecret({ id: `web-${device.id}`, name: device.name, browser: true }, s(a.name), value, 'relay');
+        return { done: true, name: r.name };
+      }
       default: throw httpError(400, `A browser can't do "${op.slice(0, 40)}".`);
     }
   }
@@ -2728,9 +2734,19 @@ export class Daemon {
    */
   receivePhoneSecret(b) {
     const { phone, name, value } = this.phones.open(b);
+    return this.keepOwnDeviceSecret({ id: `phone-${phone.id}`, name: phone.name, phone: true }, name, value, 'sound');
+  }
+
+  /**
+   * A key from one of the person's own devices (a paired phone by sound, or an added browser through
+   * the relay): the person sent it on purpose, so it's kept; the same name from the same device
+   * replaces the older copy. `value` is a Buffer, zeroed here.
+   */
+  keepOwnDeviceSecret(from, name, value, via) {
     try {
+      if (!/^[A-Za-z0-9_.-]{1,40}$/.test(name)) throw httpError(400, 'Names use letters, digits, _ . - (up to 40).');
+      if (!value.length || value.length > 200) throw httpError(413, 'A key can be 1 to 200 bytes.');
       const s = this.store.secrets();
-      const from = { id: `phone-${phone.id}`, name: phone.name, phone: true };
       const old = s.items.filter(x => x.from?.id === from.id && x.name === name);
       if (s.items.length - old.length >= MAX_SECRETS) throw httpError(507, `This device already holds ${MAX_SECRETS} secrets. Delete some first.`);
       const id = randomBytes(8).toString('hex');
@@ -2738,10 +2754,10 @@ export class Daemon {
       const w = this.wrapValue(label, value); // fails closed; sealed to the vault when it has a passphrase
       for (const o of old) forget(o.keystore, o.keyLabel);
       s.items = s.items.filter(x => !old.includes(x));
-      s.items.push({ id, name, from, receivedAt: new Date().toISOString(), via: 'sound', keystore: w.kind, keyLabel: label, wrapped: w.stored, ...(w.vault ? { vault: true } : {}) });
+      s.items.push({ id, name, from, receivedAt: new Date().toISOString(), via, keystore: w.kind, keyLabel: label, wrapped: w.stored, ...(w.vault ? { vault: true } : {}) });
       this.store.saveSecrets(s);
-      this.log(`secret "${name}" ← phone ${phone.name} by sound`);
-      this.audit.add('secret.in', { phone: phone.name, name, via: 'sound', ...(old.length ? { replacement: true } : {}) });
+      this.log(`secret "${name}" ← ${from.phone ? 'phone' : 'browser'} ${from.name} by ${via}`);
+      this.audit.add('secret.in', { [from.phone ? 'phone' : 'browser']: from.name, name, via, ...(old.length ? { replacement: true } : {}) });
       this.changed();
       return { duplicate: false, id, name, from, keystore: w.kind, pending: false, offered: false };
     } finally { value.fill(0); }
@@ -3173,7 +3189,7 @@ export class Daemon {
       case 'POST /ui/web/start': {
         const acc = this.cloud.account();
         if (!acc?.device || !this.relayOn()) throw httpError(409, 'Sign in, link this computer and turn on the Relay first (Account): the browser reaches this computer through it.');
-        return sendJson(res, 200, state({ webPairing: this.web.start({ deviceId: this.meId, name: this.me.name, account: acc.userId, base: process.env.VINAC_WEB_BASE || 'https://vinac.tech/web/' }) }));
+        return sendJson(res, 200, state({ webPairing: this.web.start({ deviceId: this.meId, name: this.me.name, account: acc.userId, base: process.env.VINAC_WEB_BASE || 'https://vinac.tech/app/' }) }));
       }
       case 'POST /ui/web/confirm': {
         const r = this.web.confirm(body.allow === true);

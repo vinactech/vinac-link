@@ -1,7 +1,7 @@
 {
-  "name": "VINAC Link phone vault",
-  "short_name": "VINAC Vault",
-  "description": "Keep API keys on your phone and hand one to your computer by sound.",
+  "name": "VINAC Link",
+  "short_name": "VINAC",
+  "description": "What needs you on your computers, projects and rooms, and your keys, sealed end to end.",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

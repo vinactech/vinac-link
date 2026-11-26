@@ -29,14 +29,16 @@ can find it. This never goes to us or to the internet, and it stops when you lea
 If you choose to connect VINAC Link to third-party AI services (for example a cloud AI agent), those
 services handle your data under their own terms and privacy policies, not ours.
 
-The **phone vault** (vinac.tech/app) runs in your phone's browser. Your keys, your passphrase and
-the computers you pair stay on the phone, encrypted; the app sends nothing to us. The pairing code in
-its link sits after the `#`, which browsers never send to a web server.
+The **VINAC Link app** (app.vinac.tech) runs in your browser. Its **Keys** (the phone vault): your
+keys, your passphrase and the devices you pair by code or sound stay on that device, encrypted; that
+part sends nothing to us. Pairing codes and keys in its links sit after the `#`, which browsers never
+send to a web server.
 
-**VINAC Web** (vinac.tech/web) lets a browser you add reach your computer through your account's
-relay. The browser keeps its own key and your sign-in session in that browser's storage; its
-requests and the answers are sealed so that only that browser and that computer can read them. The
-relay passes them on as described below and keeps none of them.
+If you sign in and add the browser to your computers, the app also reaches them through your
+account's relay. The browser keeps its own keys and your sign-in session in that browser's storage;
+its requests and the answers (and any key you send from the app to a computer) are sealed so that
+only that browser and that computer can read them. The relay passes them on as described below and
+keeps none of them.
 
 ## Accounts (optional)
 

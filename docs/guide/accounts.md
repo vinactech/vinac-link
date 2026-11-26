@@ -65,23 +65,33 @@ networks, each with their own computers and agents.
 Teammates' computers use a channel for their team that only members can join, and each computer
 checks the other's key against the team's list before anything goes through.
 
-## Your computer from a browser (VINAC Web)
+## The app: your computers from a browser
 
-VINAC Web (vinac.tech/web) lets a browser, on a phone or another laptop, reach one of your computers
-through your account's relay: what needs you, your projects (claim a task, mark it done) and rooms
-(read and post), answers and approvals.
+The VINAC Link app (**app.vinac.tech**, on a phone or another laptop; add it to the Home Screen) has
+five tabs: **Needs me** (from all your computers in one list), **Projects** (claim a task, mark it
+done), **Rooms** (read and post), **Keys** (your own keys, encrypted on that device: see
+[Secrets](secrets.md#your-keys-on-your-phone-phone-vault-beta)) and **Devices**. Keys work without an
+account; the other tabs reach your computers through your account's relay.
+
+To add the browser to a computer:
 
 1. On the computer: sign in, link it and turn on the **Relay** (Account).
 2. **Account › Your browsers › Add a browser.** Open the link it shows in the browser you want to add
    (or scan the code with a phone). It works for 10 minutes, once.
-3. In that browser, sign in with **the same account**, name the browser and press **Add this browser**.
+3. In the app, sign in with **the same account** (Devices), name the browser and press **Add this
+   browser**. The app doesn't create accounts: make one on a computer first.
 4. Both screens show 6 digits. If they match, press **Allow** on the computer.
 
-The browser makes its own key (it can't be copied out of the browser) and seals every request for
-that computer only; the relay sees neither the request nor the answer. Old or replayed requests are
-refused. A browser can't pair devices, change firewall rules or see key values, and the computer
-handles only a short list of actions from it, each recorded in the activity log. To take a browser's
-access away, press **Remove** next to it in **Your browsers**.
+Repeat on each computer you want to reach. With **Keys**, a key can also go from the app straight to
+one of these computers (**Send to a device › … (through your account) › Send now**); the computer
+keeps it as a key from that browser.
+
+The browser makes its own key for each computer (it can't be copied out of the browser) and seals
+every request for that computer only; the relay sees neither the request nor the answer. Old or
+replayed requests are refused. A browser can't pair devices, change firewall rules or see key values
+kept on the computer, and the computer handles only a short list of actions from it, each recorded
+in the activity log. To take a browser's access away, press **Remove** next to it in **Your
+browsers**.
 
 ## The Team console
 

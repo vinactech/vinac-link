@@ -35,8 +35,8 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .status.ok { color: var(--ok); } .status.bad { color: var(--bad); }
 
 /* create / unlock */
-.auth { min-height: 100dvh; max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; justify-content: center; gap: var(--s4);
-  padding: calc(var(--s6) + env(safe-area-inset-top)) var(--s5) calc(var(--s6) + env(safe-area-inset-bottom)); }
+.auth { max-width: 420px; margin: 0 auto; display: flex; flex-direction: column; justify-content: center; gap: var(--s4);
+  padding: var(--s5) var(--s2); }
 .auth-icon { border-radius: 18px; box-shadow: 0 12px 40px -10px rgba(111, 125, 255, .6); }
 .auth h1 { font-size: 1.75rem; letter-spacing: -.02em; line-height: 1.15; }
 .auth .lead { color: var(--muted); margin-bottom: var(--s2); }
@@ -79,7 +79,7 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   width: 58px; height: 58px; border-radius: 18px; border: 0; display: grid; place-items: center; color: #fff; cursor: pointer;
   background: linear-gradient(135deg, #6f7dff, var(--accent-2)); box-shadow: 0 14px 34px -10px rgba(111, 125, 255, .75); }
 .fab svg { width: 26px; height: 26px; stroke-width: 2.2; }
-.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: 1fr 1fr; height: calc(var(--tabbar) + env(safe-area-inset-bottom));
+.tabs { position: fixed; left: 0; right: 0; bottom: 0; z-index: 6; display: grid; grid-template-columns: repeat(5, 1fr); height: calc(var(--tabbar) + env(safe-area-inset-bottom));
   padding-bottom: env(safe-area-inset-bottom); background: color-mix(in srgb, var(--bg) 90%, transparent); backdrop-filter: blur(14px); border-top: 1px solid var(--line); }
 .tab { display: grid; justify-items: center; align-content: center; gap: 4px; border: 0; background: none; color: var(--faint); font-family: inherit; font-size: .75rem; font-weight: 600; line-height: 1; cursor: pointer; }
 .tab[aria-current="page"] { color: var(--accent); }
@@ -111,3 +111,28 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
 .icon-btn + .icon-btn { margin-left: 4px; }
 .top { gap: 4px; }
 .top h1 { margin-right: auto; }
+
+/* the app (0.16.2): your computers' work, and sections */
+.auth h2 { font-size: 1.5rem; letter-spacing: -.02em; line-height: 1.15; }
+.sec { font-size: .8125rem; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--faint); margin: var(--s3) 0 0; }
+.muted { color: var(--muted); } .small { font-size: .875rem; }
+.card-box { display: grid; gap: var(--s3); padding: var(--s4); border-radius: var(--r-lg); background: var(--surface); border: 1px solid var(--line); }
+.list.items li { flex-direction: column; align-items: stretch; gap: var(--s1); }
+.list.items li small { color: var(--faint); font-size: .8125rem; }
+.list.items li b { font-weight: 600; overflow-wrap: anywhere; }
+.list.items li p { overflow-wrap: anywhere; white-space: pre-wrap; }
+.list.items li.link { cursor: pointer; }
+.list.items li.link:active { background: var(--surface-2); }
+.list li.empty { color: var(--muted); }
+.acts { display: flex; flex-wrap: wrap; gap: var(--s2); margin-top: var(--s2); }
+.chips { display: flex; gap: var(--s2); overflow-x: auto; }
+.chips:empty { display: none; }
+.chip { flex: none; min-height: 36px; padding: 0 var(--s4); border-radius: 999px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); font: 600 .875rem system-ui, sans-serif; cursor: pointer; }
+.chip.on { background: var(--surface-2); color: var(--ink); border-color: var(--accent); }
+.view-title { font-size: 1.25rem; margin: var(--s2) 0; }
+#projectView, #roomView { display: grid; gap: var(--s3); }
+#projectView > .btn, #roomView > .btn { justify-self: start; padding: 0 var(--s2); }
+textarea { width: 100%; padding: var(--s3) var(--s4); font: inherit; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); resize: vertical; }
+.tab { position: relative; }
+.badge { position: absolute; top: 6px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad); color: #fff; font-size: .6875rem; line-height: 18px; text-align: center; }
+@media (min-width: 900px) { .content { max-width: 720px; } }

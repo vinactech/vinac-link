@@ -345,6 +345,9 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     const APP = path.join(OUT, 'app');
     fs.cpSync(path.join(SITE, 'app'), APP, { recursive: true });
     fs.writeFileSync(path.join(APP, 'sw.js'), fs.readFileSync(path.join(SITE, 'app', 'sw.js'), 'utf8').replaceAll('{{version}}', version));
+    // 0.16.2: the app also reaches your computers through the account (VINAC Web folded in).
+    fs.writeFileSync(path.join(APP, 'cloud.js'), fs.readFileSync(path.join(SITE, 'app', 'cloud.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
+    const appWss = CLOUD_URL.replace(/^https:/, 'wss:');
     fs.mkdirSync(path.join(APP, 'web'), { recursive: true });
     for (const f of ['phone-crypto.js', 'phone-frame.js', 'beacon.js', 'secret-frame.js', 'qr.js']) fs.copyFileSync(path.join(ROOT, 'connector', 'web', f), path.join(APP, 'web', f));
     fs.mkdirSync(path.join(APP, 'lab', 'js'), { recursive: true });
@@ -353,7 +356,7 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
     // 0.16: the same folder is also app.vinac.tech (a subdomain whose document root is this folder), so
     // it carries its own icons and its own complete server rules (a subdomain inherits nothing).
     for (const s of ['128', '512']) fs.copyFileSync(path.join(SITE, 'brand', `icon-${s}.png`), path.join(APP, `icon-${s}.png`));
-    fs.writeFileSync(path.join(APP, '.htaccess'), `# The phone vault web app: vinac.tech/app/ and app.vinac.tech (same files).
+    fs.writeFileSync(path.join(APP, '.htaccess'), `# The VINAC Link app: vinac.tech/app/ (app.vinac.tech forwards here). May talk to the account service only.
 Options -Indexes
 DirectoryIndex index.html
 <IfModule mod_rewrite.c>
@@ -362,7 +365,7 @@ DirectoryIndex index.html
 </IfModule>
 AddType application/manifest+json .webmanifest
 <IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
+  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data: blob:; media-src 'self' blob:; style-src 'self'; script-src 'self'; worker-src 'self'; connect-src 'self' ${CLOUD_URL} ${appWss}; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
   Header always set X-Content-Type-Options "nosniff"
   Header always set X-Frame-Options "DENY"
   Header always set Referrer-Policy "no-referrer"
@@ -386,32 +389,14 @@ AddType application/manifest+json .webmanifest
     fs.writeFileSync(path.join(CON, '.htaccess'), `# Team console: may fetch from the account service (Supabase), nothing else from outside.\n<IfModule mod_headers.c>\n  Header always set Content-Security-Policy "${CONSOLE_CSP}"\n  Header always set X-Robots-Tag "noindex, nofollow"\n  Header set Cache-Control "no-cache"\n</IfModule>\n`);
   }
 
-  // VINAC Web (/web/, 0.16): this browser as a device. Like the console, it may talk to the account
-  // service only (REST + the Realtime relay over wss), nothing else from outside; it also has its own
-  // icons and complete rules, so the folder can be served by a subdomain later.
-  if (fs.existsSync(path.join(SITE, 'web'))) {
+  // /web/ (VINAC Web in 0.16.1) is now part of the app: forward there, keeping the link after #
+  // (browsers carry it over a redirect). The page is the fallback where .htaccess isn't read.
+  {
     const WEB = path.join(OUT, 'web');
-    fs.mkdirSync(path.join(WEB, 'lib'), { recursive: true });
-    for (const f of ['index.html', 'web.css', 'manifest.webmanifest']) fs.copyFileSync(path.join(SITE, 'web', f), path.join(WEB, f));
-    fs.writeFileSync(path.join(WEB, 'web.js'), fs.readFileSync(path.join(SITE, 'web', 'web.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
-    for (const f of ['phone-frame.js', 'beacon.js']) fs.copyFileSync(path.join(ROOT, 'connector', 'web', f), path.join(WEB, 'lib', f));
-    for (const s of ['128', '512']) fs.copyFileSync(path.join(SITE, 'brand', `icon-${s}.png`), path.join(WEB, `icon-${s}.png`));
-    const wss = CLOUD_URL.replace(/^https:/, 'wss:');
-    fs.writeFileSync(path.join(WEB, '.htaccess'), `# VINAC Web: may talk to the account service (REST and the relay), nothing else from outside.
-Options -Indexes
-DirectoryIndex index.html
-AddType application/manifest+json .webmanifest
-<IfModule mod_headers.c>
-  Header always set Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self'; script-src 'self'; connect-src 'self' ${CLOUD_URL} ${wss}; object-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"
-  Header always set X-Content-Type-Options "nosniff"
-  Header always set X-Frame-Options "DENY"
-  Header always set Referrer-Policy "no-referrer"
-  Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
-  Header always set Strict-Transport-Security "max-age=31536000"
-  Header always set X-Robots-Tag "noindex, nofollow"
-  Header set Cache-Control "no-cache"
-</IfModule>
-`);
+    fs.mkdirSync(WEB, { recursive: true });
+    fs.writeFileSync(path.join(WEB, 'index.html'), '<!doctype html>\n<html lang="en"><head><meta charset="utf-8"><title>VINAC Link app</title><meta name="robots" content="noindex"><script src="go.js"></script></head>\n<body><p>VINAC Web is now part of the <a href="../app/">VINAC Link app</a>.</p></body></html>\n');
+    fs.writeFileSync(path.join(WEB, 'go.js'), "location.replace('../app/' + location.hash);\n");
+    fs.writeFileSync(path.join(WEB, '.htaccess'), '# VINAC Web is now part of the app.\nRedirectMatch 301 ^/web(/.*)?$ /app/\n');
   }
 
   if (fs.existsSync(path.join(SITE, 'logos'))) fs.cpSync(path.join(SITE, 'logos'), path.join(OUT, 'logos'), { recursive: true, filter: f => !f.endsWith('.md') });

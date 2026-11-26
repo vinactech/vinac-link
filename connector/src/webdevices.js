@@ -2,7 +2,7 @@
 //
 // Pairing, like the phone vault but over the account's relay instead of sound:
 //  - the page makes a one-time X25519 key and secret and shows them as a link (QR code):
-//    https://vinac.tech/web/#pair=<b64u JSON {v, d: this device id, n: name, k: cpub, s: secret, a: account}>
+//    https://vinac.tech/app/#pair=<b64u JSON {v, d: this device id, n: name, k: cpub, s: secret, a: account}>
 //  - the browser (signed in to the SAME account) makes its own X25519 key (private part not
 //    extractable), and sends HELLO {ppub, name, tag} through the relay; the tag is an HMAC with a key
 //    only someone who saw the link can derive, so a stranger on the account channel can't pair
@@ -65,7 +65,7 @@ export class WebDevices {
   }
 
   /** "Add a browser" on the page: a one-time key pair and secret, as a link (QR code). */
-  start({ deviceId, name, account, base = 'https://vinac.tech/web/' }) {
+  start({ deviceId, name, account, base = 'https://vinac.tech/app/' }) {
     if (this.list().length >= MAX_WEB) throw httpError(409, `At most ${MAX_WEB} browsers. Remove one first.`);
     const { privateKey, publicKey } = crypto.generateKeyPairSync('x25519');
     const cpub = rawX25519(publicKey), secret = crypto.randomBytes(16);

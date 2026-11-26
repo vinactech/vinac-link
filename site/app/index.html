@@ -3,61 +3,38 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>VINAC Link · Phone vault</title>
-<meta name="description" content="Keep API keys on your phone and hand them to your computer or another phone, by code or by sound. Encrypted on the phone; nothing is sent to any server.">
+<title>VINAC Link · App</title>
+<meta name="description" content="VINAC Link in your browser: what needs you on your computers, projects and rooms, and your keys, kept encrypted on this device. Sealed end to end.">
 <meta name="theme-color" content="#0b0b10">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="128x128" href="icon-128.png">
 <link rel="apple-touch-icon" href="icon-512.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="VINAC Vault">
+<meta name="apple-mobile-web-app-title" content="VINAC">
 <link rel="stylesheet" href="app.css">
 <script type="module" src="app.js"></script>
 </head>
 <body>
-
-<!-- first time, and locked: one centred card -->
-<main class="auth" id="vCreate" hidden>
-  <img class="auth-icon" src="icon-128.png" alt="" width="72" height="72">
-  <h1>Your keys, on your phone</h1>
-  <p class="lead">Keep API keys and tokens here, encrypted with a passphrase only you know, and hand them to your computer or another phone, by code or by sound. Nothing goes to any server.</p>
-  <form id="createForm" class="stack">
-    <label class="field"><span>Name of this phone</span><input id="phoneName" maxlength="20" value="My phone" autocomplete="off" required></label>
-    <label class="field"><span>Passphrase</span><input id="newPass" type="password" minlength="8" autocomplete="new-password" placeholder="8 characters or more" required></label>
-    <label class="field"><span>Passphrase again</span><input id="newPass2" type="password" minlength="8" autocomplete="new-password" required></label>
-    <button class="btn primary block" type="submit">Create the vault</button>
-    <p class="hint">If you forget the passphrase, the keys here can't be opened. Keep copies of important keys elsewhere.</p>
-  </form>
-</main>
-
-<main class="auth" id="vLocked" hidden>
-  <img class="auth-icon" src="icon-128.png" alt="" width="72" height="72">
-  <h1>Vault locked</h1>
-  <p class="lead" id="lockedLead">Enter your passphrase to open your keys.</p>
-  <form id="unlockForm" class="stack">
-    <label class="field"><span class="sr">Passphrase</span><input id="pass" type="password" autocomplete="current-password" placeholder="Passphrase" required></label>
-    <button class="btn primary block" type="submit">Unlock</button>
-    <p class="status" id="unlockStatus" role="status"></p>
-  </form>
-</main>
-
-<!-- open -->
-<div class="shell" id="vOpen" hidden>
+<div class="shell">
   <header class="top">
-    <h1 id="title">Keys</h1>
-    <button class="icon-btn" id="receiveBtn" type="button" aria-label="Receive a key">
+    <h1 id="title">VINAC</h1>
+    <button class="icon-btn" id="refreshBtn" type="button" aria-label="Refresh" hidden>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+    </button>
+    <button class="icon-btn" id="receiveBtn" type="button" aria-label="Receive a key" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
     </button>
-    <button class="icon-btn" id="lockBtn" type="button" aria-label="Lock the vault">
+    <button class="icon-btn" id="lockBtn" type="button" aria-label="Lock your keys" hidden>
       <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
     </button>
   </header>
 
   <div class="content">
+    <!-- pairing this device with a computer or a phone that showed its code (by code or sound) -->
     <section class="pair-banner" id="pairCard" hidden>
       <div class="pb-head"><span class="pb-dot"></span><b>Pair with <span id="pairName"></span></b></div>
-      <p id="pairIntro">Hold the phone close to that computer, volume up, then play the sound. The computer is listening for it.</p>
+      <p id="pairIntro"></p>
       <p class="code" id="pairCode" hidden></p>
       <div class="qr" id="pairQr" hidden></div>
       <div class="btn-row">
@@ -69,32 +46,113 @@
       <p class="status" id="pairStatus" role="status"></p>
     </section>
 
-    <section id="tabKeys">
-      <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="keySearch" type="search" placeholder="Search keys" aria-label="Search keys" autocomplete="off"></label>
-      <ul class="list" id="keyList"></ul>
+    <!-- adding this browser to a computer (the link from Account › Your browsers) -->
+    <section class="pair-banner" id="addCard" hidden>
+      <div class="pb-head"><span class="pb-dot"></span><b>Add this browser to <span id="addComputer"></span></b></div>
+      <p id="addIntro">It will reach that computer through your account, sealed end to end, and can answer what needs you there. It can't pair devices, change rules or see key values.</p>
+      <form id="addForm" class="stack">
+        <label class="field"><span>Name of this browser</span><input id="browserName" maxlength="40" required></label>
+        <button class="btn primary block" type="submit">Add this browser</button>
+      </form>
+      <div id="addCompare" hidden>
+        <p>Check that the computer shows the same 6 digits, then press <b>Allow</b> there:</p>
+        <p class="code" id="addDigits"></p>
+      </div>
+      <button class="btn quiet" id="addCancel" type="button">Cancel</button>
+      <p class="status" id="addStatus" role="status"></p>
     </section>
 
-    <section id="tabComputers" hidden>
-      <ul class="list" id="computerList"></ul>
-      <div class="note">
-        <b>Pair a computer</b>
-        <p>On the computer: <b>Secrets › Phones › Pair a phone</b>. Then point this phone's camera at the code it shows.</p>
+    <!-- what needs you, on every computer this browser reaches -->
+    <section data-panel="needs" hidden>
+      <div class="note" id="noComputer" hidden>
+        <b>Reach your computers from here</b>
+        <p id="noComputerText">Sign in, then add this browser on a computer: VINAC Link › <b>Account</b> › <b>Your browsers</b> › <b>Add a browser</b>, and open the link it shows here.</p>
+        <button class="btn primary" type="button" data-go="devices">Go to Devices</button>
       </div>
-      <div class="note">
-        <b>Pair another phone</b>
-        <p>Show a code here and open it on the other phone (its camera, or Receive in its vault). Then you compare 6 digits.</p>
-        <button class="btn primary" id="hostBtn" type="button">Pair another phone</button>
+      <ul class="list items" id="needsList"></ul>
+    </section>
+
+    <section data-panel="projects" hidden>
+      <div class="chips" id="projectChips"></div>
+      <ul class="list items" id="projectList"></ul>
+      <div id="projectView" hidden></div>
+    </section>
+
+    <section data-panel="rooms" hidden>
+      <div class="chips" id="roomChips"></div>
+      <ul class="list items" id="roomList"></ul>
+      <div id="roomView" hidden></div>
+    </section>
+
+    <!-- keys: encrypted on this device with a passphrase; no account needed -->
+    <section data-panel="keys" hidden>
+      <div class="auth" id="vCreate" hidden>
+        <h2>Your keys, on this device</h2>
+        <p class="lead">Keep API keys and tokens here, encrypted with a passphrase only you know, and hand them to your computers or another phone: by code, by sound, or through your account. Nothing readable goes to any server.</p>
+        <form id="createForm" class="stack">
+          <label class="field"><span>Name of this device</span><input id="phoneName" maxlength="20" value="My phone" autocomplete="off" required></label>
+          <label class="field"><span>Passphrase</span><input id="newPass" type="password" minlength="8" autocomplete="new-password" placeholder="8 characters or more" required></label>
+          <label class="field"><span>Passphrase again</span><input id="newPass2" type="password" minlength="8" autocomplete="new-password" required></label>
+          <button class="btn primary block" type="submit">Create the vault</button>
+          <p class="hint">If you forget the passphrase, the keys here can't be opened. Keep copies of important keys elsewhere.</p>
+        </form>
+      </div>
+      <div class="auth" id="vLocked" hidden>
+        <h2>Keys locked</h2>
+        <p class="lead" id="lockedLead">Enter your passphrase to open your keys.</p>
+        <form id="unlockForm" class="stack">
+          <label class="field"><span class="sr">Passphrase</span><input id="pass" type="password" autocomplete="current-password" placeholder="Passphrase" required></label>
+          <button class="btn primary block" type="submit">Unlock</button>
+          <p class="status" id="unlockStatus" role="status"></p>
+        </form>
+      </div>
+      <div id="vOpen" hidden>
+        <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="keySearch" type="search" placeholder="Search keys" aria-label="Search keys" autocomplete="off"></label>
+        <ul class="list" id="keyList"></ul>
       </div>
     </section>
 
-    <p class="foot">Encrypted on this phone (AES-256, PBKDF2). Keys leave it only sealed for one paired device: as a code the other phone opens, or as sound. Add this page to your Home Screen so the phone keeps it.</p>
+    <!-- devices: computers through the account, and devices paired by code or sound -->
+    <section data-panel="devices" hidden>
+      <h2 class="sec">Through your account</h2>
+      <div class="card-box" id="signIn" hidden>
+        <p class="muted">Sign in with the account your computers use to reach them from here. We email an 8-digit code; there is no password. No account yet? Make one on a computer (VINAC Link › Account).</p>
+        <form id="emailForm" class="stack"><label class="field"><span>Email</span><input id="email" type="email" autocomplete="email" required></label><button class="btn primary block" type="submit">Send me a code</button></form>
+        <form id="codeForm" class="stack" hidden><label class="field"><span>Code</span><input id="code" inputmode="numeric" autocomplete="one-time-code" maxlength="10" required></label><button class="btn primary block" type="submit">Sign in</button><button class="btn quiet block" type="button" id="otherEmail">Use another email</button></form>
+      </div>
+      <ul class="list" id="webList" hidden></ul>
+      <div class="note" id="acctNote" hidden>
+        <p>Signed in as <b id="acctEmail"></b>. To add a computer: on it, VINAC Link › <b>Account</b> › <b>Your browsers</b> › <b>Add a browser</b>, then open the link here (or scan its code with this phone).</p>
+        <button class="btn small" id="signOutBtn" type="button">Sign out</button>
+      </div>
+
+      <h2 class="sec">By code or sound</h2>
+      <p class="muted small" id="vaultDevicesLocked" hidden>Open <b>Keys</b> to see the devices paired with this one by code or sound.</p>
+      <div id="vaultDevices" hidden>
+        <ul class="list" id="computerList"></ul>
+        <div class="note">
+          <b>Pair a computer</b>
+          <p>On the computer: <b>Secrets › Phones › Pair a phone</b>. Then point this phone's camera at the code it shows.</p>
+        </div>
+        <div class="note">
+          <b>Pair another phone</b>
+          <p>Show a code here and open it on the other phone (its camera, or Receive in its app). Then you compare 6 digits.</p>
+          <button class="btn primary" id="hostBtn" type="button">Pair another phone</button>
+        </div>
+      </div>
+    </section>
+
+    <p class="foot">Keys are encrypted on this device (AES-256, PBKDF2). Anything sent leaves it sealed for one device only. Add this page to your Home Screen so the device keeps it.</p>
   </div>
 
-  <button class="fab" id="addKeyBtn" type="button" aria-label="Add a key"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
+  <button class="fab" id="addKeyBtn" type="button" aria-label="Add a key" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 
   <nav class="tabs" aria-label="Sections">
-    <button class="tab" id="tabKeysBtn" type="button" aria-current="page" aria-label="Keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg><span>Keys</span></button>
-    <button class="tab" id="tabComputersBtn" type="button" aria-label="Devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"/><path d="M2 19h20"/></svg><span>Devices</span></button>
+    <button class="tab" type="button" data-tab="needs" aria-label="Needs me"><span class="badge" id="needsCount" hidden></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg><span>Needs me</span></button>
+    <button class="tab" type="button" data-tab="projects" aria-label="Projects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Projects</span></button>
+    <button class="tab" type="button" data-tab="rooms" aria-label="Rooms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/></svg><span>Rooms</span></button>
+    <button class="tab" type="button" data-tab="keys" aria-label="Keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg><span>Keys</span></button>
+    <button class="tab" type="button" data-tab="devices" aria-label="Devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"/><path d="M2 19h20"/></svg><span>Devices</span></button>
   </nav>
 </div>
 
@@ -117,19 +175,23 @@
   <div class="key-head"><span class="avatar big" id="keyAvatar"></span><div><h2 id="keyTitle"></h2><small id="keyAdded"></small></div></div>
   <div class="value-box"><code id="keyValueShown">••••••••••••</code><button class="btn small" id="keyShow" type="button">Show</button></div>
   <button class="btn primary block" id="keySend" type="button">Send to a device</button>
-  <button class="btn danger block" id="keyDelete" type="button">Delete from this phone</button>
+  <button class="btn danger block" id="keyDelete" type="button">Delete from this device</button>
 </section>
 
 <section class="sheet" id="sheetSend" hidden aria-labelledby="sendTitle">
   <div class="grip"></div>
   <h2 id="sendTitle">Send <span id="sendName"></span></h2>
   <label class="field" id="sendToRow"><span>To</span><select id="sendTo"></select></label>
+  <div id="sendNet" hidden>
+    <p class="hint">Goes through your account, sealed for that computer only. It's kept there as a key from this browser.</p>
+    <button class="btn primary block" id="sendNow" type="button">Send now</button>
+  </div>
   <ol class="steps" id="sendStepsPc">
     <li>On the computer: <b>Secrets › Receive… › From your phone</b>.</li>
     <li>Hold the phone close to it, volume up, and press <b>Play</b>. It takes 10–20 seconds.</li>
   </ol>
   <div id="sendPhone" hidden>
-    <p class="hint">Open this code on the other phone: its camera, or <b>Receive</b> in its vault. It opens only there, once.</p>
+    <p class="hint">Open this code on the other phone: its camera, or <b>Receive</b> in its app. It opens only there, once.</p>
     <div class="qr" id="sendQr"></div>
     <button class="btn primary block" id="sendMakeQr" type="button">Show the code</button>
   </div>
@@ -142,7 +204,7 @@
   <div class="grip"></div>
   <h2 id="hostTitle">Pair another phone</h2>
   <div id="hostWait">
-    <p class="hint">1. On the other phone, open this code (its camera, or <b>Receive</b> in its vault). It works for 10 minutes.</p>
+    <p class="hint">1. On the other phone, open this code (its camera, or <b>Receive</b> in its app). It works for 10 minutes.</p>
     <div class="qr" id="hostQr"></div>
     <p class="hint">2. It then shows its own code: open it here with <b>Scan</b>, or with this phone's camera. Or let it play its sound while this phone listens.</p>
     <div class="btn-row">
@@ -161,9 +223,9 @@
 
 <section class="sheet" id="sheetReceive" hidden aria-labelledby="recvTitle">
   <div class="grip"></div>
-  <h2 id="recvTitle">Receive a key</h2>
+  <h2 id="recvTitle">Receive</h2>
   <div id="recvWays">
-    <p class="hint">Open the code the other device shows: <b>Scan</b> here, or point this phone's camera at it. A computer can also play it as sound while this phone listens.</p>
+    <p class="hint">Open the code the other device shows: <b>Scan</b> here, or point this phone's camera at it. A computer can also play a key as sound while this phone listens.</p>
     <div class="btn-row">
       <button class="btn primary" id="recvScan" type="button">Scan</button>
       <button class="btn" id="recvListen" type="button">Listen</button>
@@ -171,8 +233,8 @@
   </div>
   <div id="recvGot" hidden>
     <p><b id="recvName"></b> from <b id="recvFrom"></b></p>
-    <p class="hint" id="recvReplace" hidden>It replaces the key with this name on this phone.</p>
-    <button class="btn primary block" id="recvSave" type="button">Save on this phone</button>
+    <p class="hint" id="recvReplace" hidden>It replaces the key with this name on this device.</p>
+    <button class="btn primary block" id="recvSave" type="button">Save on this device</button>
   </div>
   <button class="btn quiet block" id="recvCancel" type="button">Close</button>
   <p class="status" id="recvStatus" role="status"></p>

@@ -40,7 +40,7 @@ test('a browser as a device: add with 6 digits and Allow, then sealed fresh requ
     const st = await ui(A, 'POST', '/ui/web/start', {});
     assert.equal(st.status, 200, JSON.stringify(st.body));
     const link = st.body.webPairing.link;
-    assert.match(link, /^https:\/\/vinac\.tech\/web\/#pair=/);
+    assert.match(link, /^https:\/\/vinac\.tech\/app\/#pair=/);
     const p = JSON.parse(Buffer.from(link.split('#pair=')[1], 'base64url').toString('utf8'));
     assert.equal(p.d, A.meId); assert.equal(p.a, A.cloud.account().userId);
 
@@ -96,6 +96,17 @@ test('a browser as a device: add with 6 digits and Allow, then sealed fresh requ
     assert.ok(A.store.messages().some(m => m.dir === 'local' && m.by === 'person' && m.text === 'Hi from my phone browser'));
     const audit = (await ui(A, 'GET', '/ui/audit?last=20')).body;
     assert.match(JSON.stringify(audit), /web\.action/);
+
+    // A key from the browser's own vault: kept on the computer as from that browser; the value never
+    // comes back in the answer; a bad name is refused; the same name again replaces it.
+    const given = await call('giveKey', { name: 'OPENAI_API_KEY', value: 'sk-test-from-browser-1' });
+    assert.equal(given.ok, true, JSON.stringify(given)); assert.ok(!JSON.stringify(given).includes('sk-test-from-browser-1'));
+    const mine = () => A.store.secrets().items.filter(x => x.from?.id === `web-${id}`);
+    assert.equal(mine().length, 1); assert.equal(mine()[0].from.browser, true); assert.equal(mine()[0].via, 'relay');
+    assert.equal((await call('giveKey', { name: 'bad name', value: 'x' })).ok, false);
+    await call('giveKey', { name: 'OPENAI_API_KEY', value: 'sk-test-from-browser-2' });
+    assert.equal(mine().length, 1, 'replaced, not added');
+    assert.equal((await ui(A, 'POST', '/ui/secrets/reveal', { id: mine()[0].id })).body.value, 'sk-test-from-browser-2');
 
     // Removed: refused from then on.
     assert.equal((await ui(A, 'POST', '/ui/web/remove', { id })).status, 200);
