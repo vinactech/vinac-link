@@ -1,13 +1,13 @@
 {
   "name": "vinac-link-connector",
-  "version": "0.16.2",
+  "version": "0.16.3",
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
   "description": "VINAC Link (protocol v3: Noise; v2 for older devices): sound-started pairing, encrypted messages and secrets between AI agents on two computers, as a Claude Code / Codex plugin and MCP server",
   "bin": { "vinac": "bin/vinac.mjs" },
   "scripts": {
-    "test": "node --test tests/noise.test.mjs tests/noise-protocol.test.mjs tests/beacon.test.mjs tests/pairing.test.mjs tests/messaging.test.mjs tests/secrets.test.mjs tests/mcp.test.mjs tests/plugin.test.mjs tests/firewall.test.mjs tests/features.test.mjs tests/openclaw.test.mjs tests/watch.test.mjs tests/autoreply.test.mjs tests/frontdesk.test.mjs tests/offline.test.mjs tests/site.test.mjs tests/modes.test.mjs tests/vault.test.mjs tests/redact.test.mjs tests/outbox.test.mjs tests/easy-pairing.test.mjs tests/grants.test.mjs tests/phone.test.mjs tests/compliance.test.mjs tests/i18n.test.mjs tests/account.test.mjs tests/relay.test.mjs tests/rooms.test.mjs tests/mac-reuse.test.mjs tests/notify.test.mjs tests/connect.test.mjs tests/workspace.test.mjs tests/teamdir.test.mjs tests/teamrelay.test.mjs tests/teampair.test.mjs tests/mailbox.test.mjs tests/webdevice.test.mjs tests/qr.test.mjs tests/phonevault2.test.mjs tests/cards.test.mjs tests/projects.test.mjs tests/roomfiles.test.mjs tests/roomrules.test.mjs tests/search.test.mjs tests/needsme.test.mjs tests/help.test.mjs",
+    "test": "node --test tests/noise.test.mjs tests/noise-protocol.test.mjs tests/beacon.test.mjs tests/pairing.test.mjs tests/messaging.test.mjs tests/secrets.test.mjs tests/mcp.test.mjs tests/plugin.test.mjs tests/firewall.test.mjs tests/features.test.mjs tests/openclaw.test.mjs tests/watch.test.mjs tests/autoreply.test.mjs tests/frontdesk.test.mjs tests/offline.test.mjs tests/site.test.mjs tests/modes.test.mjs tests/vault.test.mjs tests/redact.test.mjs tests/outbox.test.mjs tests/easy-pairing.test.mjs tests/grants.test.mjs tests/phone.test.mjs tests/compliance.test.mjs tests/i18n.test.mjs tests/account.test.mjs tests/relay.test.mjs tests/rooms.test.mjs tests/mac-reuse.test.mjs tests/notify.test.mjs tests/connect.test.mjs tests/workspace.test.mjs tests/teamdir.test.mjs tests/teamrelay.test.mjs tests/teampair.test.mjs tests/mailbox.test.mjs tests/webdevice.test.mjs tests/qr.test.mjs tests/phonevault2.test.mjs tests/review0163.test.mjs tests/pairingtext.test.mjs tests/cards.test.mjs tests/projects.test.mjs tests/roomfiles.test.mjs tests/roomrules.test.mjs tests/search.test.mjs tests/needsme.test.mjs tests/help.test.mjs",
     "daemon": "node bin/vinac.mjs daemon --open",
     "mcp": "node bin/vinac.mjs mcp"
   },

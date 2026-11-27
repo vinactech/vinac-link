@@ -136,8 +136,14 @@ sealed to the computer that asked, never to the room, and lands in the same proj
 
 ### Your keys on your phone (phone vault, beta)
 
-Keep keys on your phone and hand them between your phone, your computers and other phones, with no
-network between them.
+Your API key is on your phone and you need it on your laptop: send it sealed for that laptop, without
+joining a Wi-Fi network or pasting it into an AI chat. Keep keys on your phone and hand them between
+your phone, your computers and other phones, with no network between them.
+
+> Sound is optional and in beta. A nearby microphone can record the tones. They are sealed for one
+> paired device and a recording played again is refused, but someone who later steals that pairing
+> key could open an old recording (no forward secrecy yet; see [SECURITY.md](../../SECURITY.md)).
+> Use test keys until the independent security review.
 
 1. **Pair once.** On the computer: **Secrets › Phones › Pair a phone**. Point your phone's camera at
    the code; it opens the phone vault at vinac.tech/app (the computer's one-time code is after the `#`

@@ -173,6 +173,7 @@ export class Store {
     c.setAAD(Buffer.from(`${FILE_LABEL}|${id}`));
     writeAtomic(this.filePath(id), Buffer.concat([nonce, c.update(bytes), c.final(), c.getAuthTag()]));
   }
+  removeFile(id) { try { fs.rmSync(this.filePath(id), { force: true }); } catch {} }
   readFile(id) {
     const raw = fs.readFileSync(this.filePath(id));
     const d = crypto.createDecipheriv('aes-256-gcm', this.historyKey(), raw.subarray(0, 12));

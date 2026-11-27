@@ -27,14 +27,14 @@ const exact = {
 
   // ---- welcome, overview -------------------------------------------------------------
   'Welcome to VINAC Link': 'Bienvenue dans VINAC Link',
-  'Pair this computer with another one, with a short code (or by sound, in beta). Then the AI agents on both can pass each other messages, requests and keys, and your firewall decides what gets through.':
-    'Jumelez cet ordinateur avec un autre, avec un code court (ou par le son, en bêta). Les agents IA des deux pourront alors s\'échanger des messages, des demandes et des clés, et votre pare-feu décide de ce qui passe.',
+  'Pair this computer with another one: pick it on the same network, compare 6 digits and press Allow on both (an invite, a code or sound also work). Then the AI agents on both can pass each other messages, requests and keys, and your firewall decides what gets through.':
+    'Jumelez cet ordinateur avec un autre : choisissez-le sur le même réseau, comparez 6 chiffres et appuyez sur Autoriser des deux côtés (une invitation, un code ou le son marchent aussi). Les agents IA des deux pourront alors s\'échanger des messages, des demandes et des clés, et votre pare-feu décide de ce qui passe.',
   'Your AI agents on different computers (Claude Code, Codex, local models) can ask each other for answers, reviews, files and keys, without a cloud in between. Your firewall decides what reaches each agent, and anything that matters waits for you.':
     'Vos agents IA sur différents ordinateurs (Claude Code, Codex, modèles locaux) peuvent se demander des réponses, des révisions, des fichiers et des clés, sans nuage entre eux. Votre pare-feu décide de ce qui atteint chaque agent, et tout ce qui compte vous attend.',
   'Recent activity': 'Activité récente', 'Received today': 'Reçus aujourd\'hui', 'Blocked this week': 'Bloqués cette semaine',
   'Nothing blocked': 'Rien de bloqué', 'Nothing to approve': 'Rien à approuver', 'Has read everything': 'A tout lu',
   'What\'s next': 'Prochaines étapes', 'Get the most out of it': 'En tirer le meilleur parti',
-  'Pair a second computer': 'Jumeler un deuxième ordinateur', 'Sound or a typed code; you swap 6-digit codes.': 'Par le son ou un code tapé; vous échangez des codes à 6 chiffres.',
+  'Pair a second computer': 'Jumeler un deuxième ordinateur', 'Pick it on the same network (or use an invite, a code or sound); compare 6 digits and press Allow on both.': 'Choisissez-le sur le même réseau (ou utilisez une invitation, un code ou le son); comparez 6 chiffres et appuyez sur Autoriser des deux côtés.',
   'Connect an agent and send a first message': 'Connecter un agent et envoyer un premier message',
   'One click for Claude Code or Codex: Agents › Connect.': 'Un clic pour Claude Code ou Codex : Agents › Connecter.',
   'Nothing needs you right now.': 'Rien n\'attend votre action pour l\'instant.',
@@ -102,8 +102,8 @@ const exact = {
   'On the other device, open VINAC Link, press': 'Sur l\'autre appareil, ouvrez VINAC Link, appuyez sur',
   'on the other computer too. It appears below. Then check that both screens show the same 6 digits and press Allow on both.':
     'sur l\'autre ordinateur aussi. Il apparaît ci-dessous. Vérifiez ensuite que les deux écrans affichent les mêmes 6 chiffres et appuyez sur Autoriser sur les deux.',
-  'with a code (recommended, works on any network the devices share or over Tailscale) or by sound (beta, no typing, devices close together). Either way you swap 6 digits, so only you can finish it.':
-    'avec un code (recommandé, fonctionne sur tout réseau que les appareils partagent ou par Tailscale) ou par le son (bêta, rien à taper, appareils rapprochés). Dans les deux cas, vous échangez 6 chiffres : vous seul pouvez terminer.',
+  'pick the other computer on the same network (recommended), use an invite from another network (Tailscale), a code, or sound (beta, devices close together). Every way ends the same: both screens show the same 6 digits and you press Allow on both, so only you can finish it.':
+    'choisissez l\'autre ordinateur sur le même réseau (recommandé), utilisez une invitation depuis un autre réseau (Tailscale), un code, ou le son (bêta, appareils rapprochés). Chaque façon se termine pareil : les deux écrans affichent les mêmes 6 chiffres et vous appuyez sur Autoriser des deux côtés, vous seul pouvez donc terminer.',
   'travel over your local network or Tailscale, encrypted end to end. No internet needed.':
     'circulent sur votre réseau local ou Tailscale, chiffrés de bout en bout. Aucun accès Internet requis.',
   'live in this computer\'s key store. Send one by Wi-Fi, or by sound (beta) when there is no network. VINAC Link\'s agent tools show names, not values.':
@@ -122,6 +122,19 @@ const exact = {
   'Recommended. Values get sealed with a key only your passphrase opens, so no other program can read them while the vault is locked. Receiving still works.':
     'Recommandé. Les valeurs sont scellées avec une clé que seule votre phrase de passe ouvre : aucun autre programme ne peut les lire tant que le coffre est verrouillé. La réception fonctionne toujours.',
   'Set passphrase': 'Définir la phrase de passe', 'New passphrase (8+ characters)': 'Nouvelle phrase de passe (8 caractères ou plus)',
+  'OpenClaw': 'OpenClaw', 'Connect with its own identity': 'Connecter avec sa propre identité', 'Remove its identity': 'Retirer son identité', 'Plugin guide': 'Guide des extensions',
+  'OpenClaw reaches VINAC Link through its two plugins (node and gateway), which you add in OpenClaw. Here you give it its own identity, so the log, the project boards and allowed runs say "OpenClaw". VINAC Link doesn\'t change OpenClaw\'s settings.':
+    'OpenClaw rejoint VINAC Link par ses deux extensions (nœud et passerelle), que vous ajoutez dans OpenClaw. Ici, vous lui donnez sa propre identité, pour que le journal, les tableaux de projet et les exécutions autorisées disent « OpenClaw ». VINAC Link ne modifie pas les réglages d\'OpenClaw.',
+  'Rules in effect': 'Règles en vigueur', 'Automation': 'Automatisation', 'Notifications, agent wake-ups and auto-reply': 'Notifications, réveil des agents et réponse automatique', 'Notifications and wake-ups': 'Notifications et réveils',
+  'Device details': 'Détails de l\'appareil', 'Technical details': 'Détails techniques', 'All set up.': 'Tout est prêt.', 'Why?': 'Pourquoi?',
+  'Who may post': 'Qui peut publier', 'Save who may post': 'Enregistrer qui peut publier', 'Only the agents ticked below': 'Seulement les agents cochés ci-dessous', 'Every agent on this computer (named or not)': 'Tout agent de cet ordinateur (nommé ou non)',
+  'Tick at least one agent, or choose "Every agent".': 'Cochez au moins un agent, ou choisissez « Tout agent ».',
+  'the default agent': 'l\'agent par défaut', 'Agents here: paused.': 'Agents ici : en pause.', 'Agents here that may post:': 'Agents ici qui peuvent publier :',
+  'Agents here: every agent on this computer may post.': 'Agents ici : tout agent de cet ordinateur peut publier.', 'Each post goes to:': 'Chaque publication va à :',
+  '(encrypted, through each one\'s firewall; no server keeps it).': '(chiffrée, par le pare-feu de chacun; aucun serveur ne la garde).', 'No other device: this room stays on this computer.': 'Aucun autre appareil : ce salon reste sur cet ordinateur.',
+  'No passphrase set': 'Aucune phrase de passe', 'Locked': 'Verrouillé',
+  'Values are protected by this computer\'s key store only. Recommended: a passphrase, so no other program can read them while the vault is locked.': 'Les valeurs sont protégées seulement par le magasin de clés de cet ordinateur. Recommandé : une phrase de passe, pour qu\'aucun autre programme ne puisse les lire tant que le coffre est verrouillé.',
+  'Passphrase set. It locks itself after 15 minutes.': 'Phrase de passe définie. Il se verrouille après 15 minutes.',
   'Lock now': 'Verrouiller maintenant', 'Remove passphrase…': 'Retirer la phrase de passe…', 'It locks itself after 15 minutes.': 'Il se verrouille après 15 minutes.',
   'Reveal': 'Révéler', 'Hide': 'Masquer', 'Approve': 'Approuver', 'Reject': 'Rejeter', 'Accept': 'Accepter', 'Decline': 'Refuser',
   'Dismiss': 'Ignorer', 'Add it': 'L\'ajouter', 'Revoke': 'Révoquer', 'Deny': 'Refuser', 'Remove': 'Retirer',
@@ -191,6 +204,8 @@ const exact = {
   'On the phone: point its camera at the code, or open the vault and press': 'Sur le téléphone : visez le code avec son appareil photo, ou ouvrez le coffre et appuyez sur',
   '. No camera handy? Press': '. Pas d\'appareil photo ? Appuyez sur', 'there, then play it as sound here.': 'là-bas, puis faites-le jouer en son ici.',
   'Play as sound': 'Jouer en son',
+  'Send encrypted key by sound': 'Envoyer la clé chiffrée par le son',
+  'Sound is in beta. A nearby microphone can record the tones; they open only on that phone, but until the security review use test keys.': 'Le son est en bêta. Un micro à proximité peut enregistrer les tonalités; elles ne s\'ouvrent que sur ce téléphone, mais d\'ici l\'examen de sécurité, utilisez des clés de test.',
   'Reach this computer from a browser (a phone, a laptop): what needs you, projects and rooms, answers and approvals. It goes through your account\'s relay, sealed for this computer only. A browser can\'t pair devices, change rules or see key values.':
     'Joignez cet ordinateur depuis un navigateur (un téléphone, un portable) : ce qui vous attend, projets et salons, réponses et approbations. Tout passe par le relais de votre compte, scellé pour cet ordinateur seulement. Un navigateur ne peut pas jumeler d\'appareils, changer les règles ni voir les valeurs des clés.',
   'Add to the room': 'Ajouter au salon', 'Ignore': 'Ignorer', 'Pair over the internet': 'Jumeler par Internet', 'Pairing request': 'Demande de jumelage',
@@ -578,6 +593,8 @@ const patterns = [
   ['{0} matching entry', '{0} entrée correspondante'],
   ['{0} matching entries, showing {1}', '{0} entrées correspondantes, {1} affichées'],
   ['Chain intact · {0} entries checked', 'Chaîne intacte · {0} entrées vérifiées'],
+  ['{0} retained entries verified', '{0} entrées conservées vérifiées'],
+  ['{0} retained entry verified', '{0} entrée conservée vérifiée'],
   ['Latest fingerprint {0} · this device {1}', 'Dernière empreinte {0} · cet appareil {1}'],
   ['Added on this device · {0} · user-only file', 'Ajoutée sur cet appareil · {0} · fichier réservé à l\'utilisateur'],
   ['Added on this device · {0}', 'Ajoutée sur cet appareil · {0}'],

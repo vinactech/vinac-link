@@ -13,7 +13,7 @@ for a security problem.
 | Attacker | Goal we stop |
 |---|---|
 | Another device on the same network | Reading, faking, replaying or redirecting messages; joining as a paired device |
-| Someone in the room with a microphone/speaker | Pairing without both people swapping the codes; reading secrets sent by sound without the pairing key |
+| Someone in the room with a microphone/speaker | Pairing without a person checking the same 6 digits and pressing Allow on both devices; reading secrets sent by sound without the pairing key |
 | A malicious web page in your browser | Using the local page or its API (CSRF, DNS rebinding, framing) |
 | A paired but compromised device | Getting its requests or files past your firewall; replaying; moving your record of its address |
 | A confused or prompt-injected agent on this computer, **using VINAC Link's tools** | Confirming a pairing, reading secret values, changing firewall rules, approving requests |
@@ -32,7 +32,9 @@ for a security problem.
 | Files | Up to 64 MB. Over 192 KB, they travel as sealed parts (each with its own receipt), stored encrypted until the closing message; then size and sha256 are checked before the firewall decides. Names without folders; at most 4 unfinished transfers per device, deleted after an hour. Readable by agents only after the firewall lets them through; big ones only by saving them (`vinac file save`, never overwriting). Downloaded by the page as attachments, never rendered. `vinac send-file` reads the file in the agent's own command; the service never opens a path an agent names. |
 | Git | `vinac git fetch` verifies the bundle and fetches its branches into `refs/remotes/vinac/<device>/`; it never checks out, merges or runs hooks. |
 | `vinac run` | Secret values go to a program only after the person approves that run on the page, which shows the command and folder. One use per approval, 2-minute expiry, logged. |
-| Standing grants (0.11) | Made only on the page, from a run the person approves ("Allow for 1 h / 8 h / 24 h / 7 days"). A grant names one agent identity (or the default token), the keys, the exact command (optionally followed by more arguments) and one folder with its subfolders; at most 7 days, revocable, unusable while the vault is locked. A granted run is started by the service itself, with the service's own PATH, no stdin, and output passed back through the redactor: the values never reach the agent or the agent API. One run per answer; every grant, use and revocation is audited. |
+| Standing grants (0.11) | Made only on the page, from a run the person approves ("Allow for 1 h / 8 h / 24 h / 7 days"). A grant names one agent identity (or the default token), the keys, the exact command (optionally followed by more arguments) and one folder with its subfolders; at most 7 days, revocable, unusable while the vault is locked. A granted run is started by the service itself, with the service's own PATH, no stdin, and output passed back through the redactor: the values never reach the agent or the agent API. One run per answer; every grant, use and revocation is audited. Since 0.16.3 a grant is bound to the argument list the service starts (not a display string) and to the variable each key goes into; on Windows the program starts without a shell, and an npm-style `.cmd` file gets only plain arguments. Grants made before 0.16.3 match nothing. |
+| One-time run approvals (0.16.3) | The values of a run approved once are handed out only to the identity that asked, once, within 30 seconds of the approval; the record is checked again and removed after any wait, so two waiting callers can't both collect it. They go to the program that asked (`vinac run`), which starts the command itself; see "`vinac run` trusts the command it is told" below. |
+| Rooms (0.16.3) | Text, cards and files in a room pass the same checks with the posting agent's identity (project agents, paused rooms, card types, rates) before anything is stored. A room name that several rooms share reaches no room. |
 | Phone vault (0.11, beta) | The computer shows a QR link whose code (a one-time X25519 key and 16-byte secret) sits after `#`, so it never reaches the web server. The phone answers by sound with its X25519 key and an HMAC tag; both derive keys with HKDF and show 6 digits; only the page's Allow stores the phone (its sealing key wrapped by the OS key store). Keys from the phone: AES-256-GCM with the header as additional data and a counter that must grow (replays refused), accepted only while the person listens. On the phone, the vault is AES-256-GCM with a PBKDF2-SHA256 key (600,000 rounds) from the passphrase, kept in the browser's storage; it locks after 5 minutes. The web app loads nothing from other sites. |
 | Agent identities (0.11) | Made only on the page; each has its own token (`agt_…`), shown once and stored only as SHA-256. Requests carry the agent's name into the audit log; grants can be limited to one agent; removing an agent ends its token and its grants. |
 | Audit log | One hash-chained line per event, never contents; `vinac audit --verify` finds changed or removed lines. |
@@ -58,7 +60,10 @@ for a security problem.
   message can still talk a tricked agent into something. That's why it's labelled untrusted, and why
   you can hold plain text per device.
 - **Sound secrets** are sealed with a key from the long-lived pairing key (no forward secrecy). A
-  recording plus a later stolen pairing key reveals them. Sound suggests proximity but can be relayed.
+  nearby microphone can record the tones; a recording plus a later stolen pairing key reveals them.
+  Sound suggests proximity but can be relayed. Planned: the receiving device makes a one-time key
+  when the person presses Receive, so an old recording opens nothing. Use test keys until the
+  independent review.
 - **Protocol v3 is new and not reviewed.** Pairing and sessions now use Noise (XX, KKpsk0/NNpsk0),
   but some parts are still our own: the commit/reveal code swap, binding the Ed25519 identity to the
   Noise key, keys exported from the handshake, and the message layer (AES-256-GCM, random nonces).

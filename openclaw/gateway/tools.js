@@ -33,7 +33,8 @@ export const TOOLS = {
   vinac_pair_request: {
     command: 'vinac.pair_request',
     parameters: { type: 'object', properties: { mode: { type: 'string', enum: ['announce', 'listen'], description: 'announce = that computer plays the pairing sound; listen = it hears the other device.' } }, required: ['mode'], additionalProperties: false },
-    description: 'Open the VINAC Link page on the computer that runs VINAC Link so the person can pair a nearby device. The person must type each device\'s 6-digit code into the other device; no tool can complete pairing, and you must not try to complete it any other way.',
+    // Kept word for word with connector/src/pairing-text.js (PAIR_ENDING); a test compares them.
+    description: 'Open the VINAC Link page on the computer that runs VINAC Link so the person can pair a nearby device. Usually the devices find each other on the same network without sound. Both screens then show the same 6 digits: the person checks them and presses Allow on both devices. No tool can do this step, and you must not try to complete it any other way.',
   },
   vinac_send: {
     command: 'vinac.send', timeoutMs: () => 30_000,

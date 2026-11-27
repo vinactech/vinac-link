@@ -7,7 +7,10 @@
 // What OpenClaw agents can NOT do through these commands, by design: confirm a
 // pairing, see pairing codes, read or send secret values, change firewall rules,
 // approve requests, or unpair a device. Those stay with the person (the page).
+import fs from 'node:fs';
+import path from 'node:path';
 import { AgentApi } from '../../connector/src/mcp.js';
+import { defaultHome } from '../../connector/src/store.js';
 
 const MODES = ['announce', 'listen'];
 const MAX_WAIT = 30; // seconds; node invocations should stay short
@@ -73,6 +76,14 @@ export const COMMANDS = {
 };
 export const COMMAND_NAMES = Object.keys(COMMANDS);
 
+/** The token the VINAC Link page wrote for OpenClaw (agent-tokens/openclaw.token in its home), if any. */
+function ownToken(home) {
+  try {
+    const t = fs.readFileSync(path.join(home || defaultHome(), 'agent-tokens', 'openclaw.token'), 'utf8').trim();
+    return /^agt_[\w-]+$/.test(t) ? t : undefined;
+  } catch { return undefined; }
+}
+
 /** Runs one command. `home` comes from trusted plugin config only. Never throws. */
 export async function runCommand(command, paramsJSON, { home } = {}) {
   const spec = COMMANDS[command];
@@ -82,7 +93,8 @@ export async function runCommand(command, paramsJSON, { home } = {}) {
   try { args = toArgs(params(paramsJSON, allowed)); }
   catch (e) { return JSON.stringify({ ok: false, code: e.code || 'REQ_INVALID', error: e.message }); }
   try {
-    const api = new AgentApi({ home });
+    // 0.16.3: OpenClaw's own identity, when the person gave it one on the VINAC Link page.
+    const api = new AgentApi({ home, token: ownToken(home) });
     await api.connect();                       // uses the running service, or starts it in the background
     const result = await api.tool(tool, args);
     return JSON.stringify({ ok: true, result });

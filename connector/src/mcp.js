@@ -16,6 +16,7 @@ import { fileURLToPath } from 'node:url';
 import { Store } from './store.js';
 import { Daemon, DEFAULT_PORT } from './daemon.js';
 import { env } from './env.js';
+import { PAIR_ENDING, PAIR_WAYS } from './pairing-text.js';
 import {macLifecycleAvailable,managedConnect} from './mac-lifecycle.js';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
@@ -31,12 +32,12 @@ export const TOOLS = [
   },
   {
     name: 'vinac_pair_request',
-    description: 'Open the VINAC Link page on this computer so the person can pair it with a nearby device. mode "announce" plays a short pairing sound from this device; mode "listen" listens for the other device\'s sound. The person must then type each device\'s 6-digit code into the other device: this tool cannot complete pairing, and you must not try to complete it any other way. Afterwards, check progress with vinac_pair_status.',
+    description: `Open the VINAC Link page on this computer so the person can pair it with a nearby device. mode "announce" plays a short pairing sound from this device; mode "listen" listens for the other device's sound. Usually the devices find each other on the same network without sound. ${PAIR_ENDING} Afterwards, check progress with vinac_pair_status.`,
     inputSchema: { type: 'object', properties: { mode: { type: 'string', enum: ['announce', 'listen'], description: 'announce = this device plays the sound; listen = this device hears the other one.' } }, required: ['mode'], additionalProperties: false },
   },
   {
     name: 'vinac_pair_status',
-    description: 'Show the state of the pairing in progress: announcing, listening, connecting, comparing (waiting for the person to type the codes), paired, failed, cancelled or expired. The codes are shown only on the VINAC Link page.',
+    description: 'Show the state of the pairing in progress: announcing, listening, connecting, comparing (waiting for the person to check the same 6 digits and press Allow on both devices), paired, failed, cancelled or expired. The codes are shown only on the VINAC Link page.',
     inputSchema: { type: 'object', properties: {}, additionalProperties: false },
     annotations: { readOnlyHint: true },
   },
@@ -152,7 +153,7 @@ export const SIMPLE_TOOLS = [
 export const toolList = ({ simple = env('TOOLS') === 'simple' } = {}) => (simple ? SIMPLE_TOOLS : TOOLS);
 
 export class AgentApi {
-  constructor({ home, port = DEFAULT_PORT, name } = {}) { this.home = home; this.port = port; this.name = name; this.store = new Store(home); }
+  constructor({ home, port = DEFAULT_PORT, name, token } = {}) { this.home = home; this.port = port; this.name = name; this.ownToken = token; this.store = new Store(home); }
 
   /** Uses the running daemon if there is one. Returns false if none answers. */
   async attach() {
@@ -161,7 +162,7 @@ export class AgentApi {
     const info = this.store.daemonInfo();
     if (!info?.uiPort) return false;
     // Attaching never creates/replaces a token; only the daemon initializes a new profile.
-    try { this.token = env('API_TOKEN') || env('AGENT_TOKEN') || fs.readFileSync(this.store.file('api-token'),'utf8').trim(); }
+    try { this.token = env('API_TOKEN') || env('AGENT_TOKEN') || this.ownToken || fs.readFileSync(this.store.file('api-token'),'utf8').trim(); }
     catch { return false; }
     this.base = `http://127.0.0.1:${info.uiPort}`;
     try { await this.call('GET', '/api/status', null, 2000); return true; } catch { return false; }
@@ -251,10 +252,7 @@ export class AgentApi {
       case 'vinac_peers': return this.call('GET', '/api/peers');
       case 'vinac_pair_request': {
         const r = await this.call('POST', '/api/pair/open', { mode: args.mode });
-        const step = args.mode === 'listen'
-          ? 'On the approval page, the person opens Pair a device on both computers, presses Pair next to the other computer in the list, checks that both screens show the same 6 digits and presses Allow on both. From another network: the person makes an invite there (Invite a device) and you run `vinac join <code>` here.'
-          : 'On the approval page, the person opens Pair a device on both computers; the other computer lists this one. They press Pair there, check that both screens show the same 6 digits and press Allow on both.';
-        return { ...r, nextSteps: [step, 'Each screen then shows its own 6-digit code. The person types each device\'s code into the other device. No tool can do this step.', 'Use vinac_pair_status to follow progress.'] };
+        return { ...r, nextSteps: [PAIR_WAYS.nearby, PAIR_WAYS.invite, PAIR_WAYS.code, PAIR_WAYS.sound, PAIR_ENDING, 'Use vinac_pair_status to follow progress.'] };
       }
       case 'vinac_unpair': return this.call('POST', '/api/unpair', { id: String(args.id || '') });
       // The folder this agent works in picks its project: it sees that project's key names only.

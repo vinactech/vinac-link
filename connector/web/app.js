@@ -306,7 +306,7 @@ function render(s) {
   $('roomsCount').textContent = (state.rooms || []).filter(r => !r.archived).length || '';
   if (main === 'rooms') renderRoomsPage();
   $('agentsNav').setAttribute('aria-current', String(main === 'agents'));
-  $('agentsNavCount').textContent = (state.agents || []).length || '';
+  agentSummary();
   if (main === 'agents') renderAgentsPage();
   if (main === 'activity' && !render.activityShown) loadActivity();
   render.activityShown = main === 'activity';
@@ -651,7 +651,7 @@ function renderUses() {
     const no = button('Deny', () => act('POST', '/ui/secret-use/decide', { id: u.id, approve: false }));
     yes.className = 'primary small-btn'; no.className = 'ghost';
     row.append(yes, how, no);
-    li.append(row, more, cmd, text('small', `In ${u.cwd || 'an unknown folder'} · expires in ${u.expiresIn} s · the program gets the value; check that you started this command.${u.canAllow ? ' Allowing it lets this agent run this exact command in this folder (and its subfolders) with these keys, without asking, until it expires.' : ''}`));
+    li.append(row, more, cmd, text('small', `In ${u.cwd || 'an unknown folder'} · expires in ${u.expiresIn} s · Approve once: the values go to the program that asked (vinac run${u.agent ? `, started by ${u.agent}` : ''}), which then starts this command with them. Check that you or your agent started it.${u.canAllow ? ' Allowing it instead lets this agent run this exact command (the same arguments) in this folder and its subfolders with these keys, without asking, until it expires; VINAC Link starts it itself and the values never reach the agent.' : ''}`));
     list.append(li);
   }
 }
@@ -670,7 +670,7 @@ function renderGrants() {
     const rev = button('Revoke', () => act('POST', '/ui/grants/revoke', { id: g.id })); rev.className = 'ghost';
     row.append(rev);
     const cmd = text('code', `${g.command}${g.prefix ? ' …' : ''}`); cmd.className = 'use-cmd';
-    li.append(row, cmd, text('small', `In ${g.cwd} and its subfolders · until ${when(g.expiresAt)} · used ${g.uses} time${g.uses === 1 ? '' : 's'}${g.lastUsedAt ? `, last ${when(g.lastUsedAt)}` : ''}`));
+    li.append(row, cmd, text('small', `In ${g.cwd} and its subfolders · until ${when(g.expiresAt)} · used ${g.uses} time${g.uses === 1 ? '' : 's'}${g.lastUsedAt ? `, last ${when(g.lastUsedAt)}` : ''}${g.needsNewApproval ? ' · made before 0.16.3, no longer used: the next run asks you again' : ''}`));
     list.append(li);
   }
   const agents = state.agents || [];
@@ -678,7 +678,8 @@ function renderGrants() {
   const al = $('agentList'); al.replaceChildren();
   for (const a of agents) {
     const li = document.createElement('li'); li.className = 'secret';
-    li.append(text('b', a.name));
+    const head = document.createElement('div'); head.className = 'app-card-head'; head.append(appMark(appFor(a.name), a.name), text('b', a.name));
+    li.append(head);
     const row = document.createElement('div'); row.className = 'row';
     const del = button('Remove', () => { if (confirm(t(`Remove "${a.name}"? Its token stops working and its allowed runs end.`))) act('POST', '/ui/agents/remove', { id: a.id }); }); del.className = 'ghost';
     row.append(del);
@@ -718,6 +719,10 @@ const EVENT_TEXT = {
   'file.saved': f => `Saved file ${f.name}`, 'mode.changed': f => `Firewall mode: ${f.mode || ''}`, 'rule.changed': f => `Firewall rule changed${f.intent ? `: ${f.intent}` : ''}`,
   'vault.locked': () => 'Vault locked', 'vault.unlocked': () => 'Vault unlocked', 'vault.passphrase.set': () => 'Vault passphrase set', 'vault.passphrase.removed': () => 'Vault passphrase removed',
   'retention.changed': f => `Log kept ${f.keepDays ? `${f.keepDays} days` : 'always'}${f.legalHold ? ', legal hold on' : ''}`,
+  // 0.16.3: say what changed in a project.
+  'project.changed': f => ({ workspace: `Set up project ${f.project}`, folders: `Changed project ${f.project}'s folder`, brief: `Edited project ${f.project}'s brief`, agents: `Updated who may post in project ${f.project}` }[f.what] || `Changed project ${f.project}`),
+  'project.removed': f => `Deleted project ${f.project}`, 'room.created': f => `Made room ${f.room}`, 'room.left': f => `Left room ${f.room}`, 'room.rules': f => `Changed room rules in ${f.room}`,
+  'agentapp.connected': f => `Connected ${f.app}`, 'agentapp.disconnected': f => `Disconnected ${f.app}`,
   'audit.exported': f => `Log exported (${f.entries} entries)`, 'report.created': f => `Signed report made (${f.entries} entries)`, 'audit.pruned': f => `${f.entries} old entries removed (retention)`,
 };
 const WHO_ICON = { person: '●', agent: '◆', device: '▲', service: '○' };
@@ -738,8 +743,8 @@ async function loadActivity(more = false) {
   const c = r.chain;
   $('auditChain').className = `audit-chain ${c.ok ? 'ok' : 'bad'}`;
   $('auditChain').replaceChildren(
-    text('b', c.ok ? `Chain intact · ${c.count.toLocaleString(locale())} entries checked` : 'Chain broken: an entry was changed or removed'),
-    text('small', c.ok ? `Latest fingerprint ${c.head.slice(0, 16)}… · this device ${r.device.fingerprint}${r.retention.anchor ? ` · ${r.retention.anchor.removedEntries} older entries removed by retention` : ''}` : c.problem));
+    text('b', c.ok ? `${c.count.toLocaleString(locale())} retained ${c.count === 1 ? 'entry' : 'entries'} verified` : 'Chain broken: an entry was changed or removed'),
+    text('small', c.ok ? `Latest fingerprint ${c.head.slice(0, 16)}… · this device ${r.device.fingerprint}${r.retention.anchor ? ` · ${r.retention.anchor.removedEntries} older entries removed by retention` : ''}. This checks the entries against each other; to notice entries cut from the end, compare the latest fingerprint with one you noted earlier (or a signed report).` : c.problem));
   $('auditTotal').textContent = `${r.total.toLocaleString(locale())} matching ${r.total === 1 ? 'entry' : 'entries'}${r.total > auditOffset + r.entries.length ? `, showing ${auditOffset + r.entries.length}` : ''}`;
   const list = $('auditList');
   if (!more) list.replaceChildren();
@@ -865,16 +870,41 @@ $('toPhonePlay').onclick = async () => {
   catch (e) { toast(`Could not play sound: ${e.message}`); }
 };
 
+// 0.16.3: a small mark for each agent app (our own monograms, not the vendors' logos), and a
+// generic one for anything else. Used on the Agents page and wherever an app is named.
+const APP_MARKS = {
+  claude: ['CC', '#d97757'], codex: ['Cx', '#10a37f'], openclaw: ['OC', '#e5484d'], cursor: ['Cu', '#3b82f6'],
+  lmstudio: ['LM', '#7c5cff'], goose: ['Gs', '#f59e0b'], ollama: ['Ol', '#64748b'], webui: ['UI', '#0ea5e9'],
+};
+function appMark(app, label) {
+  const [letters, color] = APP_MARKS[app] || [String(label || '?').replace(/[^A-Za-z0-9]/g, '').slice(0, 2) || '•', '#8b8fa3'];
+  const s = document.createElement('span'); s.className = 'app-mark'; s.setAttribute('aria-hidden', 'true');
+  s.textContent = letters; s.style.background = color;
+  return s;
+}
+const appFor = name => { const n = String(name || '').toLowerCase(); return /claude/.test(n) ? 'claude' : /codex/.test(n) ? 'codex' : /openclaw/.test(n) ? 'openclaw' : /cursor/.test(n) ? 'cursor' : /lm ?studio/.test(n) ? 'lmstudio' : /goose/.test(n) ? 'goose' : /ollama/.test(n) ? 'ollama' : null; };
+for (const el of document.querySelectorAll('.app-mark[data-app]')) el.replaceWith(appMark(el.dataset.app));
+
+// 0.16.3: connected apps and named identities are different counts; say both.
+const appsOn = { claude: false, codex: false, openclaw: false };
+let claudeMode = null;
+function agentSummary() {
+  const apps = Object.values(appsOn).filter(Boolean).length, named = (state?.agents || []).length;
+  const line = `${apps} connected app${apps === 1 ? '' : 's'} · ${named} named identit${named === 1 ? 'y' : 'ies'}`;
+  if ($('agentsNavCount')) { $('agentsNavCount').textContent = apps || named || ''; $('agentsNav').title = line; }
+  if ($('agentsSummary')) $('agentsSummary').textContent = line;
+}
 // Claude Code on this computer: connect it from here (the service backs up its settings first).
 function renderClaude(c) {
   if (!c || !$('claudeText')) return;
   const connected = c.mode === 'direct' || c.mode === 'plugin';
+  appsOn.claude = connected; claudeMode = c.mode; agentSummary();
   const tidy = c.mode === 'plugin' && (c.manual || c.direct?.server);
   $('claudeText').textContent = c.copyProblem && !connected ? c.copyProblem : c.text;
   $('claudeText').className = `claude-line ${connected && !tidy ? 'ok' : c.present ? 'warn' : ''}`;
   $('claudeState').textContent = !c.present ? '' : connected ? '· connected' : '· not connected';
   $('claudeConnect').textContent = connected ? (tidy ? 'Tidy up' : 'Connect again') : 'Connect Claude Code';
-  if (c.mode === 'plugin') $('claudeConnect').textContent = 'Switch to VINAC Link\'s own connection';
+  if (c.mode === 'plugin') $('claudeConnect').textContent = 'Connect with its own identity';
   $('claudeConnect').hidden = !!(c.copyProblem && !connected);
   $('claudeRemove').hidden = c.mode !== 'direct' && !c.direct?.server;
   $('claudeBanner').hidden = !c.present || connected || c.dismissed || !!c.copyProblem;
@@ -889,7 +919,7 @@ async function connectClaudeNow(body = {}) {
   refreshClaude();
 }
 $('claudeConnect')?.addEventListener('click', () => {
-  const plugin = $('claudeConnect').textContent.startsWith('Switch');
+  const plugin = claudeMode === 'plugin';
   if (plugin && !confirm('Turn off the VINAC Link plugin in Claude Code and connect directly instead? Claude Code gets its own identity and the current tools; its skills (/vinac-link:…) go away. You can turn the plugin back on in Claude Code.')) return;
   connectClaudeNow(plugin ? { replacePlugin: true } : {});
 });
@@ -903,6 +933,7 @@ window.addEventListener('focus', refreshClaude);
 function renderCodex(c) {
   if (!c || !$('codexText')) return;
   const connected = c.mode === 'direct';
+  appsOn.codex = connected; agentSummary();
   $('codexText').textContent = c.copyProblem && !connected ? c.copyProblem : c.text;
   $('codexText').className = `claude-line ${connected ? 'ok' : c.present ? 'warn' : ''}`;
   $('codexState').textContent = !c.present ? '' : connected ? '· connected' : '· not connected';
@@ -910,7 +941,28 @@ function renderCodex(c) {
   $('codexConnect').hidden = !!(c.copyProblem && !connected);
   $('codexRemove').hidden = c.mode === 'none';
 }
-async function refreshCodex() { try { renderCodex(await api('GET', '/ui/connect/codex')); } catch { /* older service */ } }
+async function refreshCodex() { try { renderCodex(await api('GET', '/ui/connect/codex')); } catch { /* older service */ } refreshOpenclaw(); }
+
+// OpenClaw (0.16.3): its plugins connect it; here the person gives it its own identity.
+function renderOpenclaw(c) {
+  if (!c || !$('openclawBox')) return;
+  $('openclawBox').hidden = !c.present;
+  appsOn.openclaw = c.mode !== 'none' && c.present; agentSummary();
+  $('openclawText').textContent = c.text;
+  $('openclawText').className = `claude-line ${c.mode === 'own' ? 'ok' : c.present ? 'warn' : ''}`;
+  $('openclawState').textContent = !c.present ? '' : c.mode === 'none' ? '· not connected' : '· connected';
+  $('openclawConnect').hidden = c.mode !== 'plugin';
+  $('openclawRemove').hidden = c.mode !== 'own';
+  $('openclawGuide').hidden = c.mode !== 'none';
+  $('openclawSeen').textContent = c.lastSeenAt ? `Last used VINAC Link: ${new Date(c.lastSeenAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })}` : '';
+}
+async function refreshOpenclaw() { try { renderOpenclaw(await api('GET', '/ui/connect/openclaw')); } catch { /* older service */ } }
+async function connectOpenclawNow(body = {}) {
+  try { toast((await api('POST', '/ui/connect/openclaw', body)).message); } catch (e) { toast(e.message); }
+  refreshOpenclaw(); act('GET', '/ui/state');
+}
+$('openclawConnect')?.addEventListener('click', () => connectOpenclawNow());
+$('openclawRemove')?.addEventListener('click', () => { if (confirm('Remove OpenClaw\'s own identity? It keeps working through its plugins as this computer\'s default agent.')) connectOpenclawNow({ remove: true }); });
 async function connectCodexNow(body = {}) {
   try { toast((await api('POST', '/ui/connect/codex', body)).message); } catch (e) { toast(e.message); }
   refreshCodex(); act('GET', '/ui/state');
@@ -1115,15 +1167,33 @@ function drawProject() {
   const named = d.agents.filter(a => a.id !== 'default');
   const hasApp = re => named.some(a => re.test(a.name));
   if (true) {
+    // 0.16.3: who may post is an explicit choice; "none ticked" no longer silently means "everyone".
     const ag = document.createElement('div'); ag.className = 'proj-checks';
     checks(ag, d.agents, d.project.agents);
-    const saveAgents = small('ghost', 'Save agents', async () => { try { projData = await api('POST', '/ui/projects/agents', { id: d.project.id, agents: picked(ag) }); drawProject(); toast('Saved.'); } catch (e) { toast(e.message); } });
+    const mode = document.createElement('div'); mode.className = 'proj-checks';
+    const radio = (value, label, on) => { const l = document.createElement('label'); const r = document.createElement('input'); r.type = 'radio'; r.name = `postMode-${d.project.id}`; r.value = value; r.checked = on; l.append(r, ` ${t(label)}`); return l; };
+    const all = !d.project.agents.length;
+    mode.append(radio('selected', 'Only the agents ticked below', !all), radio('all', 'Every agent on this computer (named or not)', all));
+    const effective = document.createElement('p'); effective.className = 'note';
+    const showEffective = () => {
+      const sel = mode.querySelector('input:checked').value === 'selected';
+      ag.hidden = !sel;
+      const names = d.agents.filter(a => picked(ag).includes(a.id)).map(a => a.name);
+      effective.textContent = sel ? (names.length ? `${t('Can post in the project room:')} ${names.join(', ')}. ${t('Every other agent here is refused there.')}` : t('Tick at least one agent, or choose "Every agent".')) : t('Can post in the project room: every agent on this computer. (To stop all agents for a while, use Pause agents in the room.)');
+    };
+    mode.addEventListener('change', showEffective); ag.addEventListener('change', showEffective); showEffective();
+    const saveAgents = small('ghost', 'Save who may post', async () => {
+      const sel = mode.querySelector('input:checked').value === 'selected';
+      const list = sel ? picked(ag) : [];
+      if (sel && !list.length) return toast(t('Tick at least one agent, or choose "Every agent".'));
+      try { projData = await api('POST', '/ui/projects/agents', { id: d.project.id, agents: list }); drawProject(); toast('Saved.'); } catch (e) { toast(e.message); }
+    });
     const connectRow = document.createElement('div'); connectRow.className = 'row';
-    for (const [app, label, re] of [['claude', 'Connect Claude Code', /claude/i], ['codex', 'Connect Codex', /codex/i]]) if (!hasApp(re)) connectRow.append(small('ghost', label, async () => {
+    for (const [app, label, re] of [['claude', 'Give Claude Code its own identity', /claude/i], ['codex', 'Give Codex its own identity', /codex/i]]) if (!hasApp(re)) connectRow.append(small('ghost', label, async () => {
       try { toast((await api('POST', `/ui/connect/${app}`, {})).message); } catch (e) { toast(e.message); }
       render(await api('GET', '/ui/state')); refreshClaude(); refreshCodex(); loadProject(d.project.id);
     }));
-    agentsSec = sec('Agents', note('Only the agents ticked here post in the project room; the others are refused there. None ticked: any agent here may. "Default agent" is anything without its own identity: a plugin, a terminal, OpenClaw.'), ag, saveAgents, ...(connectRow.childElementCount ? [note('Not connected yet:'), connectRow] : []));
+    agentsSec = sec('Who may post', mode, ag, effective, saveAgents, note('"Default agent" is anything without its own identity: a plugin, a terminal, OpenClaw.'), ...(connectRow.childElementCount ? [note('Without an identity of their own here (they act as the default agent):'), connectRow] : []));
   } else {
     const row = document.createElement('div'); row.className = 'row';
     for (const [app, label] of [['claude', 'Connect Claude Code'], ['codex', 'Connect Codex']]) row.append(small('ghost', label, async () => {
@@ -1144,21 +1214,25 @@ function drawProject() {
   if (missing.length) { const kv3 = document.createElement('div'); kv3.className = 'proj-keys'; kv3.append(text('b', 'Missing'), ...missing.map(n => chip(n, 'warn'))); keyKids.push(kv3); }
   const addKeys = small('ghost', 'Add keys…', () => { $('secretsNav').click(); });
   const gl = document.createElement('ul'); gl.className = 'proj-files';
-  gl.append(...d.grants.map(g => { const li = document.createElement('li'); li.textContent = `${g.agentName}: ${g.command}${g.prefix ? ' …' : ''} with ${g.names.join(', ')} until ${new Date(g.expiresAt).toLocaleString()}`; return li; }));
+  gl.append(...d.grants.map(g => { const li = document.createElement('li'); li.textContent = `${g.agentName}: ${g.command}${g.prefix ? ' …' : ''} with ${g.names.join(', ')} until ${new Date(g.expiresAt).toLocaleString()}${g.needsNewApproval ? ' (made before 0.16.3: no longer used; allow it again)' : ''}`; return li; }));
   const gf = document.createElement('form'); gf.className = 'proj-inline';
   const gc = document.createElement('input'); gc.placeholder = 'Command, e.g. npm run dev'; gc.maxLength = 400; gc.setAttribute('aria-label', 'Command');
   const gh = document.createElement('select'); gh.setAttribute('aria-label', 'For how long');
   for (const hr of [1, 8, 24]) { const o = document.createElement('option'); o.value = hr; o.textContent = `${hr} h`; if (hr === 8) o.selected = true; gh.append(o); }
   const gb = document.createElement('button'); gb.className = 'ghost'; gb.type = 'submit'; gb.textContent = 'Allow';
-  gf.append(gc, gh, gb);
+  const gm = document.createElement('label'); gm.className = 'use-more';
+  const gmBox = document.createElement('input'); gmBox.type = 'checkbox';
+  gm.append(gmBox, ' also with more arguments after it');
+  gf.append(gc, gh, gb, gm);
   gf.onsubmit = async e => {
     e.preventDefault(); if (!gc.value.trim()) return;
-    if (!confirm(`Let this project's agents run "${gc.value.trim()}" (and with more arguments) in its folder with its dev keys for ${gh.value} h? Whatever that command runs gets the keys.`)) return;
-    try { const r = await api('POST', '/ui/projects/grant', { id: d.project.id, command: gc.value.trim(), hours: Number(gh.value), prefix: true }); projData = r; drawProject(); toast(r.note); } catch (err) { toast(err.message); }
+    const more = gmBox.checked;
+    if (!confirm(`Let this project's agents run exactly "${gc.value.trim()}"${more ? ' or that command followed by ANY further arguments' : ' (these arguments only)'} in its folder with its dev keys for ${gh.value} h? Whatever that command runs gets the keys.`)) return;
+    try { const r = await api('POST', '/ui/projects/grant', { id: d.project.id, command: gc.value.trim(), hours: Number(gh.value), prefix: more }); projData = r; drawProject(); toast(r.note); } catch (err) { toast(err.message); }
   };
   const canAllow = d.project.folders[0] && d.keys.dev.length;
   const keysSec = sec('Keys and allowed runs', ...keyKids, addKeys,
-    note(canAllow ? 'Agents never see values. Allow one command for the project\'s agents with its DEV keys, without asking each time. Prod keys always ask.' : 'Agents never see values. Give the project a folder and dev keys, then you can allow one command with them. Prod keys always ask.'),
+    note(canAllow ? 'Agent tools never return values. An allowed command is started by VINAC Link itself, so the values never reach the agent (a run you approve once gives them to the program that asked). Allow one command for the project\'s agents with its DEV keys, without asking each time. Prod keys always ask.' : 'Agent tools never return values. Give the project a folder and dev keys, then you can allow one command with them. Prod keys always ask.'),
     gl, ...(canAllow ? [gf] : []));
 
   // Files
@@ -1411,18 +1485,19 @@ function renderVaultLock() {
   const head = document.createElement('div'); head.className = 'vl-head';
   if (!v.protected) {
     // Slim by default: one line and a button; the field opens when the person asks for it.
-    head.append(text('b', 'Vault not locked'), text('small', 'Recommended: a passphrase, so no other program can read the values while the vault is locked.'));
+    // 0.16.3: three distinct states (No passphrase set / Unlocked / Locked).
+    head.append(text('b', 'No passphrase set'), text('small', 'Values are protected by this computer\'s key store only. Recommended: a passphrase, so no other program can read them while the vault is locked.'));
     const open = button(renderVaultLock.open ? 'Cancel' : 'Set passphrase…', () => { renderVaultLock.open = !renderVaultLock.open; renderVaultLock(); });
     open.className = renderVaultLock.open ? 'ghost small-btn' : 'primary small-btn';
     const line = document.createElement('div'); line.className = 'vl-line'; line.append(head, open);
     box.append(line);
     if (renderVaultLock.open) box.append(vaultForm('New passphrase (8+ characters)', 'Set passphrase', 'setup'));
   } else if (v.locked) {
-    head.append(text('b', 'Vault locked'), text('small', 'Unlock to reveal, copy or send a secret, or to approve a program run. New secrets still arrive.'));
+    head.append(text('b', 'Locked'), text('small', 'Unlock to reveal, copy or send a secret, or to approve a program run. New secrets still arrive.'));
     box.append(head, vaultForm('Passphrase', 'Unlock', 'unlock'));
   } else {
     const until = new Date(v.unlockedUntil).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' });
-    head.append(text('b', `Vault unlocked until ${until}`), text('small', 'It locks itself after 15 minutes.'));
+    head.append(text('b', `Unlocked until ${until}`), text('small', 'Passphrase set. It locks itself after 15 minutes.'));
     const row = document.createElement('div'); row.className = 'row';
     const lock = button('Lock now', () => vaultDo('lock')); lock.className = 'ghost small-btn';
     const off = button('Remove passphrase…', () => { const p = prompt(t('Type your passphrase to remove it. Secrets then rely on the OS key store only.')); if (p) vaultDo('remove', p); }); off.className = 'linkish';
@@ -1509,10 +1584,13 @@ function renderOverview() {
     const row = document.createElement('button'); row.type = 'button'; row.className = 'devrow';
     const av = document.createElement('span'); av.className = 'avatar'; avatar(av, peer);
     const info = document.createElement('div'); info.className = 'devrow-text';
-    info.append(text('b', peer.name), text('small', `${peer.fingerprint}${peer.address ? ` · ${peer.address}` : ''}`));
+    // 0.16.3: identifiers live in the conversation's details; here, what a person needs: name, last activity, online.
+    const unread = c?.unread || 0;
+    info.append(text('b', peer.name), text('small', c?.last ? `Last message ${shortWhen(c.last.sentAt)}${unread ? ` · ${unread} unread` : ''}` : `Paired ${new Date(peer.pairedAt).toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`));
     const st = text('span', peer.online === true ? (peer.reachedVia === 'relay' ? 'Online via relay' : 'Online') : peer.online === false ? 'Offline' : 'Checking'); st.className = `pill ${peer.online === true ? 'ok' : peer.online === false ? '' : 'muted'}`;
-    const last = text('small', c?.last ? `Last message ${shortWhen(c.last.sentAt)}` : `Paired ${new Date(peer.pairedAt).toLocaleDateString(locale(), { month: 'short', day: 'numeric' })}`); last.className = 'devrow-when';
-    row.append(av, info, last, st);
+    row.append(av, info);
+    if (peer.online === false) { const why = document.createElement('span'); why.className = 'linkish devrow-why'; why.textContent = t('Why?'); why.setAttribute('role', 'button'); why.tabIndex = 0; why.onclick = e => { e.stopPropagation(); explain('peer', peer.id); }; row.append(why); }
+    row.append(st);
     row.onclick = () => select(peer.id);
     box.append(row);
   }
@@ -1523,7 +1601,16 @@ function renderOverview() {
     ['Network', d.address || 'No local address'], ['Tailscale', d.tailscale || 'Not detected'],
     ['Version', `${d.version || '?'} · protocol v${d.protocol} · intents ${d.logos || '?'}`],
   ];
-  $('ovMe').replaceChildren(...facts.flatMap(([k, v]) => { const dt = text('dt', k), dd = text('dd', v); if (k === 'Fingerprint') dd.className = 'mono'; return [dt, dd]; }));
+  // 0.16.3: name and version up front; fingerprint, key store, addresses and protocol under Device details.
+  const [first, ...rest] = facts;
+  const dl = document.createElement('dl'); dl.className = 'facts';
+  dl.append(...rest.flatMap(([k, v]) => { const dt = text('dt', k), dd = text('dd', v); if (k === 'Fingerprint') dd.className = 'mono'; return [dt, dd]; }));
+  const more = document.createElement('details'); more.className = 'tech'; more.open = !!renderOverview.detailsOpen;
+  more.ontoggle = () => { renderOverview.detailsOpen = more.open; };
+  more.append(text('summary', 'Device details'), dl);
+  const top = [text('dt', first[0]), text('dd', first[1]), text('dt', 'Version'), text('dd', d.version || '?')];
+  const wrap = document.createElement('dd'); wrap.className = 'facts-more'; wrap.append(more);
+  $('ovMe').replaceChildren(...top, wrap);
 
   // Recent activity (requests and held/blocked messages)
   const act = $('ovActivity'); act.replaceChildren();
@@ -1540,14 +1627,20 @@ function renderOverview() {
 
   // Checklist
   const steps = [
-    [s.peers.length > 0, 'Pair a second computer', 'Sound or a typed code; you swap 6-digit codes.', openPair],
+    [s.peers.length > 0, 'Pair a second computer', 'Pick it on the same network (or use an invite, a code or sound); compare 6 digits and press Allow on both.', openPair],
     [s.conversations.some(c => c.total > 0), 'Connect an agent and send a first message', 'One click for Claude Code or Codex: Agents › Connect.', null],
     [!!fw && fw.intents.some(i => i.all || Object.keys(i.devices).length), 'Set your firewall rules', 'Allow what you trust, keep risky intents blocked.', openFirewall],
     [s.secrets.length > 0, 'Move a key without the chat', 'Secrets → Receive…, then send it from the other computer.', () => $('ovReceiveBtn').click()],
     [!!d.tailscale, 'Reach your devices from anywhere', 'Install Tailscale on both computers.', null],
   ];
   const ul = $('ovChecklist'); ul.replaceChildren();
-  for (const [done, title, hint, go] of steps) {
+  // 0.16.3: finished steps fold away; when all are done the panel says so in one line.
+  const open = steps.filter(x => !x[0]);
+  ul.closest('.ov-start').classList.toggle('all-done', !open.length);
+  if (!open.length) { const li = document.createElement('li'); li.className = 'done'; const m = text('span', '✓'); m.className = 'check'; li.append(m, text('b', 'All set up.')); ul.append(li); return; }
+  const shown = open;
+  const doneCount = steps.length - open.length;
+  for (const [done, title, hint, go] of shown) {
     const li = document.createElement('li'); li.className = done ? 'done' : '';
     const mark = text('span', done ? '✓' : ''); mark.className = 'check';
     const t = document.createElement('div'); t.append(text('b', title), text('small', hint));
@@ -1555,6 +1648,7 @@ function renderOverview() {
     if (go && !done) { const b = button('Start', go); b.className = 'ghost small-btn'; li.append(b); }
     ul.append(li);
   }
+  if (doneCount) { const li = document.createElement('li'); li.className = 'done'; li.append(text('small', `${doneCount} done`)); ul.append(li); }
 }
 $('firewallBackBtn').onclick = () => { wantFirewall = false; wantActivity = false; wantProjects = false; wantRooms = false; wantAgents = false; mobileMain = false; render(state); };
 
@@ -1570,13 +1664,15 @@ async function loadFirewall(force = false) {
 
 function requestItem(r) {
   const li = document.createElement('li'); li.className = 'secret';
-  const name = text('b', r.intent || 'Plain message');
+  // 0.16.3: in plain language first (the catalog's description), the intent name and raw data under Technical details.
+  const what = r.intent ? (fw?.intents?.find(i => i.intent === r.intent)?.description || r.intent) : 'A plain message';
+  const name = text('b', `${r.peer.name}: ${what.replace(/\.$/, '')}`);
   const risk = text('span', r.risk); risk.className = `fwtag r-${r.risk}`; risk.title = RISK_LABEL[r.risk] || '';
   const st = text('span', FW_LABEL[r.firewall.status]); st.className = `fwtag ${r.firewall.status}`;
   name.append(risk, st);
   const when = new Date(r.receivedAt || r.sentAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' });
-  const by = r.firewall.decidedAt ? `you, ${new Date(r.firewall.decidedAt).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' })}` : r.firewall.rule;
-  const meta = text('small', `From ${r.peer.name}${r.agent ? ` (agent ${r.agent.name}, ${r.agent.fp})` : r.by === 'agent' ? ' (its agent)' : ''} · ${when} · decided by ${by}`);
+  const by = r.firewall.decidedAt ? `you, ${new Date(r.firewall.decidedAt).toLocaleTimeString(locale(), { hour: 'numeric', minute: '2-digit' })}` : `the rule at the time (${r.firewall.rule})`;
+  const meta = text('small', `${r.agent ? `Sent by agent ${r.agent.name} (${r.agent.fp}) · ` : r.by === 'agent' ? 'Sent by its agent · ' : ''}${when} · decided by ${by}`);
   const row = document.createElement('div'); row.className = 'row';
   if (r.firewall.status === 'pending') {
     const yes = button('Approve', () => decide(r, true)); yes.className = 'primary small-btn';
@@ -1594,8 +1690,11 @@ function requestItem(r) {
     const dl = button('Download', () => downloadFile(r.args.file, r.args.name)); dl.className = 'ghost';
     row.append(dl); li.append(f);
   } else if (r.intent) {
+    const tech = document.createElement('details'); tech.className = 'tech';
+    tech.append(text('summary', 'Technical details'), text('small', `Intent ${r.intent}`));
     const shown = r.args ? JSON.stringify(r.args, null, 2) : '';
-    if (shown) { const a = text('pre', shown); a.className = 'args'; li.append(a); }
+    if (shown) { const a = text('pre', shown); a.className = 'args'; tech.append(a); }
+    li.append(tech);
   }
   const auto = r.intent === 'document.file.share' ? 'Shared file: ' : `Request: ${r.intent}`;
   if (!r.intent && r.text) { const a = text('pre', r.text.length > 1500 ? `${r.text.slice(0, 1500)}…` : r.text); a.className = 'args'; li.append(a); }
@@ -1972,11 +2071,18 @@ let agentSetup = null;
 function renderAgentsPage() {
   renderGrants();
   // Each app card says when this app last used VINAC Link (its identity's "last seen").
-  for (const [box, re] of [['claudeBox', /claude/i], ['codexBox', /codex/i]]) {
+  // 0.16.3: and which identity it acts as, and the projects whose rooms it may post in.
+  const projects = state.projects || [];
+  const mayPostIn = id => projects.filter(p => !(p.agents || []).length || (p.agents || []).includes(id)).map(p => p.name);
+  for (const [box, re] of [['claudeBox', /claude/i], ['codexBox', /codex/i], ['openclawBox', /openclaw/i]]) {
+    if (!$(box)) continue;
     const a = (state.agents || []).find(x => re.test(x.name));
     let seen = $(box).querySelector('.app-seen');
     if (!seen) { seen = document.createElement('p'); seen.className = 'app-seen'; $(box).append(seen); }
-    seen.textContent = a ? (a.lastSeenAt ? `Last used VINAC Link: ${new Date(a.lastSeenAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })}` : 'Its identity is ready; not used yet (start a new session in the app).') : '';
+    const when = a?.lastSeenAt ? `Last used VINAC Link: ${new Date(a.lastSeenAt).toLocaleString(locale(), { dateStyle: 'medium', timeStyle: 'short' })}` : a ? 'Its identity is ready; not used yet (start a new session in the app).' : '';
+    const id = a ? a.id : 'default';
+    const where = projects.length ? (mayPostIn(id).length ? `Can post in: ${mayPostIn(id).join(', ')}.` : 'Can\'t post in any project room (not ticked in Who may post).') : '';
+    seen.textContent = [a ? `Acts as "${a.name}" (${a.fingerprint}).` : 'Acts as this computer\'s default agent.', when, where].filter(Boolean).join(' ');
   }
   if (!agentSetup) { api('GET', '/ui/setup').then(s => { agentSetup = s; drawAgentOthers(); }).catch(() => {}); return; }
   if (!$('agentOthers').childElementCount) drawAgentOthers();
@@ -1991,13 +2097,13 @@ function drawAgentOthers() {
     const pre = document.createElement('pre'); pre.textContent = value;
     wrap.append(head, pre); return wrap;
   };
-  const card = (name, what, ...kids) => { const d = document.createElement('div'); d.className = 'other-app'; d.append(text('b', name), Object.assign(text('p', what), { className: 'fw-note' }), ...kids); return d; };
+  const card = (app, name, what, ...kids) => { const d = document.createElement('div'); d.className = 'other-app'; const h = document.createElement('div'); h.className = 'app-card-head'; h.append(appMark(app, name), text('b', name)); d.append(h, Object.assign(text('p', what), { className: 'fw-note' }), ...kids); return d; };
   $('agentOthers').replaceChildren(
-    card('Cursor, Continue, LibreChat and other MCP apps', 'Add an MCP server (stdio) in the app\'s settings with this JSON.', copyBox('MCP settings (JSON)', s.mcpJson)),
-    card('LM Studio and small local models', 'Program tab › Install › Edit mcp.json, and add this. "--simple" gives small models just send, inbox and peers.', copyBox('mcp.json', s.mcpJsonSimple)),
-    card('Goose', 'goose configure › Add Extension › Command-line Extension, named vinac, with this command.', copyBox('Command', s.commandLineSimple)),
-    card('OpenClaw', 'Two small plugins (node host and gateway). The guide is in the VINAC Link folder.', copyBox('Guide', s.openclaw)),
-    card('Any other app or a terminal', 'The agent tools over stdio. To act as a named agent, add VINAC_AGENT_TOKEN from "Add agent" above to its environment.', copyBox('Command', s.commandLine)),
+    card('cursor', 'Cursor, Continue, LibreChat and other MCP apps', 'Add an MCP server (stdio) in the app\'s settings with this JSON.', copyBox('MCP settings (JSON)', s.mcpJson)),
+    card('lmstudio', 'LM Studio and small local models', 'Program tab › Install › Edit mcp.json, and add this. "--simple" gives small models just send, inbox and peers.', copyBox('mcp.json', s.mcpJsonSimple)),
+    card('goose', 'Goose', 'goose configure › Add Extension › Command-line Extension, named vinac, with this command.', copyBox('Command', s.commandLineSimple)),
+    card('openclaw', 'OpenClaw', 'Two small plugins (node host and gateway). The guide is in the VINAC Link folder. Once they are in, give OpenClaw its own identity in its card above.', copyBox('Guide', s.openclaw)),
+    card(null, 'Any other app or a terminal', 'The agent tools over stdio. To act as a named agent, add VINAC_AGENT_TOKEN from "Add agent" above to its environment.', copyBox('Command', s.commandLine)),
   );
 }
 
@@ -2062,7 +2168,15 @@ function renderRoomHead() {
   $('roomName').textContent = r.name;
   $('roomMembers').textContent = r.members.length ? `You, ${r.members.map(m => m.name).join(', ')}` : 'You and the agents on this computer';
   const hint = document.querySelector('section[data-main="room"] .composer-hint');
-  if (hint) hint.textContent = r.members.length ? 'Each post goes straight to every device in the room, encrypted, through each one\'s firewall. No server keeps it.' : 'This room stays on this computer: you and its agents (Codex, Claude Code…). Nothing leaves it.';
+  if (hint) {
+    // 0.16.3: who here may post (agents on this computer) and who receives a post (other devices), apart.
+    const proj = (state.projects || []).find(p => p.id === r.projectId);
+    const ids = proj?.agents || [];
+    const names = ids.map(id => (id === 'default' ? t('the default agent') : (state.agents || []).find(a => a.id === id)?.name)).filter(Boolean);
+    const here = r.policy?.paused ? t('Agents here: paused.') : ids.length ? `${t('Agents here that may post:')} ${names.join(', ')}.` : t('Agents here: every agent on this computer may post.');
+    const there = r.members.length ? `${t('Each post goes to:')} ${r.members.map(m => m.name).join(', ')} ${t('(encrypted, through each one\'s firewall; no server keeps it).')}` : t('No other device: this room stays on this computer.');
+    hint.textContent = `${here} ${there}`;
+  }
   // Room rules on this computer: pause agents, card types, limits. Only ever stricter.
   const pol = r.policy || {};
   const pb = $('roomPauseBtn');

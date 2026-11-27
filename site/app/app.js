@@ -559,7 +559,7 @@ function renderSend() {
   const t = sendTarget(), net = !!t?.net, phone = !net && t?.d?.kind === 'phone';
   show('sendNet', net); show('sendStepsPc', !net && !phone); show('sendPhone', phone); show('sendPlay', !net);
   $('sendQr').replaceChildren(); show('sendMakeQr', true); sendFrame = null;
-  $('sendPlay').textContent = phone ? 'Play a sound instead' : 'Play';
+  $('sendPlay').textContent = phone ? 'Send by sound instead (encrypted)' : 'Send encrypted key by sound';
   $('sendPlay').className = phone ? 'btn block' : 'btn primary block';
   status('sendStatus', '');
 }

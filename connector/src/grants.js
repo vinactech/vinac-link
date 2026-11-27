@@ -15,6 +15,7 @@
 // gets the keys (for example the scripts in that folder's package.json), so allow only commands
 // and folders you trust.
 import crypto from 'node:crypto';
+import fs from 'node:fs';
 import path from 'node:path';
 import { spawn } from 'node:child_process';
 import { StringDecoder } from 'node:string_decoder';
@@ -104,9 +105,53 @@ export function insideFolder(folder, cwd) {
   return rel === '' || (!rel.startsWith('..') && !path.isAbsolute(rel));
 }
 
-/** Exact command, or (with `prefix`) the command followed by more arguments. */
+/** Exact command, or (with `prefix`) the command followed by more arguments. Display strings only (0.11). */
 export function commandMatches(grant, command) {
   return command === grant.command || (grant.prefix && command.startsWith(`${grant.command} `));
+}
+
+export const MAX_ARGS = 100, MAX_ARG = 2000;
+/** A command as the person types it ("npm run dev", "node \"my script.js\"") -> an argument list. */
+export function splitCommand(s) {
+  const out = []; let cur = '', quote = null, has = false;
+  for (const ch of String(s ?? '')) {
+    if (quote) { if (ch === quote) quote = null; else cur += ch; }
+    else if (ch === '"' || ch === "'") { quote = ch; has = true; }
+    else if (/\s/.test(ch)) { if (has || cur) out.push(cur); cur = ''; has = false; }
+    else { cur += ch; has = true; }
+  }
+  if (quote) throw httpError(400, 'The command has an unclosed quote.');
+  if (has || cur) out.push(cur);
+  return out;
+}
+/** An argument list for people to read: arguments with spaces or quotes shown in quotes. */
+export const showArgv = argv => argv.map(a => (/^[^\s"']+$/.test(a) ? a : `"${a.replace(/"/g, '\\"')}"`)).join(' ');
+/** Checks an argument list (strings, 1 to 100, each at most 2000 characters, no control characters). */
+export function checkArgv(argv) {
+  if (!Array.isArray(argv) || !argv.length || argv.length > MAX_ARGS) throw httpError(400, 'Give the command to run (1 to 100 arguments).');
+  return argv.map(a => {
+    const s = String(a);
+    if (s.length > MAX_ARG) throw httpError(400, `An argument is longer than ${MAX_ARG} characters.`);
+    if (/[\u0000-\u001f\u007f]/.test(s)) throw httpError(400, 'An argument contains a control character.');
+    return s;
+  });
+}
+/**
+ * 0.16.3: a grant is bound to the ARGUMENT LIST the service will start, not a display string.
+ * Exact: the same arguments. Prefix: the grant's arguments, then at least one more. Grants made
+ * before 0.16.3 kept only a shortened string; they match nothing (the person approves again).
+ */
+export function argvMatches(grant, argv) {
+  const g = grant.argv;
+  if (!Array.isArray(g) || !Array.isArray(argv)) return false;
+  if (grant.prefix ? argv.length <= g.length : argv.length !== g.length) return false;
+  return g.every((a, i) => a === argv[i]);
+}
+/** The environment variable a key goes into when the run doesn't say: its name in capitals. */
+export const defaultEnvName = n => String(n).toUpperCase().replace(/[^A-Z0-9_]/g, '_');
+/** A grant also fixes which variable each key goes into. */
+export function envMatches(grant, names, envNames = {}) {
+  return names.every(n => (envNames[n] || defaultEnvName(n)) === (grant.envNames?.[n] || defaultEnvName(n)));
 }
 
 export class Grants {
@@ -122,22 +167,25 @@ export class Grants {
 
   view(agentId) {
     return this.active().filter(g => agentId === undefined || (g.agentId ?? null) === (agentId ?? null))
-      .map(({ id, agentId: a, agentName, names, command, prefix, cwd, createdAt, expiresAt, uses, lastUsedAt }) => ({ id, agentId: a ?? null, agentName, names, command, prefix: !!prefix, cwd, createdAt, expiresAt, uses: uses || 0, lastUsedAt: lastUsedAt || null }));
+      .map(({ id, agentId: a, agentName, names, command, argv, prefix, cwd, createdAt, expiresAt, uses, lastUsedAt }) => ({ id, agentId: a ?? null, agentName, names, command, prefix: !!prefix, cwd, createdAt, expiresAt, uses: uses || 0, lastUsedAt: lastUsedAt || null, ...(Array.isArray(argv) ? {} : { needsNewApproval: true }) }));
   }
 
-  /** Made by the person on the page (never by an agent). */
-  add({ agentId = null, agentName, names, command, cwd, hours, prefix = false }) {
+  /** Made by the person on the page (never by an agent). `argv` (or a typed `command`) is what the service will start. */
+  add({ agentId = null, agentName, names, command, argv, envNames = null, cwd, hours, prefix = false }) {
     const h = Number(hours);
     if (!Number.isFinite(h) || h <= 0 || h > MAX_GRANT_HOURS) throw httpError(400, `A grant lasts at most ${MAX_GRANT_HOURS} hours (7 days).`);
     if (!Array.isArray(names) || !names.length || names.length > 10) throw httpError(400, 'Name 1 to 10 secrets.');
-    const cmd = cleanName(command).slice(0, 400);
-    if (!cmd) throw httpError(400, 'A grant needs the exact command.');
+    const args = checkArgv(Array.isArray(argv) ? argv : splitCommand(command));
+    const cmd = showArgv(args);
+    if (!cmd.trim()) throw httpError(400, 'A grant needs the exact command.');
+    const env = {};
+    for (const n of names) { const v = envNames?.[n]; env[n] = typeof v === 'string' && /^[A-Za-z_][A-Za-z0-9_]{0,63}$/.test(v) ? v : defaultEnvName(n); }
     if (!cwd || !path.isAbsolute(String(cwd))) throw httpError(400, 'A grant needs the folder the command runs in.');
     const list = this.active();
     if (list.length >= MAX_GRANTS) throw httpError(409, `At most ${MAX_GRANTS} allowed runs. Revoke one first.`);
     const g = {
       id: crypto.randomBytes(6).toString('hex'), agentId: agentId ?? null, agentName: agentName || 'this computer\'s agents',
-      names: [...new Set(names.map(String))], command: cmd, prefix: !!prefix, cwd: path.resolve(String(cwd)),
+      names: [...new Set(names.map(String))], command: cmd, argv: args, envNames: env, prefix: !!prefix, cwd: path.resolve(String(cwd)),
       createdAt: new Date().toISOString(), expiresAt: new Date(Date.now() + h * 3600_000).toISOString(), uses: 0, lastUsedAt: null,
     };
     this.store.saveGrants([...list, g]);
@@ -152,10 +200,10 @@ export class Grants {
     return g;
   }
 
-  /** The grant that allows this run, if any: same agent, all names covered, command and folder. */
-  match({ agentId = null, names, command, cwd }) {
+  /** The grant that allows this run, if any: same agent, all names covered (into the same variables), the same arguments, and folder. */
+  match({ agentId = null, names, argv, envNames, cwd }) {
     return this.active().find(g => (g.agentId ?? null) === (agentId ?? null)
-      && names.every(n => g.names.includes(n)) && commandMatches(g, command) && insideFolder(g.cwd, cwd)) || null;
+      && names.every(n => g.names.includes(n)) && envMatches(g, names, envNames) && argvMatches(g, argv) && insideFolder(g.cwd, cwd)) || null;
   }
 
   used(id) {
@@ -173,6 +221,35 @@ export function runPath(extraDirs = []) {
   return [...new Set([...(process.env.PATH || process.env.Path || '').split(sep), ...extraDirs].filter(Boolean))].join(sep);
 }
 
+/** Windows: the file a bare command name starts (PATH and PATHEXT; not the current folder), or null. */
+export function findWindowsProgram(cmd, env = process.env, fsx = fs) {
+  const exts = String(env.PATHEXT || '.COM;.EXE;.BAT;.CMD').split(';').filter(Boolean).map(e => e.toLowerCase());
+  const tryFile = f => {
+    const cands = path.extname(f) ? [f, ...exts.map(e => f + e)] : exts.map(e => f + e);
+    return cands.find(c => { try { return fsx.statSync(c).isFile(); } catch { return false; } }) || null;
+  };
+  if (/[\\/]/.test(cmd)) return tryFile(path.resolve(cmd));
+  for (const dir of String(env.PATH || env.Path || '').split(';').filter(Boolean)) { const f = tryFile(path.join(dir, cmd)); if (f) return f; }
+  return null;
+}
+// cmd.exe reads %, !, ^, &, |, <, >, ( and ) and quotes even inside quotes, so a batch file only gets plain arguments.
+const BATCH_SAFE = /^[\w./:=@+,\\ -]*$/;
+/**
+ * Starts exactly `argv` (0.16.3). Windows: an .exe directly (no shell, the runtime quotes each
+ * argument); a .cmd/.bat (npm, npx) through cmd.exe only when every argument is plain.
+ */
+export function spawnArgv(argv, opts) {
+  const [cmd, ...args] = argv;
+  if (process.platform !== 'win32') return spawn(cmd, args, opts);
+  const file = findWindowsProgram(cmd, opts.env || process.env);
+  if (!file) { const e = new Error(`${cmd} was not found on the PATH`); e.code = 'ENOENT'; throw e; }
+  if (!/\.(cmd|bat)$/i.test(file)) return spawn(file, args, { ...opts, shell: false });
+  const bad = args.find(a => !BATCH_SAFE.test(a));
+  if (bad !== undefined) { const e = new Error(`${path.basename(file)} is a batch file, and the argument ${JSON.stringify(bad.slice(0, 60))} has characters cmd.exe would read (quotes, %, !, ^, &, |, <, >, brackets). Run the program directly instead.`); e.code = 'EUNSAFEARG'; throw e; }
+  const q = a => (/^[\w./:=@+,\\-]+$/.test(a) ? a : `"${a}"`);
+  return spawn(process.env.ComSpec || 'cmd.exe', ['/d', '/s', '/c', `"${[`"${file}"`, ...args.map(q)].join(' ')}"`], { ...opts, shell: false, windowsVerbatimArguments: true });
+}
+
 /**
  * Starts `argv` in `cwd` with `values` in its environment (as `envNames[name]`), no stdin.
  * Output goes through the redactor to `onData(stream, text)`; `onExit(code)` at the end.
@@ -182,11 +259,14 @@ export function startRun({ argv, cwd, values, envNames, extraDirs = [], onData, 
   const env = { ...process.env, PATH: runPath(extraDirs) };
   if (process.platform === 'win32') delete env.Path;
   for (const [name, value] of Object.entries(values)) env[envNames[name] || name] = value;
-  const [cmd, ...args] = argv;
-  const winQuote = a => (/^[\w./:=@+\\-]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
-  const child = process.platform === 'win32'
-    ? spawn(argv.map(winQuote).join(' '), { cwd, env, shell: true, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] })
-    : spawn(cmd, args, { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  const cmd = argv[0];
+  let child;
+  try {
+    child = spawnArgv(argv, process.platform === 'win32' ? { cwd, env, windowsHide: true, stdio: ['ignore', 'pipe', 'pipe'] } : { cwd, env, stdio: ['ignore', 'pipe', 'pipe'], detached: true });
+  } catch (e) {
+    setImmediate(() => { onData('stderr', `vinac: could not start ${cmd}: ${e.message}\n`); onExit(127); });
+    return { stop() {} };
+  }
   let open = 2, code = null, ended = false;
   const finish = () => { if (!ended && open === 0 && code !== null) { ended = true; onExit(code); } };
   for (const stream of ['stdout', 'stderr']) {

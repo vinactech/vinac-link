@@ -31,6 +31,7 @@ import { env } from '../src/env.js';
 import { isOlderVersion } from '../src/version.js';
 import { defaultHome } from '../src/store.js';
 import { redactor } from '../src/redact.js';
+import { spawnArgv } from '../src/grants.js';
 import {macLifecycleAvailable,managedConnect,readOnlyStartupDiagnostics,withLaunchLock} from '../src/mac-lifecycle.js';
 import {maybeInstallFromVolume} from '../src/mac-install.js';
 
@@ -287,15 +288,13 @@ Next: pair another computer on the page, then connect your agent:
     const childEnv = { ...process.env };
     for (const w of wanted) childEnv[w.as] = r.values[w.name];
     await api.daemon?.stop();
-    const [cmd, ...args] = opt.cmd;
-    // Windows: npm, npx and other .cmd files need cmd.exe; quote each argument ourselves.
-    const winQuote = a => (/^[\w./:=@+-]+$/.test(a) ? a : `"${a.replace(/"/g, '""')}"`);
+    const cmd = opt.cmd[0];
     // By default the program's output passes through a filter that hides the values
     // ([hidden: NAME]). --show-output keeps the terminal as is (colours, prompts).
     const stdio = opt['show-output'] ? 'inherit' : ['inherit', 'pipe', 'pipe'];
-    const child = process.platform === 'win32'
-      ? spawn([cmd, ...args].map(winQuote).join(' '), { stdio, env: childEnv, shell: true })
-      : spawn(cmd, args, { stdio, env: childEnv });
+    // 0.16.3: exactly the approved argument list (Windows: no shell for programs; npm/npx .cmd only with plain arguments).
+    let child;
+    try { child = spawnArgv(opt.cmd, { stdio, env: childEnv }); } catch (e) { fail(`could not start ${cmd}: ${e.message}`); }
     if (!opt['show-output']) {
       const values = Object.fromEntries(wanted.map(w => [w.name, r.values[w.name]]));
       child.stdout.pipe(redactor(values)).pipe(process.stdout);

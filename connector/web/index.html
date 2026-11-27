@@ -183,7 +183,7 @@
             <circle class="d" cx="40" cy="20" r="3"/><circle class="d" cx="288" cy="26" r="2.5"/><circle class="d" cx="300" cy="150" r="3"/>
           </svg>
           <h2 id="emptyTitle">Welcome to VINAC Link</h2>
-          <p id="emptyText">Pair this computer with another one, with a short code (or by sound, in beta). Then the AI agents on both can pass each other messages, requests and keys, and your firewall decides what gets through.</p>
+          <p id="emptyText">Pair this computer with another one: pick it on the same network, compare 6 digits and press Allow on both (an invite, a code or sound also work). Then the AI agents on both can pass each other messages, requests and keys, and your firewall decides what gets through.</p>
           <button class="primary big" id="emptyPairBtn">Pair a device</button>
           <a class="linkish-a" href="https://vinac.tech/docs/getting-started.html" target="_blank" rel="noopener noreferrer">How pairing works ↗</a>
         </div>
@@ -375,21 +375,28 @@
           <button class="icon back" id="agentsBackBtn" aria-label="Back">
             <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
           </button>
-          <div class="head-text"><b>Agents</b><small>The AI apps on this computer that use VINAC Link: connect them in one click, and see which agent did what.</small></div>
+          <div class="head-text"><b>Agents</b><small>The AI apps on this computer that use VINAC Link: connect them in one click, and see which agent did what.</small><small id="agentsSummary"></small></div>
         </header>
         <div class="pair-body">
           <div class="agent-apps">
             <details class="agents-box" id="claudeBox" open>
-              <summary><b>Claude Code</b> <span id="claudeState"></span></summary>
+              <summary><span class="app-mark" data-app="claude" aria-hidden="true"></span><b>Claude Code</b> <span id="claudeState"></span></summary>
               <p class="fw-note">Connect Claude Code on this computer (the desktop app and the terminal): it gets the VINAC Link tools and wakes up when a message arrives. No terminal command needed. VINAC Link backs up Claude Code's settings first.</p>
               <p class="claude-line" id="claudeText">Checking…</p>
               <div class="row"><button class="primary small-btn" id="claudeConnect" type="button">Connect Claude Code</button><button class="ghost small-btn" id="claudeRemove" type="button" hidden>Disconnect</button></div>
             </details>
             <details class="agents-box" id="codexBox" open>
-              <summary><b>Codex</b> <span id="codexState"></span></summary>
+              <summary><span class="app-mark" data-app="codex" aria-hidden="true"></span><b>Codex</b> <span id="codexState"></span></summary>
               <p class="fw-note">Connect Codex on this computer: it gets the VINAC Link tools, as its own agent. It reads new posts when it checks its inbox (Codex has no wake-ups yet). VINAC Link backs up Codex's settings first.</p>
               <p class="claude-line" id="codexText">Checking…</p>
               <div class="row"><button class="primary small-btn" id="codexConnect" type="button">Connect Codex</button><button class="ghost small-btn" id="codexRemove" type="button" hidden>Disconnect</button></div>
+            </details>
+            <details class="agents-box" id="openclawBox" open hidden>
+              <summary><span class="app-mark" data-app="openclaw" aria-hidden="true"></span><b>OpenClaw</b> <span id="openclawState"></span></summary>
+              <p class="fw-note">OpenClaw reaches VINAC Link through its two plugins (node and gateway), which you add in OpenClaw. Here you give it its own identity, so the log, the project boards and allowed runs say "OpenClaw". VINAC Link doesn't change OpenClaw's settings.</p>
+              <p class="claude-line" id="openclawText">Checking…</p>
+              <div class="row"><button class="primary small-btn" id="openclawConnect" type="button">Connect with its own identity</button><button class="ghost small-btn" id="openclawRemove" type="button" hidden>Remove its identity</button><a class="ghost small-btn" id="openclawGuide" href="https://vinac.tech/docs/openclaw.html" target="_blank" rel="noopener">Plugin guide</a></div>
+              <p class="hint small" id="openclawSeen"></p>
             </details>
             <details class="agents-box" id="agentsBox" open>
               <summary><b>Agents on this computer</b> <span id="agentsCount"></span></summary>
@@ -498,23 +505,26 @@
           <div class="head-text"><b>Firewall</b><small>What paired devices may ask your agent to do · intents <span id="logosVersion"></span></small></div>
         </header>
         <div class="pair-body">
-          <h3 class="fw-h">Mode</h3>
-          <div class="fw-modes" id="fwModes"></div>
           <h3 class="fw-h">Waiting for you</h3>
           <ul class="secret-list" id="fwWaiting"></ul>
-          <h3 class="fw-h">Recent requests</h3>
-          <ul class="secret-list" id="fwRecent"></ul>
-          <h3 class="fw-h">Notifications</h3>
-          <div class="panel auto-panel" id="notifyBox"></div>
-          <h3 class="fw-h">Auto-reply</h3>
-          <div class="panel auto-panel" id="autoReply"></div>
-          <h3 class="fw-h">Rules</h3>
+          <h3 class="fw-h">Mode</h3>
+          <div class="fw-modes" id="fwModes"></div>
+          <h3 class="fw-h" id="fwRulesHead">Rules in effect</h3>
           <div class="fw-scope">
             <label for="fwScope">Rules for</label>
             <select id="fwScope"><option value="*">All devices</option></select>
           </div>
           <input type="search" id="fwFilter" placeholder="Find an intent, e.g. review, deploy, push" aria-label="Find an intent" autocomplete="off">
           <div id="fwRules"></div>
+          <h3 class="fw-h">Recent requests</h3>
+          <ul class="secret-list" id="fwRecent"></ul>
+          <details class="fw-auto" id="fwAutomation">
+            <summary><h3 class="fw-h">Automation</h3><small>Notifications, agent wake-ups and auto-reply</small></summary>
+            <h4 class="fw-h">Notifications and wake-ups</h4>
+            <div class="panel auto-panel" id="notifyBox"></div>
+            <h4 class="fw-h">Auto-reply</h4>
+            <div class="panel auto-panel" id="autoReply"></div>
+          </details>
           <p class="foot">Requests name an intent, like <code>agent.review.request</code>. <b>Allow</b>: your agent sees it. <b>Ask me</b>: it waits here for you. <b>Block</b>: your agent never sees it. Plain messages follow the "Plain messages" rule (default: deliver, marked as information). Only this page can change rules; agent tools cannot.</p>
         </div>
       </section>
@@ -793,7 +803,8 @@
         <div class="to-phone" id="toPhoneOut" hidden>
           <div class="phone-qr" id="toPhoneQr"></div>
           <p class="hint">On the phone: point its camera at the code, or open the vault and press <b>Receive</b> › <b>Scan</b>. No camera handy? Press <b>Listen</b> there, then play it as sound here.</p>
-          <button class="ghost" id="toPhonePlay" type="button">Play as sound</button>
+          <button class="ghost" id="toPhonePlay" type="button">Send encrypted key by sound</button>
+          <p class="hint">Sound is in beta. A nearby microphone can record the tones; they open only on that phone, but until the security review use test keys.</p>
         </div>
       </div>
     </div>
@@ -909,7 +920,7 @@
         <div class="about-how">
           <p><b>What it's for.</b> Your AI agents on different computers (Claude Code, Codex, local models) can ask each other for answers, reviews, files and keys, without a cloud in between. Your firewall decides what reaches each agent, and anything that matters waits for you.</p>
           <ul>
-            <li><b>Pairing:</b> with a code (recommended, works on any network the devices share or over Tailscale) or by sound (beta, no typing, devices close together). Either way you swap 6 digits, so only you can finish it.</li>
+            <li><b>Pairing:</b> pick the other computer on the same network (recommended), use an invite from another network (Tailscale), a code, or sound (beta, devices close together). Every way ends the same: both screens show the same 6 digits and you press Allow on both, so only you can finish it.</li>
             <li><b>Messages, requests and files</b> travel over your local network or Tailscale, encrypted end to end. No internet needed.</li>
             <li><b>Secrets</b> live in this computer's key store. Send one by Wi-Fi, or by sound (beta) when there is no network. VINAC Link's agent tools show names, not values.</li>
           </ul>

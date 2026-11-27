@@ -255,6 +255,55 @@ export function disconnectCodex({ dir, env, bin = BIN } = {}) {
   return { ok: true, changed: [p.config], message: 'Removed VINAC Link from Codex. Restart Codex sessions.', status: codexStatus({ dir, env, bin }) };
 }
 
+// ---- OpenClaw (0.16.3) --------------------------------------------------------------
+// OpenClaw reaches VINAC Link through two plugins it loads itself (openclaw/README.md): the node
+// plugin on this computer and the gateway plugin wherever the gateway runs. VINAC Link never edits
+// OpenClaw's settings. Connecting from the page only gives OpenClaw its own agent identity: the
+// token goes into <VINAC home>/agent-tokens/openclaw.token, which the node plugin reads.
+
+export function openclawPaths({ dir, env = process.env } = {}) {
+  const base = dir || env.VINAC_OPENCLAW_DIR || env.OPENCLAW_HOME || path.join(os.homedir(), '.openclaw');
+  return { dir: base, config: path.join(base, 'openclaw.json') };
+}
+export const openclawTokenFile = home => path.join(home, 'agent-tokens', 'openclaw.token');
+
+/** What OpenClaw on this computer knows about VINAC Link. Reads only. */
+export function openclawStatus({ dir, env, home } = {}) {
+  const p = openclawPaths({ dir, env });
+  const present = fs.existsSync(p.dir);
+  let cfg = null;
+  try { cfg = readJson(p.config); } catch { cfg = null; }
+  const entry = cfg?.plugins?.entries?.['vinac-link-node'];
+  const plugin = !!entry && entry.enabled !== false;
+  const identity = !!home && fs.existsSync(openclawTokenFile(home));
+  return { present, plugin, identity, mode: plugin ? (identity ? 'own' : 'plugin') : 'none', paths: { config: p.config } };
+}
+
+export function connectOpenclaw({ home, agent, dir, env } = {}) {
+  const s = openclawStatus({ dir, env, home });
+  if (!s.plugin) return { ok: false, changed: [], message: 'Install the VINAC Link node plugin in OpenClaw first (guide: openclaw/README.md, or vinac.tech/docs/openclaw.html).', status: s };
+  const f = openclawTokenFile(home);
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const tmp = `${f}.tmp-${process.pid}`;
+  fs.writeFileSync(tmp, `${agent.token}\n`, { mode: 0o600 });
+  fs.renameSync(tmp, f);
+  return { ok: true, mode: 'own', changed: [f], message: 'OpenClaw now acts as its own agent ("OpenClaw") on its next VINAC Link call.', status: openclawStatus({ dir, env, home }) };
+}
+
+export function disconnectOpenclaw({ home, dir, env } = {}) {
+  const f = openclawTokenFile(home);
+  if (!fs.existsSync(f)) return { ok: true, changed: [], message: 'OpenClaw had no identity of its own here.', status: openclawStatus({ dir, env, home }) };
+  fs.rmSync(f, { force: true });
+  return { ok: true, changed: [f], message: 'OpenClaw acts as the default agent again. To stop it using VINAC Link at all, turn off the plugins in OpenClaw.', status: openclawStatus({ dir, env, home }) };
+}
+
+export function describeOpenclaw(s) {
+  if (!s.present) return 'OpenClaw was not found on this computer (no ~/.openclaw folder).';
+  if (s.mode === 'own') return 'Connected through its plugins, as its own agent ("OpenClaw").';
+  if (s.mode === 'plugin') return 'Connected through its plugins, as this computer\'s default agent (no identity of its own).';
+  return 'Not connected: OpenClaw needs the two VINAC Link plugins (node and gateway); see the guide.';
+}
+
 export function describeCodex(s) {
   if (!s.present) return 'Codex was not found on this computer (no ~/.codex folder).';
   if (s.mode === 'direct') return `Connected: tools${s.identity ? ', as its own agent' : ''}. Codex has no wake-ups yet: it sees new posts when it checks its VINAC Link inbox.`;

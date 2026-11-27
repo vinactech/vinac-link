@@ -195,14 +195,15 @@
   </div>
   <ol class="steps" id="sendStepsPc">
     <li>On the computer: <b>Secrets › Receive… › From your phone</b>.</li>
-    <li>Hold the phone close to it, volume up, and press <b>Play</b>. It takes 10–20 seconds.</li>
+    <li>Hold the phone close to it, volume up, and press <b>Send encrypted key by sound</b>. It takes 10–20 seconds.</li>
   </ol>
+  <p class="hint" id="sendSoundNote">Sound is in beta. A nearby microphone can record the tones; they open only on the device it's sealed for, but until the security review use test keys.</p>
   <div id="sendPhone" hidden>
     <p class="hint">Open this code on the other phone: its camera, or <b>Receive</b> in its app. It opens only there, once.</p>
     <div class="qr" id="sendQr"></div>
     <button class="btn primary block" id="sendMakeQr" type="button">Show the code</button>
   </div>
-  <button class="btn block" id="sendPlay" type="button">Play</button>
+  <button class="btn block" id="sendPlay" type="button">Send encrypted key by sound</button>
   <button class="btn quiet block" id="sendCancel" type="button">Close</button>
   <p class="status" id="sendStatus" role="status"></p>
 </section>
