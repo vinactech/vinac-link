@@ -93,10 +93,16 @@ test('site: builds every page with no leftover placeholders, no outside requests
     seen.add(rel);
     assert.ok(fs.existsSync(path.join(out, 'app', rel)), `app/${rel}`);
     const src = fs.readFileSync(path.join(out, 'app', rel), 'utf8');
-    for (const [, dep] of src.matchAll(/^import [^;]*? from '(\.{1,2}\/[^']+)'/gm)) walk(path.posix.normalize(path.posix.join(path.posix.dirname(rel), dep)), seen);
+    for (const [, dep] of src.matchAll(/^import [^;]*? from '(\.{1,2}\/[^']+)'/gm)) {
+      // 0.16.3: every module is asked for with ?v=<version>, so a browser never mixes versions.
+      assert.match(dep, /\?v=\d+\.\d+\.\d+$/, `app/${rel} imports ${dep} with its version`);
+      walk(path.posix.normalize(path.posix.join(path.posix.dirname(rel), dep.replace(/\?v=.*$/, ''))), seen);
+    }
     return seen;
   };
   for (const f of walk('app.js')) assert.ok(sw.includes(`'${f}'`), `sw.js caches ${f}`);
+  assert.match(appPage, /src="app\.js\?v=\d+\.\d+\.\d+"/, 'the page loads the app with its version');
+  assert.match(appPage, /href="app\.css\?v=\d+\.\d+\.\d+"/);
   assert.doesNotMatch(fs.readFileSync(path.join(out, 'app', 'sw.js'), 'utf8'), /\{\{version\}\}/);
   for (const f of ['privacy.html', 'terms.html', 'about.html']) assert.ok(fs.existsSync(path.join(out, f)), f);
   for (const f of files) {

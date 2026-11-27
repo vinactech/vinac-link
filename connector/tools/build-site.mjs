@@ -339,6 +339,25 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   for (const f of ['demo.mp4', 'poster.jpg']) fs.rmSync(path.join(OUT, 'media', f), { force: true });
   const demoFile = ['walkthrough.mp4'].find(f => fs.existsSync(path.join(SITE, 'media', f)));
 
+  // 0.16.3: every script, stylesheet and module the app and the console load carries ?v=<version>.
+  // The host's front server keeps .js and .css for a year whatever .htaccess says, so without this a
+  // browser that saw an older version mixes its old scripts with the new page (and the app breaks).
+  const versionUrls = (dir, v) => {
+    const local = '(?!https?:|//|#|data:|blob:)';
+    for (const e of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
+      if (!e.isFile()) continue;
+      const f = path.join(e.parentPath ?? e.path, e.name);
+      if (e.name.endsWith('.html')) {
+        const s = fs.readFileSync(f, 'utf8').replace(new RegExp(`((?:src|href)=")(${local}[^"?]+\\.(?:js|css|webmanifest))"`, 'g'), `$1$2?v=${v}"`);
+        fs.writeFileSync(f, s);
+      } else if (e.name.endsWith('.js') && e.name !== 'sw.js') {
+        // Relative module paths and worklet URLs: './x.js', '../lab/js/y.js'.
+        const s = fs.readFileSync(f, 'utf8').replace(/(['"])(\.{1,2}\/[^'"?\s]+\.js)\1/g, `$1$2?v=${v}$1`);
+        fs.writeFileSync(f, s);
+      }
+    }
+  };
+
   // The phone vault web app (/app/): its page plus the modules it shares with the computer's page
   // (phone formats and crypto, the sound modem). Same origin, no outside code.
   if (fs.existsSync(path.join(SITE, 'app'))) {
@@ -377,6 +396,7 @@ AddType application/manifest+json .webmanifest
   </FilesMatch>
 </IfModule>
 `);
+    versionUrls(APP, version);
   }
 
   // The Team console (/console/): the one page that talks to another site, the account service. Its own
@@ -387,6 +407,7 @@ AddType application/manifest+json .webmanifest
     for (const f of ['index.html', 'console.css']) fs.copyFileSync(path.join(SITE, 'console', f), path.join(CON, f));
     fs.writeFileSync(path.join(CON, 'console.js'), fs.readFileSync(path.join(SITE, 'console', 'console.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
     fs.writeFileSync(path.join(CON, '.htaccess'), `# Team console: may fetch from the account service (Supabase), nothing else from outside.\n<IfModule mod_headers.c>\n  Header always set Content-Security-Policy "${CONSOLE_CSP}"\n  Header always set X-Robots-Tag "noindex, nofollow"\n  Header set Cache-Control "no-cache"\n</IfModule>\n`);
+    versionUrls(CON, version);
   }
 
   // /web/ (VINAC Web in 0.16.1) is now part of the app: forward there, keeping the link after #

@@ -8,8 +8,10 @@ const FILES = [
   'web/phone-crypto.js', 'web/phone-frame.js', 'web/beacon.js', 'web/secret-frame.js', 'web/qr.js',
   'lab/js/audio.js', 'lab/js/modem.js', 'lab/js/frame.js', 'lab/js/fec.js', 'lab/js/bytes.js',
   'lab/js/crypto.js', 'lab/js/logos.js', 'lab/worklets/vinac-tx-processor.js', 'lab/worklets/vinac-rx-processor.js',
-].map(f => new URL(f, BASE).href);
-self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES)).then(() => self.skipWaiting())));
+].map(f => new URL(f === './' ? f : `${f}?v={{version}}`, BASE).href);
+// 0.16.3: the files carry ?v=<version> (the page and its modules ask for exactly these), and the
+// install skips the browser's own cache, so an update never mixes old scripts with a new page.
+self.addEventListener('install', e => e.waitUntil(caches.open(CACHE).then(c => c.addAll(FILES.map(u => new Request(u, { cache: 'reload' })))).then(() => self.skipWaiting())));
 self.addEventListener('activate', e => e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim())));
 self.addEventListener('fetch', e => {
   const url = new URL(e.request.url);
