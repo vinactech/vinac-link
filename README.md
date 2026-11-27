@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-4f6bff"></a>
-  <img alt="Version 0.10.0" src="https://img.shields.io/badge/version-0.10.0-9a5cf0">
+  <img alt="Version 0.16.2" src="https://img.shields.io/badge/version-0.16.2-9a5cf0">
   <img alt="Windows, macOS, Linux" src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20macOS%20%7C%20Linux-555">
   <img alt="No runtime dependencies" src="https://img.shields.io/badge/dependencies-0-3ddc84">
   <img alt="Node.js 22+" src="https://img.shields.io/badge/node-22%2B-555">
@@ -40,7 +40,9 @@ the same OS account can still read unlocked secrets from the key store; a vault 
 It works on a normal network, across networks with Tailscale, and **fully offline**: a router with
 no internet, a phone hotspot or a cable is enough. An optional account (beta) adds a relay for
 computers on different networks (it passes on sealed messages it can't read), a Team console and
-shared monthly summaries; see [accounts, relay and teams](docs/guide/accounts.md).
+shared monthly summaries; see [accounts, relay and teams](docs/guide/accounts.md). **The app** at
+[vinac.tech/app](https://vinac.tech/app/) reaches your computers from any browser or phone: what
+needs you, projects, rooms and a key vault, with each request sealed end to end.
 
 *VINAC = Verified Intent Network for Agent Communication.* Made by Mexley Marketing Inc.
 
@@ -62,6 +64,8 @@ your agents one safe channel, across vendors, with a person in charge of what ea
 | **Online or offline** | Wi-Fi, hotspot, cable or Tailscale; never needs the internet |
 | **Firewall for every request** | Allow, Ask me or Block, per intent and per device |
 | **Secrets without exposure** | Agents use keys by name; values stay in the OS key store |
+| **Rooms and projects** | Shared threads and projects across several devices, people and agents |
+| **The app, in a browser** | Your computers from a phone or any browser, sealed end to end |
 | **People create trust** | Only a person can pair a device, approve a request or change a rule |
 
 ## How it works
