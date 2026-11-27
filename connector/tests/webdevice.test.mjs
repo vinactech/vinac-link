@@ -43,6 +43,7 @@ test('a browser as a device: add with 6 digits and Allow, then sealed fresh requ
     assert.match(link, /^https:\/\/vinac\.tech\/app\/#pair=/);
     const p = JSON.parse(Buffer.from(link.split('#pair=')[1], 'base64url').toString('utf8'));
     assert.equal(p.d, A.meId); assert.equal(p.a, A.cloud.account().userId);
+    assert.equal(p.e, 'ana@web.example', '0.16.4: the link carries the account email, after #, so the app fills it in');
 
     // The browser: its own X25519 key, the keys from the link, HELLO through the account relay.
     const { privateKey, publicKey } = crypto.generateKeyPairSync('x25519');
@@ -63,6 +64,9 @@ test('a browser as a device: add with 6 digits and Allow, then sealed fresh requ
     assert.equal(wp.state, 'confirm'); assert.equal(wp.browserName, 'Chrome on Ana phone');
     const myCode = codeFromMac(crypto.createHmac('sha256', kmac).update('code').digest());
     assert.equal(wp.code, myCode, 'both screens show the same 6 digits');
+    const need = (await state(A)).needsMe.find(n => n.kind === 'browserAdd');
+    assert.ok(need, '0.16.4: a browser waiting for Allow is in Needs me');
+    assert.equal(need.code, myCode); assert.match(need.title, /Chrome on Ana phone wants to be added/);
     assert.equal((await R.request(A.meId, '/web/check', { from: id })).state, 'waiting');
     // Before Allow, a request is refused.
     const early = await R.request(A.meId, '/web/call', { from: id, ...seal(kenc, Buffer.from(JSON.stringify({ t: Date.now(), q: 1, op: 'state' })), reqAad(id, A.meId)) }).catch(e => e);

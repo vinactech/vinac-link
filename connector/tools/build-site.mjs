@@ -342,6 +342,11 @@ export function build({ out: OUT = DEFAULT_OUT, withKit = !args.includes('--no-k
   // 0.16.3: every script, stylesheet and module the app and the console load carries ?v=<version>.
   // The host's front server keeps .js and .css for a year whatever .htaccess says, so without this a
   // browser that saw an older version mixes its old scripts with the new page (and the app breaks).
+  const folderHash = dir => {
+    const h = crypto.createHash('sha256');
+    for (const e of fs.readdirSync(dir, { withFileTypes: true, recursive: true }).filter(x => x.isFile()).map(x => path.join(x.parentPath ?? x.path, x.name)).sort()) h.update(path.relative(dir, e)).update(fs.readFileSync(e));
+    return h.digest('hex').slice(0, 8);
+  };
   const versionUrls = (dir, v) => {
     const local = '(?!https?:|//|#|data:|blob:)';
     for (const e of fs.readdirSync(dir, { withFileTypes: true, recursive: true })) {
@@ -396,7 +401,12 @@ AddType application/manifest+json .webmanifest
   </FilesMatch>
 </IfModule>
 `);
-    versionUrls(APP, version);
+    // The version plus a fingerprint of the app's files: any change (even within one release) is a new
+    // address, so a browser that cached the old file for a year still gets the new one.
+    const appV = `${version}.${folderHash(APP)}`;
+    versionUrls(APP, appV);
+    const swFile = path.join(APP, 'sw.js');
+    fs.writeFileSync(swFile, fs.readFileSync(swFile, 'utf8').replaceAll(`?v=${version}`, `?v=${appV}`).replace(`vinac-vault-${version}`, `vinac-vault-${appV}`));
   }
 
   // The Team console (/console/): the one page that talks to another site, the account service. Its own
@@ -407,7 +417,7 @@ AddType application/manifest+json .webmanifest
     for (const f of ['index.html', 'console.css']) fs.copyFileSync(path.join(SITE, 'console', f), path.join(CON, f));
     fs.writeFileSync(path.join(CON, 'console.js'), fs.readFileSync(path.join(SITE, 'console', 'console.js'), 'utf8').replaceAll('{{cloud_url}}', CLOUD_URL).replaceAll('{{cloud_key}}', CLOUD_KEY));
     fs.writeFileSync(path.join(CON, '.htaccess'), `# Team console: may fetch from the account service (Supabase), nothing else from outside.\n<IfModule mod_headers.c>\n  Header always set Content-Security-Policy "${CONSOLE_CSP}"\n  Header always set X-Robots-Tag "noindex, nofollow"\n  Header set Cache-Control "no-cache"\n</IfModule>\n`);
-    versionUrls(CON, version);
+    versionUrls(CON, `${version}.${folderHash(CON)}`);
   }
 
   // /web/ (VINAC Web in 0.16.1) is now part of the app: forward there, keeping the link after #

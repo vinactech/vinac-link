@@ -118,6 +118,12 @@
 
     <!-- ===== main area ===== -->
     <main class="main">
+      <!-- 0.16.4: a browser waiting for Allow, on every page -->
+      <div class="web-banner" id="webBanner" role="alert" hidden>
+        <span class="wb-dot" aria-hidden="true"></span>
+        <p id="webBannerText"></p>
+        <div class="row"><button class="primary small-btn" id="webBannerAllow" type="button">Same code: Allow</button><button class="ghost small-btn" id="webBannerDeny" type="button">Different: cancel</button></div>
+      </div>
       <!-- overview: the dashboard -->
       <section class="view overview-view" data-main="overview">
         <header class="page-head">
@@ -541,6 +547,31 @@
           <section class="card" id="pairCard" aria-live="polite">
             <div data-view="idle">
               <h2>Pair a device</h2>
+              <!-- 0.16.4: one place to add any device; every way ends with the same 6 digits and Allow -->
+              <div class="add-kinds" role="tablist" aria-label="What are you adding?">
+                <button class="add-kind" type="button" role="tab" data-kind="computer" aria-selected="true"><b>Another computer</b><span>Its agents and yours work together</span></button>
+                <button class="add-kind" type="button" role="tab" data-kind="phone" aria-selected="false"><b>Phone or browser</b><span>Needs me, projects, rooms and keys on the go</span></button>
+                <button class="add-kind" type="button" role="tab" data-kind="teammate" aria-selected="false"><b>A teammate's computer</b><span>Over the internet, through your team</span></button>
+              </div>
+              <div class="add-panel" id="kindPhone" hidden>
+                <div class="pair-way">
+                  <p class="way-head"><b>Through your account</b><span class="tag rec">Recommended</span></p>
+                  <p class="hint small">Any phone, tablet or browser, from anywhere. Open the link or scan the code there, sign in with the same account (we fill in the email), and press Allow here when the digits match.</p>
+                  <div id="kindPhoneWeb"></div>
+                </div>
+                <div class="pair-way">
+                  <p class="way-head"><b>Without an account</b><span class="tag beta">Keys only</span></p>
+                  <p class="hint small">A phone keeps API keys for this computer and hands them over by code or by sound (beta), with no network between them.</p>
+                  <button class="ghost small-btn" type="button" id="kindPhoneVault">Pair a phone for keys</button>
+                </div>
+              </div>
+              <div class="add-panel" id="kindTeammate" hidden>
+                <div class="pair-way">
+                  <p class="hint small">Both of you are in the same team (Team console). Pick your teammate's computer, they accept, you compare the 6 digits by phone or chat, and both press Allow. Messages go through the team relay, sealed end to end.</p>
+                  <button class="ghost small-btn" type="button" id="kindTeamOpen">Choose a teammate's computer</button>
+                </div>
+              </div>
+              <div id="kindComputer">
               <p class="hint">Open <b>Pair a device</b> on the other computer too. It appears below. Then check that both screens show the same 6 digits and press Allow on both.</p>
               <div class="nearby" id="nearbyBox">
                 <p class="way-head"><b>On this network</b><span class="tag rec">Recommended</span></p>
@@ -582,6 +613,7 @@
                 <p class="hint small" id="tailscaleRow" hidden>Device on another network? Both devices on Tailscale:
                   <button type="button" class="linkish" id="announceTsBtn">announce over Tailscale</button>, then type the code shown on the other device.</p>
               </details>
+              </div>
               <div class="result" id="result" hidden></div>
               <button class="primary wide" id="openNewBtn" hidden>Open the conversation</button>
             </div>
@@ -881,7 +913,7 @@
               <div class="phone-qr" id="webQr"></div>
               <div>
                 <p id="webPairText">Open this link in the browser to add (or scan the code with a phone), sign in with this account, and press <b>Add this browser</b>. It works for 10 minutes.</p>
-                <p><button class="ghost small-btn" type="button" id="webCopy">Copy the link</button> <button class="linkish" type="button" id="webCancel">Cancel</button></p>
+                <p><button class="ghost small-btn" type="button" id="webOpen">Open in this browser</button> <button class="ghost small-btn" type="button" id="webCopy">Copy the link</button> <button class="linkish" type="button" id="webCancel">Cancel</button></p>
                 <div class="web-confirm" id="webConfirm" hidden>
                   <p>Does <b id="webName"></b> show <b class="phone-code" id="webCode"></b>?</p>
                   <div class="row"><button class="primary small-btn" id="webAllow" type="button">Same code: Allow</button><button class="ghost" id="webDeny" type="button">Different: cancel</button></div>

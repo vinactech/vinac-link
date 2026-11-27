@@ -165,6 +165,13 @@ test('the page: other host names, other origins and a missing token are refused;
     assert.equal(await raw({ origin: 'http://evil.example' }), 403);
     assert.equal(await raw({ 'sec-fetch-site': 'cross-site' }), 403);
     assert.equal(await raw({}), 200);
+    // 0.16.4: the page itself may open from a link elsewhere (a top-level navigation); its data may not.
+    const nav = (p, extra = {}) => new Promise((resolve, reject) => {
+      http.get({ host: '127.0.0.1', port: A.uiPort, path: p, headers: { 'sec-fetch-site': 'cross-site', 'sec-fetch-mode': 'navigate', 'sec-fetch-dest': 'document', ...extra } }, r => { r.resume(); resolve(r.statusCode); }).on('error', reject);
+    });
+    assert.equal(await nav('/'), 200, 'a page load from elsewhere opens');
+    assert.equal(await nav('/ui/state', { 'x-ui-token': A.uiToken }), 403, 'page data never loads cross-site, even as a navigation');
+    assert.equal(await nav('/', { 'sec-fetch-dest': 'iframe' }), 403, 'and the page is never framed from elsewhere');
     assert.equal((await ui(A, 'GET', '/ui/state', null, { token: 'wrong' })).status, 401);
     const page = await fetch(`http://127.0.0.1:${A.uiPort}/`);
     assert.match(page.headers.get('content-security-policy'), /frame-ancestors 'none'/);

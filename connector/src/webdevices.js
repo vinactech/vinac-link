@@ -65,11 +65,13 @@ export class WebDevices {
   }
 
   /** "Add a browser" on the page: a one-time key pair and secret, as a link (QR code). */
-  start({ deviceId, name, account, base = 'https://vinac.tech/app/' }) {
+  start({ deviceId, name, account, email = null, base = 'https://vinac.tech/app/' }) {
     if (this.list().length >= MAX_WEB) throw httpError(409, `At most ${MAX_WEB} browsers. Remove one first.`);
     const { privateKey, publicKey } = crypto.generateKeyPairSync('x25519');
     const cpub = rawX25519(publicKey), secret = crypto.randomBytes(16);
-    const payload = b64u(Buffer.from(JSON.stringify({ v: 1, d: deviceId, n: String(name).slice(0, 60), k: b64u(cpub), s: b64u(secret), a: account })));
+    // 0.16.4: the account's email too (e), so the app can fill it in and send the sign-in code in one tap.
+    // It sits after # like the rest, which browsers never send to a server.
+    const payload = b64u(Buffer.from(JSON.stringify({ v: 1, d: deviceId, n: String(name).slice(0, 60), k: b64u(cpub), s: b64u(secret), a: account, ...(email ? { e: String(email).slice(0, 120) } : {}) })));
     this.pairing = { privateKey, cpub, secret, link: `${base}#pair=${payload}`, expires: Date.now() + WEB_PAIR_MS, candidate: null, outcome: new Map() };
     return this.pairingView();
   }

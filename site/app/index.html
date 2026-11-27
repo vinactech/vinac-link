@@ -5,7 +5,8 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>VINAC Link · App</title>
 <meta name="description" content="VINAC Link in your browser: what needs you on your computers, projects and rooms, and your keys, kept encrypted on this device. Sealed end to end.">
-<meta name="theme-color" content="#0b0b10">
+<meta name="theme-color" content="#0b0b10" media="(prefers-color-scheme: dark)">
+<meta name="theme-color" content="#f6f6fa" media="(prefers-color-scheme: light)">
 <meta name="robots" content="noindex">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="icon" type="image/png" sizes="128x128" href="icon-128.png">
@@ -23,13 +24,13 @@
       <span><b>VINAC Link</b><small id="brandSub">Your agents' secure link</small></span>
     </a>
     <button class="icon-btn" id="refreshBtn" type="button" aria-label="Refresh" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 11a8 8 0 1 0-2.3 5.7M20 4v7h-7"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 12a8 8 0 1 1-2.35-5.65L20 8.7"/><path d="M20 3.8v4.9h-4.9"/></svg>
     </button>
     <button class="icon-btn" id="receiveBtn" type="button" aria-label="Receive a key" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5v10.5M8 10l4 4 4-4"/><path d="M4 14.5V18a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3.5"/></svg>
     </button>
     <button class="icon-btn" id="lockBtn" type="button" aria-label="Lock your keys" hidden>
-      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4.5" y="10.5" width="15" height="10" rx="2.8"/><path d="M8 10.5V8a4 4 0 0 1 8 0v2.5"/><path d="M12 14.6v2.2"/></svg>
     </button>
   </header>
 
@@ -111,7 +112,7 @@
         </form>
       </div>
       <div id="vOpen" hidden>
-        <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></svg><input id="keySearch" type="search" placeholder="Search keys" aria-label="Search keys" autocomplete="off"></label>
+        <label class="search"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4.2 4.2"/></svg><input id="keySearch" type="search" placeholder="Search keys" aria-label="Search keys" autocomplete="off"></label>
         <ul class="list" id="keyList"></ul>
       </div>
     </section>
@@ -155,11 +156,11 @@
   <button class="fab" id="addKeyBtn" type="button" aria-label="Add a key" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></button>
 
   <nav class="tabs" aria-label="Sections">
-    <button class="tab" type="button" data-tab="needs" aria-label="Needs me"><span class="badge" id="needsCount" hidden></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 16V11a6 6 0 0 1 12 0v5l2 2H4zM10 20a2 2 0 0 0 4 0"/></svg><span>Needs me</span></button>
-    <button class="tab" type="button" data-tab="projects" aria-label="Projects"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span>Projects</span></button>
-    <button class="tab" type="button" data-tab="rooms" aria-label="Rooms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 4 7 20M17 4l-2 16M4 9h16M3 15h16"/></svg><span>Rooms</span></button>
-    <button class="tab" type="button" data-tab="keys" aria-label="Keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 7l3 3M14 9l2 2"/></svg><span>Keys</span></button>
-    <button class="tab" type="button" data-tab="devices" aria-label="Devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="11" rx="2"/><path d="M2 19h20"/></svg><span>Devices</span></button>
+    <button class="tab" type="button" data-tab="needs" aria-label="Needs me"><span class="badge" id="needsCount" hidden></span><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 10.5a6 6 0 0 1 12 0c0 4.6 1.6 6.4 2.3 7H3.7c.7-.6 2.3-2.4 2.3-7Z"/><path d="M10 20.5a2.2 2.2 0 0 0 4 0"/></svg><span>Needs me</span></button>
+    <button class="tab" type="button" data-tab="projects" aria-label="Projects"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4" width="4.6" height="12.5" rx="1.6"/><rect x="9.7" y="4" width="4.6" height="8" rx="1.6"/><rect x="15.9" y="4" width="4.6" height="16" rx="1.6"/></svg><span>Projects</span></button>
+    <button class="tab" type="button" data-tab="rooms" aria-label="Rooms"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 4.5h13a2.5 2.5 0 0 1 2.5 2.5v8a2.5 2.5 0 0 1-2.5 2.5H11l-4.5 3.5V17.5h-1A2.5 2.5 0 0 1 3 15V7a2.5 2.5 0 0 1 2.5-2.5Z"/><path d="M8 9.5h8M8 13h5"/></svg><span>Rooms</span></button>
+    <button class="tab" type="button" data-tab="keys" aria-label="Keys"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="7.5" cy="16" r="4"/><path d="M10.4 13.1 20 3.5"/><path d="m16.5 7 2.8 2.8M13.9 9.6l2 2"/></svg><span>Keys</span></button>
+    <button class="tab" type="button" data-tab="devices" aria-label="Devices"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="2.5" y="4.5" width="13.5" height="10" rx="2"/><path d="M1.5 18h11"/><rect x="17" y="8" width="5" height="12" rx="1.6"/><path d="M19.5 17.6h0"/></svg><span>Devices</span></button>
   </nav>
 </div>
 

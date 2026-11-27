@@ -122,6 +122,22 @@ const exact = {
   'Recommended. Values get sealed with a key only your passphrase opens, so no other program can read them while the vault is locked. Receiving still works.':
     'Recommandé. Les valeurs sont scellées avec une clé que seule votre phrase de passe ouvre : aucun autre programme ne peut les lire tant que le coffre est verrouillé. La réception fonctionne toujours.',
   'Set passphrase': 'Définir la phrase de passe', 'New passphrase (8+ characters)': 'Nouvelle phrase de passe (8 caractères ou plus)',
+  'Another computer': 'Un autre ordinateur', 'Its agents and yours work together': 'Ses agents et les vôtres travaillent ensemble',
+  'Phone or browser': 'Téléphone ou navigateur', 'Needs me, projects, rooms and keys on the go': 'À traiter, projets, salons et clés en déplacement',
+  'A teammate\'s computer': 'L\'ordinateur d\'un coéquipier', 'Over the internet, through your team': 'Par Internet, par votre équipe',
+  'Through your account': 'Par votre compte', 'Without an account': 'Sans compte', 'Keys only': 'Clés seulement',
+  'Any phone, tablet or browser, from anywhere. Open the link or scan the code there, sign in with the same account (we fill in the email), and press Allow here when the digits match.':
+    'Tout téléphone, tablette ou navigateur, de partout. Ouvrez le lien ou scannez le code là-bas, connectez-vous avec le même compte (nous remplissons le courriel), et appuyez sur Autoriser ici quand les chiffres correspondent.',
+  'A phone keeps API keys for this computer and hands them over by code or by sound (beta), with no network between them.':
+    'Un téléphone garde des clés d\'API pour cet ordinateur et les transmet par code ou par le son (bêta), sans réseau entre les deux.',
+  'Pair a phone for keys': 'Jumeler un téléphone pour les clés',
+  'Both of you are in the same team (Team console). Pick your teammate\'s computer, they accept, you compare the 6 digits by phone or chat, and both press Allow. Messages go through the team relay, sealed end to end.':
+    'Vous êtes tous deux dans la même équipe (console d\'équipe). Choisissez l\'ordinateur de votre coéquipier, il accepte, vous comparez les 6 chiffres par téléphone ou clavardage, et les deux appuient sur Autoriser. Les messages passent par le relais d\'équipe, scellés de bout en bout.',
+  'Choose a teammate\'s computer': 'Choisir l\'ordinateur d\'un coéquipier', 'Open in this browser': 'Ouvrir dans ce navigateur', 'What are you adding?': 'Qu\'ajoutez-vous?',
+  'Show the code': 'Afficher le code', 'Open Account': 'Ouvrir le compte', 'First sign in and link this computer (Account). It takes a minute, once.': 'Connectez-vous d\'abord et liez cet ordinateur (Compte). Une minute, une seule fois.',
+  'The browser is waiting: compare the digits in the banner above and press Allow.': 'Le navigateur attend : comparez les chiffres dans la bannière ci-dessus et appuyez sur Autoriser.',
+  'The link works once, for 10 minutes.': 'Le lien fonctionne une fois, pendant 10 minutes.', 'Add a browser': 'Ajouter un navigateur', 'Does it show': 'Affiche-t-il',
+  'A browser': 'Un navigateur', 'wants to be added to this computer. Does it show': 'veut être ajouté à cet ordinateur. Affiche-t-il',
   'OpenClaw': 'OpenClaw', 'Connect with its own identity': 'Connecter avec sa propre identité', 'Remove its identity': 'Retirer son identité', 'Plugin guide': 'Guide des extensions',
   'OpenClaw reaches VINAC Link through its two plugins (node and gateway), which you add in OpenClaw. Here you give it its own identity, so the log, the project boards and allowed runs say "OpenClaw". VINAC Link doesn\'t change OpenClaw\'s settings.':
     'OpenClaw rejoint VINAC Link par ses deux extensions (nœud et passerelle), que vous ajoutez dans OpenClaw. Ici, vous lui donnez sa propre identité, pour que le journal, les tableaux de projet et les exécutions autorisées disent « OpenClaw ». VINAC Link ne modifie pas les réglages d\'OpenClaw.',

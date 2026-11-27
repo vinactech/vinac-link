@@ -125,7 +125,59 @@ function renderWeb(a) {
 $('webAddBtn').onclick = async () => { try { render(await api('POST', '/ui/web/start', {})); renderWeb(await api('GET', '/ui/account').then(r => r.account)); } catch (e) { toast(e.message); } };
 $('webCopy').onclick = async () => { try { await navigator.clipboard.writeText(state.webPairing.link); toast('Link copied. Open it only in the browser you want to add.'); } catch { toast('Could not copy.'); } };
 $('webCancel').onclick = () => act('POST', '/ui/web/cancel', {});
-$('webAllow').onclick = async () => { try { const s = await api('POST', '/ui/web/confirm', { allow: true }); render(s); toast(`${s.webAdded?.name || 'The browser'} added.`); } catch (e) { toast(e.message); } };
+async function allowBrowser() { try { const s = await api('POST', '/ui/web/confirm', { allow: true }); render(s); toast(`${s.webAdded?.name || 'The browser'} added.`); } catch (e) { toast(e.message); } }
+$('webAllow').onclick = allowBrowser;
+// 0.16.4: "Open in this browser" (a computer adding its own browser, or one next to it).
+$('webOpen')?.addEventListener('click', () => { if (state?.webPairing?.link) window.open(state.webPairing.link, '_blank', 'noopener'); });
+// 0.16.4: a browser waiting for Allow shows as a banner on every page, not only inside Account.
+function renderWebBanner() {
+  const wp = state?.webPairing, b = $('webBanner');
+  if (!b) return;
+  b.hidden = wp?.state !== 'confirm';
+  if (b.hidden) return;
+  $('webBannerText').textContent = `${wp.browserName || t('A browser')} ${t('wants to be added to this computer. Does it show')} ${wp.code.slice(0, 3)} ${wp.code.slice(3)}?`;
+}
+$('webBannerAllow')?.addEventListener('click', allowBrowser);
+
+// 0.16.4: Add a device: one screen, three kinds (another computer, a phone or browser, a teammate).
+var addKind = 'computer', kindQrKey = '';
+function renderAddKind() {
+  for (const b of document.querySelectorAll('.add-kind')) b.setAttribute('aria-selected', String(b.dataset.kind === addKind));
+  $('kindComputer').hidden = addKind !== 'computer'; $('kindPhone').hidden = addKind !== 'phone'; $('kindTeammate').hidden = addKind !== 'teammate';
+  if (addKind !== 'phone') return;
+  const box = $('kindPhoneWeb'), a = lastAccount, wp = state?.webPairing;
+  if (!a?.signedIn || !a?.linked) {
+    if (box.dataset.mode === 'signin') return;
+    box.dataset.mode = 'signin'; kindQrKey = '';
+    box.replaceChildren(text('p', t('First sign in and link this computer (Account). It takes a minute, once.')), button('Open Account', () => $('accountNav').click()));
+    box.lastChild.className = 'ghost small-btn';
+    return;
+  }
+  if (!wp) {
+    if (box.dataset.mode === 'start') return;
+    box.dataset.mode = 'start'; kindQrKey = '';
+    const b = button('Show the code', async () => { try { render(await api('POST', '/ui/web/start', {})); } catch (e) { toast(e.message); } }); b.className = 'primary small-btn';
+    box.replaceChildren(b);
+    return;
+  }
+  if (box.dataset.mode === 'qr' && kindQrKey === wp.link + wp.state) return;
+  box.dataset.mode = 'qr'; kindQrKey = wp.link + wp.state;
+  const qr = document.createElement('div'); qr.className = 'phone-qr'; qr.innerHTML = qrSvg(wp.link, { scale: 4 });
+  const row = document.createElement('p');
+  const open = button('Open in this browser', () => window.open(wp.link, '_blank', 'noopener')); open.className = 'ghost small-btn';
+  const copy = button('Copy the link', async () => { try { await navigator.clipboard.writeText(wp.link); toast('Link copied. Open it only in the browser you want to add.'); } catch { toast('Could not copy.'); } }); copy.className = 'ghost small-btn';
+  const cancel = button('Cancel', () => act('POST', '/ui/web/cancel', {})); cancel.className = 'linkish';
+  row.append(open, ' ', copy, ' ', cancel);
+  box.replaceChildren(qr, row, text('small', wp.state === 'confirm' ? t('The browser is waiting: compare the digits in the banner above and press Allow.') : t('The link works once, for 10 minutes.')));
+}
+for (const b of document.querySelectorAll('.add-kind')) b.addEventListener('click', async () => {
+  addKind = b.dataset.kind;
+  if (addKind === 'phone' && !lastAccount) { try { lastAccount = (await api('GET', '/ui/account')).account; } catch { /* older service */ } }
+  renderAddKind();
+});
+$('kindPhoneVault')?.addEventListener('click', () => { $('secretsNav').click(); showSecretTab('devices'); $('phonesBox').open = true; $('phonePairBtn').click(); });
+$('kindTeamOpen')?.addEventListener('click', async () => { $('accountNav').click(); setTimeout(() => $('accountTeamDir')?.scrollIntoView({ block: 'start', behavior: 'smooth' }), 400); });
+$('webBannerDeny')?.addEventListener('click', () => act('POST', '/ui/web/confirm', { allow: false }));
 $('webDeny').onclick = () => act('POST', '/ui/web/confirm', { allow: false });
 
 // 0.16 pairing with a teammate's computer over the internet: then the pairing screen (6 digits).
@@ -285,6 +337,8 @@ function render(s) {
   $('overviewNav').setAttribute('aria-current', String(main === 'overview'));
   const needs = s.needsMe || [];
   renderNeeds();
+  renderWebBanner();
+  renderAddKind();
 
   renderPairing(p);
   if (typeof accountModal !== 'undefined' && !accountModal.hidden && lastAccount) renderWeb(lastAccount);
@@ -891,7 +945,7 @@ let claudeMode = null;
 function agentSummary() {
   const apps = Object.values(appsOn).filter(Boolean).length, named = (state?.agents || []).length;
   const line = `${apps} connected app${apps === 1 ? '' : 's'} · ${named} named identit${named === 1 ? 'y' : 'ies'}`;
-  if ($('agentsNavCount')) { $('agentsNavCount').textContent = apps || named || ''; $('agentsNav').title = line; }
+  if ($('agentsNavCount')) { $('agentsNavCount').textContent = apps || named || ''; $('agentsNav').title = line; $('agentsNav').setAttribute('aria-label', `${t('Agents')}: ${line}`); }
   if ($('agentsSummary')) $('agentsSummary').textContent = line;
 }
 // Claude Code on this computer: connect it from here (the service backs up its settings first).
@@ -2234,7 +2288,8 @@ $('explainClose').onclick = () => { $('explainModal').hidden = true; };
 $('explainModal').addEventListener('click', e => { if (e.target === $('explainModal')) $('explainModal').hidden = true; });
 
 // "Needs me": everything waiting for the person, across rooms and conversations, with the action at hand.
-const NEED_LABEL = { pairOffer: 'Pairing request', request: 'Held request', decision: 'Decision', key: 'Key request', task: 'Open task', keyOffer: 'Key to accept', run: 'Program asks', keyAsk: 'Key asked for', mention: 'Mention' };
+const t_ = s => t(s); // `t` is shadowed inside fillNeeds
+const NEED_LABEL = { browserAdd: 'Add a browser', pairOffer: 'Pairing request', request: 'Held request', decision: 'Decision', key: 'Key request', task: 'Open task', keyOffer: 'Key to accept', run: 'Program asks', keyAsk: 'Key asked for', mention: 'Mention' };
 // It lives in two places: the panel at the top of the Overview, and the bell (count + dropdown).
 function renderNeeds() {
   const needs = state.needsMe || [];
@@ -2271,6 +2326,7 @@ function fillNeeds(list, needs, max) {
     else if (n.kind === 'request' || n.kind === 'run' || n.kind === 'keyAsk') acts.append(button('Open', () => { closeNeedsPop(); if (n.kind === 'request') openFirewall(); else $('secretsNav').click(); }));
     else if (n.kind === 'keyOffer') acts.append(button('Open', () => { closeNeedsPop(); $('secretsNav').click(); }));
     else if (n.kind === 'pairOffer') acts.append(button('Accept', () => acceptTeamPair(n.from)), button('Ignore', () => act('POST', '/ui/team/pair/ignore', { from: n.from })));
+    else if (n.kind === 'browserAdd') { t.append(text('span', `${t_('Does it show')} ${n.code.slice(0, 3)} ${n.code.slice(3)}?`)); acts.append(button('Same code: Allow', allowBrowser), button('Different: cancel', () => act('POST', '/ui/web/confirm', { allow: false }))); }
     else if (n.kind === 'key' && n.local) acts.append(button('Add key', () => { closeNeedsPop(); $('secretsNav').click(); }), button('Open', go));
     else if (n.kind === 'key') acts.append(button('Send', async () => { if (!confirm(`Send this key to ${n.from}? It goes sealed to that device only.`)) return; try { render(await api('POST', '/ui/card/send-key', { card: n.card })); toast('Sent.'); } catch (e) { toast(e.message); } }), button('Open', go));
     else if (n.kind === 'task') acts.append(button('Claim', () => act('POST', '/ui/card', { room: n.roomId, to: n.peerId, cardUpdate: { card: n.card, action: 'claim' } })), button('Open', go));

@@ -19,7 +19,7 @@
 
 <p align="center">
   <a href="LICENSE"><img alt="License: Apache-2.0" src="https://img.shields.io/badge/license-Apache--2.0-4f6bff"></a>
-  <img alt="Version 0.16.3" src="https://img.shields.io/badge/version-0.16.3-9a5cf0">
+  <img alt="Version 0.16.4" src="https://img.shields.io/badge/version-0.16.4-9a5cf0">
   <img alt="Windows, macOS, Linux" src="https://img.shields.io/badge/runs%20on-Windows%20%7C%20macOS%20%7C%20Linux-555">
   <img alt="No runtime dependencies" src="https://img.shields.io/badge/dependencies-0-3ddc84">
   <img alt="Node.js 22+" src="https://img.shields.io/badge/node-22%2B-555">

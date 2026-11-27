@@ -50,6 +50,8 @@ document.addEventListener('visibilitychange', () => { if (document.hidden && key
 function el(tag, text, cls) { const e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
 function btn(label, fn, cls = 'btn small') { const b = el('button', label, cls); b.type = 'button'; b.addEventListener('click', fn); return b; }
 const when = iso => new Date(iso).toLocaleDateString([], { dateStyle: 'medium' });
+// 0.16.4: the header gets a hairline once the page scrolls under it.
+window.addEventListener('scroll', () => document.querySelector('.top')?.classList.toggle('scrolled', window.scrollY > 4), { passive: true });
 const chevron = () => { const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); s.setAttribute('viewBox', '0 0 24 24'); s.classList.add('chev'); s.innerHTML = '<path d="m9 6 6 6-6 6"/>'; return s; };
 function toast(msg) { const t = $('toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(() => { t.hidden = true; }, 3500); }
 function status(id, text, cls = '') { const s = $(id); s.className = `status ${cls}`.trim(); s.textContent = text; }
@@ -184,7 +186,9 @@ function renderAccount() {
   if (browserLink) {
     $('addComputer').textContent = browserLink.n || 'your computer';
     show('addForm', signed && !adding); show('addCompare', !!adding);
-    if (!signed) status('addStatus', 'Sign in first, below, with the same account as that computer.');
+    // 0.16.4: the link carries the computer's account email: fill it in, one tap sends the code.
+    if (!signed && browserLink.e && !pendingEmail && !$('email').value) $('email').value = browserLink.e;
+    if (!signed) status('addStatus', pendingEmail ? `Step 2 of 3: type the code we emailed to ${pendingEmail} (below).` : `Step 1 of 3: sign in with ${browserLink.e || 'the same account as that computer'} (below).`);
   }
   const none = !signed || !mine.length;
   show('noComputer', none);
@@ -201,9 +205,20 @@ $('codeForm').addEventListener('submit', async e => {
   try { await cloud.verifyCode(pendingEmail, $('code').value); pendingEmail = null; $('code').value = ''; status('addStatus', ''); render(); loadAll(); } catch (err) { toast(err.message); }
 });
 $('otherEmail').addEventListener('click', () => { pendingEmail = null; render(); });
+// 0.16.4: paste the whole email line ("Your code is 0581 4657") or type: digits only, and it signs in at 8.
+$('code').addEventListener('input', () => {
+  const d = $('code').value.replace(/\D/g, '').slice(0, 10);
+  if (d !== $('code').value) $('code').value = d;
+  if (d.length === 8) $('codeForm').requestSubmit();
+});
 $('signOutBtn').addEventListener('click', () => { cloud.signOut(); views.clear(); render(); });
 cloud.whenSignedOut(() => { views.clear(); render(); });
-$('browserName').value = /iPhone|iPad/.test(navigator.userAgent) ? 'iPhone browser' : /Android/.test(navigator.userAgent) ? 'Android browser' : /Mac/.test(navigator.userAgent) ? 'Mac browser' : 'Browser';
+{ // 0.16.4: a name that says which browser on which device ("Chrome on Windows").
+  const ua = navigator.userAgent;
+  const app = /Edg\//.test(ua) ? 'Edge' : /Firefox\//.test(ua) ? 'Firefox' : /Chrome\//.test(ua) ? 'Chrome' : /Safari\//.test(ua) ? 'Safari' : 'Browser';
+  const dev = /iPhone/.test(ua) ? 'iPhone' : /iPad/.test(ua) ? 'iPad' : /Android/.test(ua) ? 'Android' : /Mac/.test(ua) ? 'Mac' : /Windows/.test(ua) ? 'Windows' : /Linux/.test(ua) ? 'Linux' : '';
+  $('browserName').value = dev ? `${app} on ${dev}` : app;
+}
 $('addForm').addEventListener('submit', async e => {
   e.preventDefault();
   const name = $('browserName').value.trim().slice(0, 40) || 'Browser';
@@ -211,7 +226,7 @@ $('addForm').addEventListener('submit', async e => {
     status('addStatus', 'Asking the computer…');
     const r = await cloud.addBrowser(browserLink, name);
     adding = r; $('addDigits').textContent = r.code; render();
-    status('addStatus', 'Waiting for Allow on the computer…');
+    status('addStatus', 'Step 3 of 3: the computer shows a banner with these digits. Same digits? Press Allow there.');
     const c = await r.wait(() => adding !== r);
     adding = null; browserLink = null; status('addStatus', '');
     toast(`Added. This browser can now reach ${c.computer.name}.`); go('needs');

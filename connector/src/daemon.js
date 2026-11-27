@@ -2034,6 +2034,9 @@ export class Daemon {
       if (s.card.type === 'key' && s.state !== 'done') items.push({ kind: 'key', ...(local ? { local: true } : {}), title: `${String(s.from).replace(/^me › /, '')} needs ${s.card.name}${s.card.project ? ` (${s.card.project}${s.card.env ? `, ${s.card.env}` : ''})` : ''}`, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
       if (s.card.type === 'task' && s.state === 'open') items.push({ kind: 'task', title: s.card.title, card: id, from: s.from, at: s.at, id: m.id, ...where(m) });
     }
+    // 0.16.4: a browser waiting to be added: the person compares 6 digits and allows it (also a banner on the page).
+    const wp = this.web?.pairingView?.();
+    if (wp?.state === 'confirm') items.push({ kind: 'browserAdd', title: `${wp.browserName || 'A browser'} wants to be added to this computer`, code: wp.code, at: '9999' }); // always first
     for (const o of this.teamOffersView()) items.push({ kind: 'pairOffer', title: `${o.email || 'A teammate'} wants to pair ${o.name} with this computer`, at: o.at, from: o.from });
     for (const s of this.store.secrets().items) if (s.offered || s.pending) items.push({ kind: 'keyOffer', title: `${s.name} from ${s.from?.name || 'a device'}: ${s.offered ? 'accept it?' : 'replace yours?'}`, at: s.receivedAt, secret: s.id });
     for (const u of this.secretUsesView()) items.push({ kind: 'run', title: `${u.agent || 'An agent'} wants to run ${u.command} with ${u.names.join(', ')}`, at: u.at, use: u.id });
@@ -3150,7 +3153,12 @@ export class Daemon {
       if (host !== `127.0.0.1:${this.uiPort}` && host !== `localhost:${this.uiPort}`) throw httpError(403, 'Forbidden host');
       const origin = req.headers.origin;
       if (origin && origin !== `http://127.0.0.1:${this.uiPort}` && origin !== `http://localhost:${this.uiPort}`) throw httpError(403, 'Forbidden origin');
-      if (['cross-site', 'same-site'].includes(req.headers['sec-fetch-site'])) throw httpError(403, 'Forbidden origin');
+      // 0.16.4: a plain page load from a link elsewhere (another site, an app, an extension) is a GET
+      // navigation of the page itself: the other site can't read it or frame it, so it may open. API
+      // and page-data routes (/api/, /ui/, reports) stay same-origin only.
+      const pageLoad = req.method === 'GET' && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document'
+        && !/^\/(api|ui|audit-report)\//.test(url.pathname);
+      if (['cross-site', 'same-site'].includes(req.headers['sec-fetch-site']) && !pageLoad) throw httpError(403, 'Forbidden origin');
       if (url.pathname.startsWith('/api/')) return await this.routeApi(req, res, url);
       if (url.pathname.startsWith('/ui/')) return await this.routeUi(req, res, url);
       if (url.pathname.startsWith('/audit-report/')) return this.serveReport(res, url.pathname.slice(14));
@@ -3256,7 +3264,7 @@ export class Daemon {
       case 'POST /ui/web/start': {
         const acc = this.cloud.account();
         if (!acc?.device || !this.relayOn()) throw httpError(409, 'Sign in, link this computer and turn on the Relay first (Account): the browser reaches this computer through it.');
-        return sendJson(res, 200, state({ webPairing: this.web.start({ deviceId: this.meId, name: this.me.name, account: acc.userId, base: process.env.VINAC_WEB_BASE || 'https://vinac.tech/app/' }) }));
+        return sendJson(res, 200, state({ webPairing: this.web.start({ deviceId: this.meId, name: this.me.name, account: acc.userId, email: acc.email || null, base: process.env.VINAC_WEB_BASE || 'https://vinac.tech/app/' }) }));
       }
       case 'POST /ui/web/confirm': {
         const r = this.web.confirm(body.allow === true);
